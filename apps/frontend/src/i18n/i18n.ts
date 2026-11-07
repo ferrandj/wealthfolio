@@ -3,16 +3,22 @@ import { initReactI18next } from "react-i18next";
 import resourcesToBackend from "i18next-resources-to-backend";
 
 import { reactInterpolation } from "./interpolation";
-import { DEFAULT_LOCALE, DEFAULT_NAMESPACE, NAMESPACES, SUPPORTED_LOCALE_CODES } from "./locales";
+import {
+  DEFAULT_LOCALE,
+  DEFAULT_NAMESPACE,
+  INITIAL_LOCALE,
+  NAMESPACES,
+  SUPPORTED_LOCALE_CODES,
+} from "./locales";
 
 export const LANGUAGE_STORAGE_KEY = "wealthfolio-language";
 
 function getCachedLanguage() {
   try {
     const language = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return SUPPORTED_LOCALE_CODES.find((supported) => supported === language) ?? DEFAULT_LOCALE;
+    return SUPPORTED_LOCALE_CODES.find((supported) => supported === language) ?? INITIAL_LOCALE;
   } catch {
-    return DEFAULT_LOCALE;
+    return INITIAL_LOCALE;
   }
 }
 

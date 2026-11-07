@@ -41,8 +41,10 @@ Language is an **explicit, stored user setting** (`Settings.language`), not
 browser-detected. It is chosen during onboarding and in Settings → General, and
 persisted through the normal settings pipeline (stored per-device, like `theme`
 and `baseCurrency` — device-sync is not enabled for it). The settings provider
-applies it via `i18n.changeLanguage()` on load and on change. Default is `en`;
-missing keys in fr/de fall back to `en`.
+applies it via `i18n.changeLanguage()` on load and on change. A new profile
+starts in `fr` (`DEFAULT_UI_LANGUAGE` in `settings_model.rs` and
+`INITIAL_LOCALE` in `locales.ts`); `en` stays the fallback, so missing keys in
+other languages fall back to `en`.
 
 ## Maintenance (i18next-cli)
 

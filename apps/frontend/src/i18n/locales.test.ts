@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import i18nextConfig from "../../i18next.config";
-import { SUPPORTED_LOCALE_CODES, normalizeLocaleCode } from "./locales";
+import {
+  DEFAULT_LOCALE,
+  INITIAL_LOCALE,
+  SUPPORTED_LOCALE_CODES,
+  normalizeLocaleCode,
+} from "./locales";
 
 const catalogDirectories = Object.keys(
   import.meta.glob("./locales/*/common.json", { eager: true }),
@@ -17,6 +22,11 @@ describe("supported locales", () => {
 
   it("ships a catalog directory for every supported locale", () => {
     expect(catalogDirectories.sort()).toEqual([...SUPPORTED_LOCALE_CODES].sort());
+  });
+
+  it("starts in a supported language but keeps English as the fallback", () => {
+    expect(SUPPORTED_LOCALE_CODES).toContain(INITIAL_LOCALE);
+    expect(DEFAULT_LOCALE).toBe("en");
   });
 
   it("names Chinese variants by script, not region", () => {

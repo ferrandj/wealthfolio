@@ -27,10 +27,10 @@ services:
     restart: "no"
     user: "0:0"
     command: >
-      sh -c "mkdir -p /work/data /work/secrets
-      && { [ -s /work/secrets/secret_key ] || head -c 32 /dev/urandom | base64 > /work/secrets/secret_key; }
-      && chown 1000:1000 /work/data /work/secrets /work/secrets/secret_key
-      && chmod 700 /work/data /work/secrets && chmod 400 /work/secrets/secret_key"
+      sh -c "mkdir -p /work/data /work/secrets && { [ -s /work/secrets/secret_key ] || head -c 32
+      /dev/urandom | base64 > /work/secrets/secret_key; } && chown 1000:1000 /work/data
+      /work/secrets /work/secrets/secret_key && chmod 700 /work/data /work/secrets && chmod 400
+      /work/secrets/secret_key"
     volumes:
       - /volume1/docker/wealthfolio:/work
     cap_drop: [ALL]

@@ -14,6 +14,9 @@ pub const THEME_ID_KEY: &str = "theme_id";
 /// migration `2026-10-29-000002_signature_default_theme` stored them.
 pub const DEFAULT_THEME_ID: &str = "signature";
 pub const DEFAULT_FONT: &str = "font-sans";
+/// UI language of a new profile, before the user picks one. Must be one of
+/// `SUPPORTED_UI_LANGUAGES`. English stays the frontend's fallback for missing keys.
+pub const DEFAULT_UI_LANGUAGE: &str = "fr";
 /// Text size: a name the frontend maps to a root font size. Device-local like the
 /// theme, and the frontend shows the default size for a name it does not know.
 /// Unset until the user picks one, so the frontend can start from the device's
@@ -76,7 +79,7 @@ impl Default for Settings {
             theme: "light".to_string(),
             font: DEFAULT_FONT.to_string(),
             text_size: None,
-            language: "en".to_string(),
+            language: DEFAULT_UI_LANGUAGE.to_string(),
             formatting_region: "system".to_string(),
             currency_formatting_regions: BTreeMap::new(),
             base_currency: "".to_string(),

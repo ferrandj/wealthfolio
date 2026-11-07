@@ -467,6 +467,13 @@ mod tests {
     }
 
     #[test]
+    fn new_profiles_start_in_a_supported_ui_language() {
+        let language = Settings::default().language;
+        assert_eq!(language, "fr");
+        assert_eq!(validate_ui_language(&language).unwrap(), language);
+    }
+
+    #[test]
     fn normalizes_legacy_full_locale_to_supported_ui_language() {
         assert_eq!(normalize_ui_language("en-US"), "en");
         assert_eq!(normalize_ui_language("fr_CA"), "fr");

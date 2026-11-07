@@ -21,6 +21,11 @@ export type LocaleCode = (typeof SUPPORTED_LOCALES)[number]["code"];
 
 export const DEFAULT_LOCALE: LocaleCode = "en";
 
+// Language shown before the user has picked one (first visit, login screen). Mirrors
+// DEFAULT_UI_LANGUAGE in crates/core/src/settings/settings_model.rs. DEFAULT_LOCALE
+// stays the fallback for missing keys, because English is the source language.
+export const INITIAL_LOCALE: LocaleCode = "fr";
+
 export const SUPPORTED_LOCALE_CODES = SUPPORTED_LOCALES.map((l) => l.code);
 
 // Traditional Chinese is written in Taiwan, Hong Kong and Macau, with or without
