@@ -38,8 +38,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: "docker-compose.yml is valid and has no build: line"
-        env:
-          WF_AUTH_PASSWORD_HASH: placeholder
         run: |
           docker compose -f docker-compose.yml config -q
           docker compose -f docker-compose.yml --profile cloudflare config -q

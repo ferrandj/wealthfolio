@@ -4,11 +4,17 @@
 # (voir plus bas), puis Projet -> Créer -> choisis ce dossier (ou "docker compose up -d" en SSH).
 # Les dossiers data/ et secrets/ sont préparés tout seuls (service wealthfolio-init): rien à créer ni à chmod à la main.
 #
-# Le fichier ".env" à côté de ce fichier (le seul réglage obligatoire est le mot de passe):
-#   WF_AUTH_PASSWORD_HASH='$argon2id$v=19$m=...'      <- ENTRE APOSTROPHES (à cause des $)
+# Le fichier ".env" à côté de ce fichier. Choisis UNE des deux protections:
+#   a) Avec mot de passe (par défaut):
+#        WF_AUTH_PASSWORD_HASH='$argon2id$v=19$m=...'      <- ENTRE APOSTROPHES (à cause des $)
+#      Générer le hash (remplace le mot de passe et le sel de 16 caractères):
+#        printf 'ton-mot-de-passe' | argon2 unSelDe16caracteres -id -e
+#   b) Sans mot de passe (seulement si l'accès est protégé en amont, ex. Cloudflare Access):
+#        WF_AUTH_REQUIRED=false
+#      ATTENTION: toute personne qui atteint http://<adresse-du-nas>:10459 entre alors sans rien saisir,
+#      y compris sur ton réseau local.
+# Dans les deux cas, ajoute:
 #   WF_CORS_ALLOW_ORIGINS=https://wealthfolio.ton-domaine.xyz,http://<adresse-du-nas>:10459
-# Générer le hash (remplace le mot de passe et le sel de 16 caractères):
-#   printf 'ton-mot-de-passe' | argon2 unSelDe16caracteres -id -e
 #
 # Premier démarrage: ouvre http://<adresse-du-nas>:10459, connecte-toi avec ce mot de passe, choisis « Français »
 # à l'accueil. Ensuite, data/ est la seule source de vérité: mettre à jour ou recréer le conteneur n'y touche jamais.
@@ -59,8 +65,10 @@ services:
       WF_SECRET_KEY_FILE: "/run/secrets/secret_key"
       # Base neuve = base chiffrée (SQLCipher). Sur une base existante en clair, voir docs/self-host/README.md.
       WF_DB_REQUIRE_ENCRYPTION: "true"
-      # Obligatoire. Hash Argon2id de ton mot de passe, à mettre dans le fichier .env (voir l'en-tête).
-      WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:?Mets WF_AUTH_PASSWORD_HASH dans le fichier .env (voir l'en-tête)}"
+      # Par défaut l'app exige un mot de passe: sans WF_AUTH_PASSWORD_HASH (dans .env), le serveur refuse de démarrer.
+      # Pour n'avoir AUCUN mot de passe (protection assurée devant, par ex. Cloudflare Access): WF_AUTH_REQUIRED=false.
+      WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:-}"
+      WF_AUTH_REQUIRED: "${WF_AUTH_REQUIRED:-true}"
       WF_AUTH_TOKEN_TTL_MINUTES: "${WF_AUTH_TOKEN_TTL_MINUTES:-60}"
       # Adresses depuis lesquelles tu ouvres l'app, séparées par des virgules (sans / final). Obligatoire avec Cloudflare.
       WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-http://localhost:10459}"
