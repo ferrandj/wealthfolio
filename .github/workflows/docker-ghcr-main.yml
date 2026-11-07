@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -51,3 +51,19 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Update rolling GitHub release
+        # One release, moved to the latest main commit. The tag has no "v"
+        # prefix so release.yml and docker-publish.yml (v* tags) do not run.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/wealthfolio
+        run: |
+          gh release delete docker-latest --cleanup-tag --yes || true
+          gh release create docker-latest \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Docker image (main)" \
+            --notes "Image built from main at commit ${GITHUB_SHA}.
+
+          \`docker pull ${IMAGE}:latest\`
+          \`docker pull ${IMAGE}:sha-${GITHUB_SHA}\`"
