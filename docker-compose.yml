@@ -1,59 +1,116 @@
-# Wealthfolio - Self-contained Docker Compose (builds from this repository)
+# Wealthfolio: prêt à déployer sur le NAS. Aucun secret dans ce fichier.
 #
-# Builds the image from the local Dockerfile, so it works from a fresh clone
-# without pulling a published image. For the published image, use compose.yml.
+# Synology (Container Manager): crée le dossier /volume1/docker/wealthfolio, mets-y CE fichier et un fichier ".env"
+# (voir plus bas), puis Projet -> Créer -> choisis ce dossier (ou "docker compose up -d" en SSH).
+# Les dossiers data/ et secrets/ sont préparés tout seuls (service wealthfolio-init): rien à créer ni à chmod à la main.
 #
-# 1. Create a .env file next to this file (single-quote the hash, see README):
-#      WF_SECRET_KEY=<output of: openssl rand -base64 32>
-#      WF_AUTH_PASSWORD_HASH='$argon2id$v=19$...'
-#      WF_CORS_ALLOW_ORIGINS=http://localhost:8088
-# 2. Start:
-#      docker compose up -d --build
+# Le fichier ".env" à côté de ce fichier (le seul réglage obligatoire est le mot de passe):
+#   WF_AUTH_PASSWORD_HASH='$argon2id$v=19$m=...'      <- ENTRE APOSTROPHES (à cause des $)
+#   WF_CORS_ALLOW_ORIGINS=https://wealthfolio.ton-domaine.xyz,http://<adresse-du-nas>:10459
+# Générer le hash (remplace le mot de passe et le sel de 16 caractères):
+#   printf 'ton-mot-de-passe' | argon2 unSelDe16caracteres -id -e
 #
-# Publishes port 8088 (override with WF_PORT).
-
+# Premier démarrage: ouvre http://<adresse-du-nas>:10459, connecte-toi avec ce mot de passe, choisis « Français »
+# à l'accueil. Ensuite, data/ est la seule source de vérité: mettre à jour ou recréer le conteneur n'y touche jamais.
 services:
+  wealthfolio-init:
+    # Donne les dossiers à l'utilisateur 1000 (celui de l'app) puis s'arrête. Crée aussi la clé de chiffrement UNE
+    # seule fois (jamais écrasée) dans secrets/, volontairement séparé de data/ (une copie de data/ seule est illisible).
+    image: busybox:1.37
+    container_name: wealthfolio-init
+    restart: "no"
+    user: "0:0"
+    command: >
+      sh -c "mkdir -p /work/data /work/secrets
+      && { [ -s /work/secrets/secret_key ] || head -c 32 /dev/urandom | base64 > /work/secrets/secret_key; }
+      && chown 1000:1000 /work/data /work/secrets /work/secrets/secret_key
+      && chmod 700 /work/data /work/secrets && chmod 400 /work/secrets/secret_key"
+    volumes:
+      - /volume1/docker/wealthfolio:/work
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt:
+      - no-new-privileges:true
+
   wealthfolio:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: wealthfolio:local
+    # L'image est construite et publiée par GitHub (CI): RIEN à construire sur le NAS (pas de "build:" volontairement,
+    # il ferait chercher un Dockerfile dans ce dossier au lieu de télécharger l'image).
+    image: ghcr.io/ferrandj/wealthfolio:latest
+    # :latest = dernière version, :1 = seulement les 1.x, :1.0.3 = figé sur une version.
+    # Mise à jour: docker compose pull && docker compose up -d   (ou Watchtower, voir le label plus bas)
     container_name: wealthfolio
     restart: unless-stopped
+    depends_on:
+      wealthfolio-init:
+        condition: service_completed_successfully
     ports:
-      - "${WF_PORT:-8088}:8088"
+      # <port sur le NAS>:<port dans le conteneur, garde 8088>  ->  http://<adresse-du-nas>:10459
+      # Réseau local uniquement. N'ouvre PAS ce port sur Internet (pas de redirection sur la box): passe par Cloudflare.
+      - "10459:8088"
     volumes:
-      - wealthfolio-data:/data
+      # TOUT ce que tu crées vit dans ce dossier: la base (chiffrée), les réglages. Inclus-le dans ta sauvegarde NAS
+      # (Hyper Backup, rsync...). Garde AUSSI secrets/ (la clé) dans une sauvegarde, mais séparée de data/.
+      - /volume1/docker/wealthfolio/data:/data
+      - /volume1/docker/wealthfolio/secrets:/run/secrets:ro
     environment:
+      TZ: Europe/Paris
       WF_LISTEN_ADDR: "0.0.0.0:8088"
       WF_DB_PATH: "/data/wealthfolio.db"
-      # Required: the server refuses to start without a secret key.
-      WF_SECRET_KEY: "${WF_SECRET_KEY:?Set WF_SECRET_KEY in .env (openssl rand -base64 32)}"
-      # Required when listening on 0.0.0.0: Argon2id PHC hash of the login password.
-      WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:?Set WF_AUTH_PASSWORD_HASH in .env}"
+      WF_SECRET_KEY_FILE: "/run/secrets/secret_key"
+      # Base neuve = base chiffrée (SQLCipher). Sur une base existante en clair, voir docs/self-host/README.md.
+      WF_DB_REQUIRE_ENCRYPTION: "true"
+      # Obligatoire. Hash Argon2id de ton mot de passe, à mettre dans le fichier .env (voir l'en-tête).
+      WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:?Mets WF_AUTH_PASSWORD_HASH dans le fichier .env (voir l'en-tête)}"
       WF_AUTH_TOKEN_TTL_MINUTES: "${WF_AUTH_TOKEN_TTL_MINUTES:-60}"
-      # Must match the origin you open in the browser.
-      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-http://localhost:8088}"
-      WF_REQUEST_TIMEOUT_MS: "${WF_REQUEST_TIMEOUT_MS:-30000}"
+      # Adresses depuis lesquelles tu ouvres l'app, séparées par des virgules (sans / final). Obligatoire avec Cloudflare.
+      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-http://localhost:10459}"
     healthcheck:
       test:
         ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8088/api/v1/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
+      start_period: 20s
+    # Durcissement
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
+    labels:
+      # Permet à Watchtower (si tu l'utilises) de mettre à jour ce conteneur automatiquement.
+      - com.centurylinklabs.watchtower.enable=true
+
+  # --- Cloudflare (optionnel) -------------------------------------------------------------------------------
+  # Tunnel Cloudflare: l'app est joignable en HTTPS sur ton domaine SANS ouvrir de port sur la box.
+  # 1. Cloudflare Zero Trust -> Networks -> Tunnels -> crée un tunnel, copie son jeton.
+  # 2. Ajoute dans .env:   CLOUDFLARE_TUNNEL_TOKEN=<le jeton>      (et WF_CORS_ALLOW_ORIGINS=https://ton-domaine, voir plus haut)
+  # 3. Dans le tunnel, "Public hostname": ton-domaine -> Service  http://wealthfolio:8088
+  # 4. Démarre avec le profil:   docker compose --profile cloudflare up -d
+  # 5. Recommandé: protège ce domaine avec une application Cloudflare Access (qui peut se connecter), EN PLUS du mot de passe.
+  cloudflared:
+    profiles: ["cloudflare"]
+    image: cloudflare/cloudflared:2026.10.7
+    container_name: wealthfolio-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN:-}"
+    depends_on:
+      wealthfolio:
+        condition: service_healthy
+    cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
     read_only: true
-    tmpfs:
-      - /tmp:size=64M
-
-volumes:
-  wealthfolio-data:
-    driver: local
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }

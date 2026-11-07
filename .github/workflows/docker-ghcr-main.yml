@@ -1,69 +1,165 @@
-name: Docker (GHCR, main)
+name: Release and publish image (GHCR)
 
-# Builds the image from main and publishes it to this repository owner's GHCR
-# namespace (ghcr.io/<owner>/wealthfolio). Uses only the built-in GITHUB_TOKEN:
-# no Docker Hub credentials or other secrets are needed. Release tags keep
-# using docker-publish.yml.
+# Every push to main becomes a new GitHub Release (v1.0.0, v1.0.1, ...) and a new
+# multi-arch image on ghcr.io/<owner>/wealthfolio with matching tags. Same scheme as
+# the other self-hosted apps: the NAS only pulls the image, it never builds.
+#
+# Version bump: patch by default. Put [minor] or [major] in the first line of the
+# commit message, or run this workflow manually and choose the bump.
+#
+# Only the built-in GITHUB_TOKEN is used: no Docker Hub credentials or other secrets.
+# Tags created with GITHUB_TOKEN do not start other workflows, so release.yml and
+# docker-publish.yml (which listen to v* tags) are not triggered by these releases.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump for the new release
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 concurrency:
   group: docker-ghcr-main
-  cancel-in-progress: true
+  # Never cancel a release in progress (queued runs keep versions in order).
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  publish:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    permissions:
-      contents: write
-      packages: write
+  # The deployment file must stay pullable on a NAS folder that holds only that file.
+  compose:
+    name: Deployment file is valid
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: "docker-compose.yml is valid and has no build: line"
+        env:
+          WF_AUTH_PASSWORD_HASH: placeholder
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.yml --profile cloudflare config -q
+          if docker compose -f docker-compose.yml config | grep -qE '^\s+build:'; then
+            echo 'docker-compose.yml must not contain build:'; exit 1
+          fi
+
+  image:
+    needs: compose
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write # create the tag and release
+      packages: write # push to ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name (must be lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Work out the version
+        id: ver
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          INPUT_BUMP: ${{ inputs.bump }}
+        run: |
+          git fetch --tags --force --quiet origin
+          existing=$(git tag --points-at "$GITHUB_SHA" --list 'v[0-9]*.[0-9]*.[0-9]*' | head -n1)
+          if [ -n "$existing" ]; then
+            v="${existing#v}"   # re-run of a commit that was already released: keep its version
+          else
+            last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+            title="${COMMIT_MSG%%$'\n'*}"
+            bump=patch
+            case "$title" in *'[major]'*) bump=major;; *'[minor]'*) bump=minor;; esac
+            if [ -n "$INPUT_BUMP" ]; then bump="$INPUT_BUMP"; fi
+            if [ -z "$last" ]; then
+              v=1.0.0
+            else
+              IFS=. read -r ma mi pa <<< "${last#v}"
+              case "$bump" in
+                major) ma=$((ma+1)); mi=0; pa=0;;
+                minor) mi=$((mi+1)); pa=0;;
+                *) pa=$((pa+1));;
+              esac
+              v="$ma.$mi.$pa"
+            fi
+          fi
+          IFS=. read -r ma mi pa <<< "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "major=$ma" >> "$GITHUB_OUTPUT"
+          echo "minor=$mi" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$v"
+
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - name: Log into GHCR
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Image metadata
+
+      - name: Tags and labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/wealthfolio
+          images: ${{ env.IMAGE }}
           tags: |
             type=raw,value=latest
-            type=sha,format=long
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.major }}.${{ steps.ver.outputs.minor }}
+            type=raw,value=${{ steps.ver.outputs.major }}
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=Wealthfolio
+            org.opencontainers.image.description=Self-hosted portfolio tracker
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Update rolling GitHub release
-        # One release, moved to the latest main commit. The tag has no "v"
-        # prefix so release.yml and docker-publish.yml (v* tags) do not run.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMAGE: ghcr.io/${{ github.repository_owner }}/wealthfolio
-        run: |
-          gh release delete docker-latest --cleanup-tag --yes || true
-          gh release create docker-latest \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "Docker image (main)" \
-            --notes "Image built from main at commit ${GITHUB_SHA}.
+          # Plain manifests keep NAS container UIs happy (no extra attestation entries).
+          provenance: false
+          sbom: false
 
-          \`docker pull ${IMAGE}:latest\`
-          \`docker pull ${IMAGE}:sha-${GITHUB_SHA}\`"
+      # Only after the image is safely pushed, so a release never points at a missing image.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          MAJOR: ${{ steps.ver.outputs.major }}
+          MINOR: ${{ steps.ver.outputs.minor }}
+        run: |
+          # One-time cleanup of the earlier rolling release; harmless once it is gone.
+          gh release delete docker-latest --cleanup-tag --yes >/dev/null 2>&1 || true
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists"
+            exit 0
+          fi
+          {
+            echo '## Docker image'
+            echo
+            echo '```sh'
+            echo "docker pull $IMAGE:$VERSION"
+            echo '```'
+            echo
+            echo "Tags: \`$VERSION\`, \`$MAJOR.$MINOR\`, \`$MAJOR\`, \`latest\` (linux/amd64, linux/arm64)."
+            echo
+            echo "Your data lives in the mounted \`/data\` folder and is never touched by an update."
+            echo
+          } > release-header.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file release-header.md --generate-notes --latest
