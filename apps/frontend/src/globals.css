@@ -881,11 +881,14 @@ body.qr-scan-active > .qr-overlay {
     overflow-wrap: break-word;
   }
 
-  /* Ensure grid and flex containers don't overflow */
+  /* Ensure grid and flex containers don't overflow. `clip` cuts like `hidden` but does not make
+     the box a scroll container, so the other axis stays `visible` instead of computing to `auto`:
+     with `hidden`, every flex row (each toolbar button with an enlarged touch area) became a
+     draggable scroller and, on browsers that always show scrollbars, painted an empty track. */
   .grid,
   .flex {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* Centred dialogs and side sheets size themselves with max-w-* utilities.
