@@ -23,6 +23,7 @@ import {
 import { DEFAULT_PROFILE_AVATAR, ProfileAvatar } from "./profile-avatar";
 import { ProfileAvatarPicker } from "./profile-avatar-picker";
 import { ProfileStartupRecovery } from "./profile-startup-recovery";
+import { ResetProfileButton } from "./reset-profile-button";
 import "./profile-shell.css";
 import { ProfileContext } from "./profile-context";
 import {
@@ -436,8 +437,8 @@ export function ProfileShell({ children }: { children: ReactNode }) {
     proof: string,
     retry = false,
     target = selected,
-  ) {
-    if (!target || working.current) return;
+  ): Promise<boolean> {
+    if (!target || working.current) return false;
     setSelected(target);
     working.current = true;
     epoch.current += 1;
@@ -464,6 +465,7 @@ export function ProfileShell({ children }: { children: ReactNode }) {
       setCovered(true);
       setMode("choose");
       setPhase("locked");
+      return true;
     } catch (cause) {
       setError(String(cause).replace(/^Error:\s*/, ""));
       // Validation errors leave the profile intact and allow correction.
@@ -477,10 +479,26 @@ export function ProfileShell({ children }: { children: ReactNode }) {
         revokeProfileSession();
         setPhase("deleting");
       }
+      return false;
     } finally {
       working.current = false;
       setBusy(false);
     }
+  }
+  // Starts over: deleting the profile removes its database, backups, add-ons and credentials,
+  // then a fresh profile with the same name and avatar is created and opened on the welcome screen.
+  async function resetProfile(target: ProfileSummary) {
+    if (working.current || !(await deleteProfile(target.name, "", false, target))) return;
+    await run(async () => {
+      const { recoveryCode: _noPassword, ...created } = await profileCommand<
+        ProfileSummary & { recoveryCode: string | null }
+      >("create_profile", { name: target.name, avatarId: target.avatarId, password: null });
+      intent.current = "switch";
+      setSelected(created);
+      setState((old) => (old ? { ...old, profiles: [...old.profiles, created] } : old));
+      rememberOpeningProfile(created);
+      await unlock(created.id, "", created);
+    });
   }
   if (phase === "deleting")
     return (
@@ -1186,6 +1204,23 @@ export function ProfileShell({ children }: { children: ReactNode }) {
             {isProfileEditor && <ProfileAvatarPicker value={avatar} onChange={setAvatar} />}
             {formActions}
             {formError}
+            {mode === "manage" && selected && (
+              <section className="border-destructive/25 space-y-2 border-t pt-6">
+                <h2 className="font-medium">{t("profiles.resetDataTitle")}</h2>
+                <p className="text-muted-foreground text-sm">
+                  {t(
+                    selected.lockEnabled ? "profiles.resetDataProtected" : "profiles.resetDataHelp",
+                  )}
+                </p>
+                {/* Deleting a protected profile asks for its password, so only unprotected ones reset here. */}
+                {!selected.lockEnabled && (
+                  <ResetProfileButton
+                    disabled={busy}
+                    onConfirm={() => void resetProfile(selected)}
+                  />
+                )}
+              </section>
+            )}
             {mode === "manage" && (
               <section className="border-destructive/25 space-y-2 border-t pt-6">
                 <h2 className="font-medium">{t("profiles.delete")}</h2>
