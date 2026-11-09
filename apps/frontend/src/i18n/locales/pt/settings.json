@@ -1364,6 +1364,10 @@
       "budget_write": {
         "label": "Gerir orçamentos",
         "description": "Alterar orçamentos predefinidos e mensais, grupos, reservas e saldos transitados. Requer Ver despesas."
+      },
+      "accounts_write": {
+        "label": "Gerir contas",
+        "description": "Criar contas e editar o nome, o grupo e o estado ativo ou arquivado. Requer a leitura de contas."
       }
     },
     "preset": {
@@ -1381,6 +1385,7 @@
     "pat_scope_custom_other": "Personalizado · {{count}} escopos",
     "pat_scope_custom_many": "Personalizado · {{count}} escopos",
     "scope_locked_spending_title": "Necessário para Organizar despesas ou Gerir orçamentos",
+    "scope_locked_accounts_title": "Necessário para Gerir contas",
     "dialog_presets": "Predefinições de acesso",
     "edit_permissions": "Editar permissões",
     "edit_title": "Permissões de {{name}}",

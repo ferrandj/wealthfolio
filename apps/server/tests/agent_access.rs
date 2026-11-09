@@ -520,6 +520,7 @@ async fn mcp_write_scoped_token_sees_write_tools() {
             "classification:write",
             "spending:write",
             "budget:write",
+            "accounts:write",
             "market-data:write",
         ])
         .collect();
@@ -530,7 +531,7 @@ async fn mcp_write_scoped_token_sees_write_tools() {
     )
     .await;
     assert_eq!(status, 201);
-    assert_eq!(created["scopes"].as_array().unwrap().len(), 15);
+    assert_eq!(created["scopes"].as_array().unwrap().len(), 16);
     let pat = created["token"].as_str().unwrap().to_string();
 
     let session = mcp_initialize(&server, &pat).await;
@@ -547,8 +548,8 @@ async fn mcp_write_scoped_token_sees_write_tools() {
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
         tools.len(),
-        69,
-        "full-scope token must see all 69 tools: {names:?}"
+        71,
+        "full-scope token must see all 71 tools: {names:?}"
     );
     for name in [
         "list_categorization_rules",
@@ -562,6 +563,8 @@ async fn mcp_write_scoped_token_sees_write_tools() {
         "commit_activity_updates",
         "prepare_activity_deletions",
         "commit_activity_deletions",
+        "create_account",
+        "update_account",
     ] {
         assert!(names.contains(&name), "{name} visible");
     }
@@ -591,6 +594,197 @@ async fn mcp_write_scoped_token_sees_write_tools() {
         names.contains(&"commit_asset_classification_draft"),
         "classification commit tool visible"
     );
+}
+
+/// A token can create an account over MCP, import into it, and rename it, while
+/// a token without `accounts:write` neither sees nor can call the tools.
+#[tokio::test]
+async fn mcp_creates_and_manages_an_account_then_imports_into_it() {
+    let server = spawn_server(true, false).await;
+    let cookie = login(&server).await;
+
+    let (status, reader) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({ "name": "reader", "scopes": READ_ONLY_SCOPES }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let reader_pat = reader["token"].as_str().unwrap();
+    let reader_session = mcp_initialize(&server, reader_pat).await;
+    let listed = mcp_post(
+        &server,
+        Some(reader_pat),
+        Some(&reader_session),
+        serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
+    )
+    .await;
+    let listed = parse_sse_data(&listed.text().await.unwrap());
+    let reader_tools: Vec<&str> = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert!(!reader_tools.contains(&"create_account"));
+    assert!(!reader_tools.contains(&"update_account"));
+    let denied = mcp_call_tool_error(
+        &server,
+        reader_pat,
+        &reader_session,
+        "create_account",
+        serde_json::json!({ "name": "Nope", "accountType": "CASH", "currency": "EUR" }),
+    )
+    .await;
+    assert!(denied.contains("accounts:write"), "{denied}");
+
+    // `accounts:write` alone is not a valid grant: reading accounts is required.
+    let (status, _) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({ "name": "no read", "scopes": ["accounts:write"] }),
+    )
+    .await;
+    assert_eq!(status, 400);
+
+    let (status, token) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({
+            "name": "account manager",
+            "scopes": ["accounts:read", "accounts:write", "activities:read",
+                       "activities:draft", "activities:write"]
+        }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let pat = token["token"].as_str().unwrap();
+    let session = mcp_initialize(&server, pat).await;
+
+    let created = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "create_account",
+        serde_json::json!({ "name": "Boursorama", "accountType": "CASH", "currency": "eur" }),
+    )
+    .await;
+    assert_eq!(created["status"], "created");
+    let account = &created["account"];
+    assert_eq!(account["currency"], "EUR");
+    assert_eq!(account["accountType"], "CASH");
+    assert_eq!(account["trackingMode"], "TRANSACTIONS");
+    assert_eq!(account["group"], "Cash");
+    let account_id = account["id"].as_str().unwrap().to_string();
+
+    let accounts = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "get_accounts",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(accounts["count"], 1, "{accounts}");
+    assert_eq!(accounts["accounts"][0]["id"], account_id.as_str());
+
+    // A retry with the same name must not leave a second account behind.
+    let duplicate = mcp_call_tool_error(
+        &server,
+        pat,
+        &session,
+        "create_account",
+        serde_json::json!({ "name": "boursorama", "accountType": "CASH", "currency": "EUR" }),
+    )
+    .await;
+    assert!(duplicate.contains("already exists"), "{duplicate}");
+    let accounts = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "get_accounts",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(accounts["count"], 1, "{accounts}");
+
+    // The account is usable right away: import a statement line into it.
+    let rows = serde_json::json!([
+        { "accountId": account_id, "date": "2020-11-10", "activityType": "DEPOSIT",
+          "currency": "EUR", "amount": 2200 },
+        { "accountId": account_id, "date": "2020-11-23", "activityType": "WITHDRAWAL",
+          "currency": "EUR", "amount": 94.4 }
+    ]);
+    let preview = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "prepare_activity_import",
+        serde_json::json!({ "activities": rows.clone() }),
+    )
+    .await;
+    assert_eq!(preview["summary"]["valid"], 2, "{preview}");
+    let committed = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "commit_activity_import",
+        serde_json::json!({ "activities": rows }),
+    )
+    .await;
+    assert_eq!(committed["summary"]["imported"], 2, "{committed}");
+
+    // Only the passed fields change; the account keeps its type, currency and id.
+    let updated = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "update_account",
+        serde_json::json!({ "accountId": account_id, "name": "Boursorama (courant)", "group": "Banques" }),
+    )
+    .await;
+    assert_eq!(updated["status"], "updated");
+    assert_eq!(updated["account"]["name"], "Boursorama (courant)");
+    assert_eq!(updated["account"]["group"], "Banques");
+    assert_eq!(updated["account"]["currency"], "EUR");
+    assert_eq!(updated["account"]["accountType"], "CASH");
+    assert_eq!(updated["account"]["isActive"], true);
+
+    // Archiving hides it from the active list; restoring it brings its activities back.
+    mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "update_account",
+        serde_json::json!({ "accountId": account_id, "isArchived": true }),
+    )
+    .await;
+    let accounts = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "get_accounts",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(accounts["count"], 0, "{accounts}");
+    let restored = mcp_call_tool(
+        &server,
+        pat,
+        &session,
+        "update_account",
+        serde_json::json!({ "accountId": account_id, "isArchived": false }),
+    )
+    .await;
+    assert_eq!(restored["account"]["name"], "Boursorama (courant)");
+    let stored = api_post(
+        &server,
+        &cookie,
+        "activities/search",
+        serde_json::json!({ "page": 0, "pageSize": 10, "accountIdFilter": account_id }),
+    )
+    .await;
+    assert_eq!(stored["data"].as_array().unwrap().len(), 2, "{stored}");
 }
 
 /// Exercise the actual MCP tools, shared resolver, writer and SQLite storage.

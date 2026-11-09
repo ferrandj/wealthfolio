@@ -1364,6 +1364,10 @@
       "budget_write": {
         "label": "Gérer les budgets",
         "description": "Modifier les budgets par défaut et mensuels, groupes, réserves et reports. Nécessite la consultation des dépenses."
+      },
+      "accounts_write": {
+        "label": "Gérer les comptes",
+        "description": "Créer des comptes et modifier leur nom, groupe et état actif ou archivé. Nécessite la lecture des comptes."
       }
     },
     "preset": {
@@ -1381,6 +1385,7 @@
     "pat_scope_custom_other": "Personnalisé · {{count}} portées",
     "pat_scope_custom_many": "Personnalisé · {{count}} portées",
     "scope_locked_spending_title": "Requis pour organiser les dépenses ou gérer les budgets",
+    "scope_locked_accounts_title": "Requis pour gérer les comptes",
     "dialog_presets": "Préréglages d’accès",
     "edit_permissions": "Modifier les droits",
     "edit_title": "Droits de {{name}}",

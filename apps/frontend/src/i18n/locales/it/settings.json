@@ -1364,6 +1364,10 @@
       "budget_write": {
         "label": "Gestisci budget",
         "description": "Modifica budget predefiniti e mensili, gruppi, riserve e riporti. Richiede Visualizza spese."
+      },
+      "accounts_write": {
+        "label": "Gestisci conti",
+        "description": "Crea conti e modifica nome, gruppo e stato attivo o archiviato. Richiede la lettura dei conti."
       }
     },
     "preset": {
@@ -1381,6 +1385,7 @@
     "pat_scope_custom_many": "Personalizzato · {{count}} ambiti",
     "pat_scope_custom_other": "Personalizzato · {{count}} ambiti",
     "scope_locked_spending_title": "Richiesto da Organizza spese o Gestisci budget",
+    "scope_locked_accounts_title": "Richiesto da Gestisci conti",
     "dialog_presets": "Preimpostazioni di accesso",
     "edit_permissions": "Modifica autorizzazioni",
     "edit_title": "Autorizzazioni per {{name}}",

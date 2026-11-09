@@ -1284,6 +1284,10 @@
       "budget_write": {
         "label": "Manage budgets",
         "description": "Change default and monthly budgets, groups, buffers, and rollovers. Requires View spending."
+      },
+      "accounts_write": {
+        "label": "Manage accounts",
+        "description": "Create accounts and edit their name, group, and active or archived state. Requires the accounts read scope."
       }
     },
     "preset": {
@@ -1300,6 +1304,7 @@
     "pat_scope_custom_one": "Custom · {{count}} scope",
     "pat_scope_custom_other": "Custom · {{count}} scopes",
     "scope_locked_spending_title": "Required by Organize spending or Manage budgets",
+    "scope_locked_accounts_title": "Required by Manage accounts",
     "dialog_presets": "Access presets",
     "edit_permissions": "Edit permissions",
     "edit_title": "Permissions for {{name}}",

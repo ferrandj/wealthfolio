@@ -36,7 +36,7 @@ impl AgentToolCatalog {
     }
 
     /// The MCP catalog: read + draft/suggest + commit, categorization rule,
-    /// import, transfer linking, quote import and activity update tools. Scope filtering at the
+    /// import, transfer linking, quote import, activity update and account management tools. Scope filtering at the
     /// boundary (`execute`, `list_tools`) hides whatever a token can't reach.
     pub fn mcp_catalog() -> Self {
         let mut tools = crate::tools::v1_read_tools();
@@ -49,6 +49,7 @@ impl AgentToolCatalog {
         tools.extend(crate::tools::quote_import_tools());
         tools.extend(crate::tools::activity_update_tools());
         tools.extend(crate::tools::transaction_category_tools());
+        tools.extend(crate::tools::account_management_tools());
         Self::new(tools)
     }
 
@@ -669,6 +670,42 @@ mod tests {
         assert!(names.contains(&"commit_activity_deletions"));
         // The shared v1 read catalog stays unchanged; category management is MCP-only.
         assert_eq!(crate::tools::v1_read_tools().len(), 16);
+    }
+
+    #[tokio::test]
+    async fn account_management_is_mcp_only_and_needs_accounts_write() {
+        let catalog = AgentToolCatalog::mcp_catalog();
+        let assistant = AgentToolCatalog::assistant_catalog();
+        for name in ["create_account", "update_account"] {
+            let tool = catalog.get(name).expect("published tool");
+            assert_eq!(tool.access_level(), crate::AgentToolAccess::Write);
+            assert!(
+                assistant.get(name).is_none(),
+                "{name} stays out of the assistant"
+            );
+            // Every other write scope and the read-only preset are insufficient.
+            for scopes in [
+                vec![],
+                vec!["accounts:read"],
+                vec!["accounts:write"],
+                vec!["activities:read", "activities:draft", "activities:write"],
+                vec!["spending:read", "spending:write", "budget:write"],
+            ] {
+                let error = catalog
+                    .execute(
+                        Arc::new(PanicEnv::default()),
+                        &AgentScopeSet::from_strs(scopes.clone()),
+                        name,
+                        serde_json::json!({}),
+                    )
+                    .await
+                    .unwrap_err();
+                assert!(
+                    matches!(error, AgentToolError::ScopeDenied { .. }),
+                    "{name} with {scopes:?}: {error}"
+                );
+            }
+        }
     }
 
     #[tokio::test]

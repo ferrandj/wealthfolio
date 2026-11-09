@@ -1308,6 +1308,10 @@
       "budget_write": {
         "label": "管理预算",
         "description": "更改默认和月度预算、分组、缓冲金额及结转。需要查看支出权限。"
+      },
+      "accounts_write": {
+        "label": "管理账户",
+        "description": "创建账户并编辑其名称、分组以及启用或归档状态。需要账户读取权限。"
       }
     },
     "preset": {
@@ -1323,6 +1327,7 @@
     "hero_aria": "AI 代理访问状态",
     "pat_scope_custom_other": "自定义 · {{count}} 个作用域",
     "scope_locked_spending_title": "整理支出或管理预算所必需",
+    "scope_locked_accounts_title": "管理账户所必需",
     "dialog_presets": "访问权限预设",
     "edit_permissions": "编辑权限",
     "edit_title": "{{name}} 的权限",

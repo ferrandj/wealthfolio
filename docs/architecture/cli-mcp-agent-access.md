@@ -773,13 +773,21 @@ Rules:
   write/import tools redact their `activities`/row arguments to a count
   (`"[N rows]"`) via per-tool audit sanitization.
 - Activity writes go through existing activity services and validation.
+- Account writes (`create_account`, `update_account`) go through the core
+  account service, so validation, FX pair registration and domain events match
+  the Accounts settings page. They are single-step tools without a draft, gated
+  by `accounts:write` (which itself requires `accounts:read`). Creation only
+  adds and refuses a name already in use, so a retried call cannot duplicate an
+  account. Updates change only the fields passed; type, currency, tracking mode
+  and broker links stay as stored. Deleting an account is not offered.
 - Suggestions return proposed assignments and rationale; agents never directly
   alter allocation semantics.
 
 ### Deferred Indefinitely
 
-Classification writes, taxonomy create/edit/delete, activity/account deletion,
-backups, secrets, addon install, device pairing.
+Classification writes, taxonomy create/edit/delete, activity/account deletion
+(account creation and edits ship under `accounts:write`), backups, secrets,
+addon install, device pairing.
 
 ## Scope Model
 
@@ -840,6 +848,8 @@ budget:write             budget management (also requires spending:read;
                          independent of spending:write)
 market-data:write        prepare_quote_import, commit_quote_import
                          (each also requires holdings:read)
+accounts:write           create_account, update_account
+                         (each also requires accounts:read)
 ```
 
 Spending tools no longer accept `classification:*` or `activities:read` as a
@@ -859,8 +869,9 @@ Dependency rules: `activities:write` requires `activities:draft`, and
 `classification:write` requires `classification:suggest` (you cannot commit
 without the matching draft/suggest capability). `market-data:write` requires
 `holdings:read`: both quote tools return stored quotes, so the scope reaches no
-tool without it. Token creation validates this, and no preset grants
-`market-data:write`.
+tool without it. `accounts:write` requires `accounts:read` for the same reason.
+Token creation validates this, and no preset grants `market-data:write` or
+`accounts:write`.
 
 Presets (`AgentScopeSet` constructors):
 

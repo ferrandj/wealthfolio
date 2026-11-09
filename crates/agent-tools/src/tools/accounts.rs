@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use wealthfolio_core::accounts::TrackingMode;
+use wealthfolio_core::accounts::{Account, TrackingMode};
 
 use crate::constants::MAX_ACCOUNTS;
 use crate::env::AgentEnvironment;
@@ -38,6 +38,22 @@ pub struct AccountDto {
     /// Sync provider for broker-connected accounts; absent for manual ones.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+}
+
+impl From<Account> for AccountDto {
+    fn from(account: Account) -> Self {
+        Self {
+            id: account.id,
+            name: account.name,
+            account_type: account.account_type,
+            currency: account.currency,
+            is_active: account.is_active,
+            tracking_mode: account.tracking_mode,
+            group: account.group,
+            is_default: account.is_default,
+            provider: account.provider,
+        }
+    }
 }
 
 /// Output envelope for accounts tool.
@@ -103,17 +119,7 @@ impl AgentTool for GetAccounts {
         let accounts_dto: Vec<AccountDto> = accounts
             .into_iter()
             .take(MAX_ACCOUNTS)
-            .map(|a| AccountDto {
-                id: a.id,
-                name: a.name,
-                account_type: a.account_type,
-                currency: a.currency,
-                is_active: a.is_active,
-                tracking_mode: a.tracking_mode,
-                group: a.group,
-                is_default: a.is_default,
-                provider: a.provider,
-            })
+            .map(AccountDto::from)
             .collect();
 
         let returned_count = accounts_dto.len();

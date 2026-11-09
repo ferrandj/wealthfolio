@@ -261,8 +261,8 @@ mod tests {
     /// MCP write tools that only add data. Every other write tool changes or
     /// removes existing data: creating or importing activities can rewrite an
     /// asset's quote mode and that day's manual quote, and linking transfers
-    /// rewrites both legs.
-    const ADDITIVE_TOOLS: &[&str] = &["commit_categorization_rule"];
+    /// rewrites both legs. `create_account` only adds a new account.
+    const ADDITIVE_TOOLS: &[&str] = &["commit_categorization_rule", "create_account"];
 
     #[test]
     fn mcp_catalog_labels_each_tool_read_only_or_write() {

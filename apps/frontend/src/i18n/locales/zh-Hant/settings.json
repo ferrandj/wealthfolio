@@ -1325,6 +1325,10 @@
       "budget_write": {
         "label": "管理預算",
         "description": "變更預設和每月預算、群組、緩衝金額及結轉。需要查看支出權限。"
+      },
+      "accounts_write": {
+        "label": "管理帳戶",
+        "description": "建立帳戶並編輯其名稱、群組以及啟用或封存狀態。需要帳戶讀取權限。"
       }
     },
     "preset": {
@@ -1341,6 +1345,7 @@
     "pat_scope_custom_other": "自訂 · {{count}} 個範圍",
     "pat_scope_custom_one": "自訂 · {{count}} 個範圍",
     "scope_locked_spending_title": "整理支出或管理預算所必需",
+    "scope_locked_accounts_title": "管理帳戶所必需",
     "dialog_presets": "存取權限預設",
     "edit_permissions": "編輯權限",
     "edit_title": "{{name}} 的權限",

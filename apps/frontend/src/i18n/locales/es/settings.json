@@ -1364,6 +1364,10 @@
       "budget_write": {
         "label": "Gestionar presupuestos",
         "description": "Modificar presupuestos predeterminados y mensuales, grupos, reservas y saldos transferidos. Requiere Ver gastos."
+      },
+      "accounts_write": {
+        "label": "Gestionar cuentas",
+        "description": "Crear cuentas y editar su nombre, grupo y estado activo o archivado. Requiere la lectura de cuentas."
       }
     },
     "preset": {
@@ -1381,6 +1385,7 @@
     "pat_scope_custom_other": "Personalizado · {{count}} ámbitos",
     "pat_scope_custom_many": "Personalizado · {{count}} ámbitos",
     "scope_locked_spending_title": "Necesario para Organizar gastos o Gestionar presupuestos",
+    "scope_locked_accounts_title": "Necesario para Gestionar cuentas",
     "dialog_presets": "Preajustes de acceso",
     "edit_permissions": "Editar permisos",
     "edit_title": "Permisos de {{name}}",

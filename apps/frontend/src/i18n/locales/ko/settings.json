@@ -1308,6 +1308,10 @@
       "budget_write": {
         "label": "예산 관리",
         "description": "기본 및 월별 예산, 그룹, 여유 자금 및 이월을 변경합니다. 지출 보기가 필요합니다."
+      },
+      "accounts_write": {
+        "label": "계좌 관리",
+        "description": "계좌를 만들고 이름, 그룹, 활성/보관 상태를 편집합니다. 계좌 읽기 권한이 필요합니다."
       }
     },
     "preset": {
@@ -1323,6 +1327,7 @@
     "hero_aria": "AI 에이전트 접근 상태",
     "pat_scope_custom_other": "사용자 지정 · 범위 {{count}}개",
     "scope_locked_spending_title": "지출 정리 또는 예산 관리에 필요",
+    "scope_locked_accounts_title": "계좌 관리에 필요",
     "dialog_presets": "접근 권한 프리셋",
     "edit_permissions": "권한 편집",
     "edit_title": "{{name}}의 권한",

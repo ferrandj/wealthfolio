@@ -1308,6 +1308,10 @@
       "budget_write": {
         "label": "予算を管理",
         "description": "デフォルト予算と月別予算、グループ、予備費、繰越を変更します。「支出を表示」が必要です。"
+      },
+      "accounts_write": {
+        "label": "口座を管理",
+        "description": "口座の作成と、名前・グループ・有効/アーカイブ状態の編集。口座の読み取り権限が必要です。"
       }
     },
     "preset": {
@@ -1323,6 +1327,7 @@
     "hero_aria": "AIエージェントアクセスの状態",
     "pat_scope_custom_other": "カスタム · {{count}}個のスコープ",
     "scope_locked_spending_title": "「支出を整理」または「予算を管理」に必要",
+    "scope_locked_accounts_title": "「口座を管理」に必要",
     "dialog_presets": "アクセスのプリセット",
     "edit_permissions": "権限を編集",
     "edit_title": "{{name}} の権限",

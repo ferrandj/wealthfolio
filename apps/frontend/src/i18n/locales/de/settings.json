@@ -1325,6 +1325,10 @@
       "budget_write": {
         "label": "Budgets verwalten",
         "description": "Standard- und Monatsbudgets, Gruppen, Puffer und Überträge ändern. Erfordert Ausgaben ansehen."
+      },
+      "accounts_write": {
+        "label": "Konten verwalten",
+        "description": "Konten anlegen und deren Namen, Gruppe sowie aktiven oder archivierten Status ändern. Erfordert das Lesen von Konten."
       }
     },
     "preset": {
@@ -1341,6 +1345,7 @@
     "pat_scope_custom_one": "Benutzerdefiniert · {{count}} Berechtigung",
     "pat_scope_custom_other": "Benutzerdefiniert · {{count}} Berechtigungen",
     "scope_locked_spending_title": "Für Ausgaben organisieren oder Budgets verwalten erforderlich",
+    "scope_locked_accounts_title": "Für Konten verwalten erforderlich",
     "dialog_presets": "Zugriffsvorlagen",
     "edit_permissions": "Berechtigungen bearbeiten",
     "edit_title": "Berechtigungen für {{name}}",

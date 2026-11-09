@@ -15,6 +15,12 @@ describe("Spending permission composition", () => {
       "classification:write",
     ]);
   });
+  it("requires reading accounts to manage them and keeps it out of every preset", () => {
+    expect(applyScopeDependencies(["accounts:write"])).toEqual(["accounts:read", "accounts:write"]);
+    for (const preset of SCOPE_PRESETS) {
+      expect(preset.scopes).not.toContain("accounts:write");
+    }
+  });
   it("does not interpret legacy read tokens as broader new presets", () => {
     const legacy = READ_SCOPES.filter((scope) => scope !== "spending:read");
     expect(matchPreset(legacy)).toBeUndefined();

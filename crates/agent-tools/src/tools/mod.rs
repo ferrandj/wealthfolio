@@ -4,6 +4,7 @@
 //! existing name, schema, and output shape (guarded by the parity
 //! snapshots in `crates/ai/tests/`).
 
+pub mod account_management;
 pub mod accounts;
 pub mod activities;
 pub mod activity_deletions;
@@ -315,6 +316,15 @@ pub fn transaction_category_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(CommitTransactionCategory),
         Arc::new(transaction_categories::PrepareTransactionCategoryChange),
         Arc::new(transaction_categories::CommitTransactionCategoryChange),
+    ]
+}
+
+/// MCP-only account management. The in-app assistant has no account
+/// confirmation card; users manage accounts on the Accounts settings page.
+pub fn account_management_tools() -> Vec<Arc<dyn AgentTool>> {
+    vec![
+        Arc::new(account_management::CreateAccount),
+        Arc::new(account_management::UpdateAccount),
     ]
 }
 
