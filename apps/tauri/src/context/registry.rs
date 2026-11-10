@@ -8,7 +8,7 @@ use wealthfolio_core::{
     events::DomainEventSink,
     fx, goals, health, limits,
     lots::LotRepositoryTrait,
-    portfolio, portfolios, quotes, settings, taxonomies,
+    portfolio, portfolios, quotes, settings, statements, taxonomies,
 };
 use wealthfolio_device_sync::{engine::DeviceSyncRuntimeState, DeviceEnrollService};
 use wealthfolio_spending::analytics::AnalyticsService;
@@ -56,6 +56,7 @@ pub struct ServiceContext {
     pub asset_service: Arc<dyn assets::AssetServiceTrait>,
     pub quote_service: Arc<dyn quotes::QuoteServiceTrait>,
     pub limits_service: Arc<dyn limits::ContributionLimitServiceTrait>,
+    pub statement_service: Arc<dyn statements::StatementServiceTrait>,
     pub fx_service: Arc<dyn fx::FxServiceTrait>,
     pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
     pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
@@ -181,6 +182,10 @@ impl ServiceContext {
 
     pub fn limits_service(&self) -> Arc<dyn limits::ContributionLimitServiceTrait> {
         Arc::clone(&self.limits_service)
+    }
+
+    pub fn statement_service(&self) -> Arc<dyn statements::StatementServiceTrait> {
+        Arc::clone(&self.statement_service)
     }
 
     pub fn fx_service(&self) -> Arc<dyn fx::FxServiceTrait> {

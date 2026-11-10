@@ -904,8 +904,58 @@ diesel::joinable!(budget_rollover_settings -> taxonomies (taxonomy_id));
 
 diesel::joinable!(import_account_templates -> import_templates (template_id));
 
+diesel::table! {
+    account_identities (account_id) {
+        account_id -> Text,
+        institution -> Nullable<Text>,
+        holder_name -> Nullable<Text>,
+        holder_address -> Nullable<Text>,
+        iban -> Nullable<Text>,
+        bic -> Nullable<Text>,
+        bank_code -> Nullable<Text>,
+        branch_code -> Nullable<Text>,
+        account_number -> Nullable<Text>,
+        rib_key -> Nullable<Text>,
+        edited_by_user -> Bool,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    statement_documents (id) {
+        id -> Text,
+        account_id -> Nullable<Text>,
+        file_name -> Text,
+        stored_name -> Text,
+        content_type -> Text,
+        size_bytes -> BigInt,
+        sha256 -> Text,
+        institution -> Nullable<Text>,
+        adapter_id -> Nullable<Text>,
+        document_kind -> Nullable<Text>,
+        account_type -> Nullable<Text>,
+        period_start -> Nullable<Text>,
+        period_end -> Nullable<Text>,
+        holder_name -> Nullable<Text>,
+        iban -> Nullable<Text>,
+        reader_version -> Nullable<Text>,
+        imported_count -> Integer,
+        duplicate_count -> Integer,
+        warnings -> Text,
+        import_run_id -> Nullable<Text>,
+        status -> Text,
+        created_at -> Text,
+        content -> Binary,
+    }
+}
+
+diesel::joinable!(account_identities -> accounts (account_id));
+diesel::joinable!(statement_documents -> accounts (account_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
     import_account_templates,
+    account_identities,
+    statement_documents,
     accounts,
     portfolios,
     portfolio_accounts,

@@ -47,6 +47,7 @@ pub mod portfolio;
 pub mod portfolios;
 pub mod settings;
 pub mod spending;
+pub mod statements;
 pub mod sync;
 pub mod taxonomies;
 

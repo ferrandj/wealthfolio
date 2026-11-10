@@ -4,6 +4,11 @@ export const QueryKeys = {
 
   // Account related keys
   ACCOUNTS: "accounts",
+
+  // Bank statements & account documents
+  STATEMENT_DOCUMENTS: "statement_documents",
+  ACCOUNT_IDENTITIES: "account_identities",
+  SUPPORTED_STATEMENTS: "supported_statements",
   ACCOUNTS_SUMMARY: "accounts_summary",
 
   // Spending module keys

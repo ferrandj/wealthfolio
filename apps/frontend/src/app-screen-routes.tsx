@@ -31,6 +31,7 @@ import AddonSettingsPage from "./pages/settings/addons/addon-settings";
 import AgentAccessPage from "./pages/settings/agent-access/agent-access-page";
 import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
+import DocumentsPage from "./pages/settings/documents/documents-page";
 import { ContributionLimitDetailPage } from "./pages/settings/contribution-limits/contribution-limit-detail-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
@@ -133,6 +134,7 @@ export const AppScreenRoutes = memo(function AppScreenRoutes({ location }: AppSc
         <Route path="exports" element={<ExportSettingsPage />} />
         <Route path="contribution-limits" element={<ContributionLimitPage />} />
         <Route path="contribution-limits/:limitId" element={<ContributionLimitDetailPage />} />
+        <Route path="documents" element={<DocumentsPage />} />
         <Route path="spending" element={<SpendingSettingsPage />} />
         <Route path="spending/categories" element={<SpendingSettingsCategoriesPage />} />
         <Route path="spending/events" element={<SpendingSettingsEventsPage />} />

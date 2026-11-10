@@ -255,6 +255,20 @@ export {
   setContributionActivityExcluded,
 } from "../shared/contribution-limits";
 
+// Bank statements & account documents
+export {
+  analyzeStatement,
+  importStatement,
+  listStatementDocuments,
+  getStatementDocumentContent,
+  deleteStatementDocument,
+  linkStatementDocument,
+  listAccountIdentities,
+  getAccountIdentity,
+  saveAccountIdentity,
+  listSupportedStatements,
+} from "../shared/statements";
+
 // Exchange Rates Commands
 export {
   addExchangeRate,

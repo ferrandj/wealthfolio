@@ -117,6 +117,7 @@ export * from "../shared/asset-logos";
 
 // Contribution Limits Commands
 export * from "../shared/contribution-limits";
+export * from "../shared/statements";
 
 // Exchange Rates Commands
 export * from "../shared/exchange-rates";

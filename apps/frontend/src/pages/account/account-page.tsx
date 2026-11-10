@@ -104,6 +104,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useBackNavigation } from "@/pages/layouts/mobile-stack/use-mobile-stack";
 import { isContributionLimitCurrent } from "@/pages/settings/contribution-limits/contribution-limit-dates";
 import { AccountContributionLimit } from "./account-contribution-limit";
+import { AccountIdentityCard } from "./account-identity-card";
 import { AccountHeaderDetails } from "./account-header-details";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
@@ -1221,6 +1222,7 @@ const AccountPage = () => {
                   }
                 />
                 {showContributionLimitCard && <AccountContributionLimit accountId={id} />}
+                <AccountIdentityCard accountId={id} />
               </div>
             </div>
 

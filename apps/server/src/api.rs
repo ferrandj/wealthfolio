@@ -62,6 +62,7 @@ mod secrets;
 mod settings;
 pub mod shared;
 mod spending;
+mod statements;
 #[cfg(feature = "device-sync")]
 mod sync_crypto;
 mod taxonomies;
@@ -217,6 +218,7 @@ fn app_router_with_profiles(
         .merge(health::router())
         .merge(custom_providers::router())
         .merge(spending::router())
+        .merge(statements::router())
         .merge(allocation_targets::router())
         .merge(agent_access::router());
 
