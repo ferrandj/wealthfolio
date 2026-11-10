@@ -1,6 +1,7 @@
 // Bank statements & account documents
 import type {
   AccountCoverage,
+  LoanView,
   OutdatedDocuments,
   AccountIdentity,
   AccountIdentityInput,
@@ -115,4 +116,15 @@ export const setStatementMonthNormal = async (
   normal: boolean,
 ): Promise<AccountCoverage[]> => {
   return invoke<AccountCoverage[]>("set_statement_month_normal", { accountId, month, normal });
+};
+
+export const getStatementLoans = async (): Promise<LoanView[]> => {
+  return invoke<LoanView[]>("get_statement_loans");
+};
+
+export const setStatementLoanFirstDue = async (
+  key: string,
+  firstDue: string | null,
+): Promise<LoanView[]> => {
+  return invoke<LoanView[]>("set_statement_loan_first_due", { key, firstDue });
 };

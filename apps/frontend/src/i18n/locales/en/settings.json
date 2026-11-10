@@ -432,7 +432,8 @@
       "about": "About",
       "documents": "Documents",
       "contacts": "Contacts",
-      "rates": "Rates and taxes"
+      "rates": "Rates and taxes",
+      "loans": "Loans"
     },
     "subtitles": {
       "general": "Currency, exchange rates, and updates",
@@ -452,7 +453,8 @@
       "about": "Application information",
       "documents": "Import statements, keep the originals",
       "contacts": "Beneficiaries, debtors and people",
-      "rates": "Regulated rates, tax table, account rates"
+      "rates": "Regulated rates, tax table, account rates",
+      "loans": "Offer, schedule, early repayments"
     }
   },
   "timezone_title": "Timezone",
@@ -2200,5 +2202,54 @@
     "tax_exempt": "Tax-exempt",
     "remove": "Remove the rate",
     "error": "Could not save"
+  },
+  "loans": {
+    "title": "Loans",
+    "subtitle": "Rebuilt from the bank's papers (offer, early repayment letter, amortization table). Drop them in Documents.",
+    "empty": "No loan yet. Drop the loan offer, the early repayment letter or the amortization table in Documents: everything is read, checked and validated automatically.",
+    "consistent": "Consistent",
+    "borrowed": "Amount borrowed",
+    "rate": "Rate",
+    "taeg": "APR",
+    "duration": "Term",
+    "owed": "Capital still owed",
+    "next_payment": "Next instalment",
+    "end": "End of the loan",
+    "installments": "Instalments",
+    "installments_value": "{{paid}} paid · {{remaining}} left",
+    "future_interest": "Interest still to pay",
+    "future_insurance": "Insurance still to pay",
+    "future_total": "Left to pay",
+    "lifetime_interest": "Interest over the life of the loan",
+    "repaid_early": "Repaid early",
+    "saved": "Saved by the early repayment",
+    "saved_value": "{{interest}} of interest, {{insurance}} of insurance, {{months}} months",
+    "first_due": "Date of the 1st instalment",
+    "first_due_save": "Save",
+    "first_due_forget": "Forget",
+    "documents": "Documents",
+    "kind": {
+      "loan_offer": "Loan offer",
+      "loan_schedule": "Amortization table",
+      "loan_event": "Early repayment"
+    },
+    "status": {
+      "stored": "Stored",
+      "pending": "To check",
+      "validated": "Validated"
+    },
+    "show_plan": "Show the schedule",
+    "hide_plan": "Hide the schedule",
+    "col_date": "Due",
+    "col_capital": "Capital",
+    "col_interest": "Interest",
+    "col_insurance": "Insurance",
+    "col_total": "Total",
+    "col_remaining": "Still owed",
+    "col_source": "Source",
+    "prepayment": "Early repayment",
+    "error": "Could not save",
+    "months": "{{count}} month(s)",
+    "problems": "{{count}} point(s) to check"
   }
 }

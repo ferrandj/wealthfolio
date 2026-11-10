@@ -192,6 +192,8 @@ export const COMMANDS: CommandMap = {
   list_supported_statements: { method: "GET", path: "/statements/supported" },
   get_statement_outdated: { method: "GET", path: "/statements/outdated" },
   get_statement_coverage: { method: "GET", path: "/statements/coverage" },
+  get_statement_loans: { method: "GET", path: "/statements/loans" },
+  set_statement_loan_first_due: { method: "PUT", path: "/statements/loans" },
   set_statement_month_normal: { method: "PUT", path: "/statements/coverage" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
@@ -1166,6 +1168,12 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "get_account_identity": {
       const { accountId } = payload as { accountId: string };
       url += `/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "set_statement_loan_first_due": {
+      const { key, firstDue } = payload as { key: string; firstDue: string | null };
+      url += `/${encodeURIComponent(key)}/first-due`;
+      body = JSON.stringify({ firstDue });
       break;
     }
     case "set_statement_month_normal": {

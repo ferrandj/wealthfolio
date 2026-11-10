@@ -294,6 +294,8 @@ export {
   saveAccountIdentity,
   listSupportedStatements,
   getStatementCoverage,
+  getStatementLoans,
+  setStatementLoanFirstDue,
   getStatementOutdated,
   setStatementMonthNormal,
 } from "../shared/statements";

@@ -63,6 +63,12 @@ export default function SettingsLayout() {
             icon: <Icons.Users className="size-5" />,
           },
           {
+            title: t("settings:nav.items.loans"),
+            href: "loans",
+            subtitle: t("settings:nav.subtitles.loans"),
+            icon: <Icons.Home className="size-5" />,
+          },
+          {
             title: t("settings:nav.items.rates"),
             href: "rates",
             subtitle: t("settings:nav.subtitles.rates"),

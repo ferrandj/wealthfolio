@@ -962,6 +962,26 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    loan_documents (document_id) {
+        document_id -> Text,
+        kind -> Text,
+        reference -> Nullable<Text>,
+        payload -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    loan_settings (loan_key) {
+        loan_key -> Text,
+        first_due -> Nullable<Text>,
+        updated_at -> Text,
+    }
+}
+
+diesel::joinable!(loan_documents -> statement_documents (document_id));
+
 diesel::joinable!(statement_gap_marks -> accounts (account_id));
 
 diesel::joinable!(account_identities -> accounts (account_id));
@@ -1047,6 +1067,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     account_identities,
     statement_documents,
     statement_gap_marks,
+    loan_documents,
+    loan_settings,
     rates,
     accounts,
     portfolios,

@@ -478,7 +478,8 @@
       "about": "À propos",
       "documents": "Documents",
       "contacts": "Contacts",
-      "rates": "Taux et fiscalité"
+      "rates": "Taux et fiscalité",
+      "loans": "Prêts"
     },
     "subtitles": {
       "general": "Devise, taux de change et mises à jour",
@@ -498,7 +499,8 @@
       "about": "Informations sur l'application",
       "documents": "Importer des relevés, garder les originaux",
       "contacts": "Bénéficiaires, débiteurs et personnes",
-      "rates": "Taux réglementés, barème, taux des comptes"
+      "rates": "Taux réglementés, barème, taux des comptes",
+      "loans": "Offre, échéancier, remboursements anticipés"
     }
   },
   "timezone_title": "Fuseau horaire",
@@ -2256,5 +2258,54 @@
     "tax_exempt": "Exonéré d'impôt",
     "remove": "Retirer le taux",
     "error": "Enregistrement impossible"
+  },
+  "loans": {
+    "title": "Prêts",
+    "subtitle": "Reconstitués à partir des documents de la banque (offre, courrier de remboursement anticipé, tableau d'amortissement). Déposez-les dans Documents.",
+    "empty": "Aucun prêt pour le moment. Déposez l'offre de prêt, le courrier de remboursement anticipé ou le tableau d'amortissement dans Documents : tout est lu, vérifié et validé automatiquement.",
+    "consistent": "Cohérent",
+    "borrowed": "Montant emprunté",
+    "rate": "Taux",
+    "taeg": "TAEG",
+    "duration": "Durée",
+    "owed": "Capital restant dû",
+    "next_payment": "Prochaine échéance",
+    "end": "Fin du prêt",
+    "installments": "Échéances",
+    "installments_value": "{{paid}} payées · {{remaining}} restantes",
+    "future_interest": "Intérêts restants",
+    "future_insurance": "Assurance restante",
+    "future_total": "Reste à payer",
+    "lifetime_interest": "Intérêts sur toute la vie du prêt",
+    "repaid_early": "Remboursé par anticipation",
+    "saved": "Économisé grâce au remboursement anticipé",
+    "saved_value": "{{interest}} d'intérêts, {{insurance}} d'assurance, {{months}} mois",
+    "first_due": "Date de la 1re échéance",
+    "first_due_save": "Enregistrer",
+    "first_due_forget": "Oublier",
+    "documents": "Documents",
+    "kind": {
+      "loan_offer": "Offre de prêt",
+      "loan_schedule": "Tableau d'amortissement",
+      "loan_event": "Remboursement anticipé"
+    },
+    "status": {
+      "stored": "Conservé",
+      "pending": "À vérifier",
+      "validated": "Validé"
+    },
+    "show_plan": "Voir l'échéancier",
+    "hide_plan": "Masquer l'échéancier",
+    "col_date": "Échéance",
+    "col_capital": "Capital",
+    "col_interest": "Intérêts",
+    "col_insurance": "Assurance",
+    "col_total": "Total",
+    "col_remaining": "Restant dû",
+    "col_source": "Source",
+    "prepayment": "Remboursement anticipé",
+    "error": "Impossible d'enregistrer",
+    "months": "{{count}} mois",
+    "problems": "{{count}} point(s) à vérifier"
   }
 }

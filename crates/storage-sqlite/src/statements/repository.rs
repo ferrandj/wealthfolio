@@ -5,14 +5,17 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use wealthfolio_core::statements::{
-    AccountIdentity, NewStatementDocument, StatementDocument, StatementRepositoryTrait,
+    AccountIdentity, LoanDocumentData, NewStatementDocument, StatementDocument,
+    StatementRepositoryTrait,
 };
 use wealthfolio_core::Result;
 
 use super::model::{AccountIdentityDB, NewStatementDocumentRow, StatementDocumentRow};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use crate::schema::{account_identities, statement_documents, statement_gap_marks};
+use crate::schema::{
+    account_identities, loan_documents, loan_settings, statement_documents, statement_gap_marks,
+};
 
 pub struct StatementRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -235,6 +238,97 @@ impl StatementRepositoryTrait for StatementRepository {
                     )
                     .execute(conn)
                     .map_err(StorageError::from)?;
+                }
+                Ok(())
+            })
+            .await
+    }
+
+    async fn save_loan_document(&self, data: LoanDocumentData) -> Result<()> {
+        let payload = serde_json::to_string(&data.payload)
+            .map_err(|e| wealthfolio_core::Error::Unexpected(e.to_string()))?;
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                diesel::replace_into(loan_documents::table)
+                    .values((
+                        loan_documents::document_id.eq(&data.document_id),
+                        loan_documents::kind.eq(&data.kind),
+                        loan_documents::reference.eq(&data.reference),
+                        loan_documents::payload.eq(&payload),
+                        loan_documents::created_at.eq(chrono::Utc::now().to_rfc3339()),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn delete_loan_document(&self, document_id: &str) -> Result<()> {
+        let id = document_id.to_string();
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                diesel::delete(loan_documents::table.find(&id))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn list_loan_documents(&self) -> Result<Vec<LoanDocumentData>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rows = loan_documents::table
+            .select((
+                loan_documents::document_id,
+                loan_documents::kind,
+                loan_documents::reference,
+                loan_documents::payload,
+            ))
+            .load::<(String, String, Option<String>, String)>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|(document_id, kind, reference, payload)| {
+                Some(LoanDocumentData {
+                    document_id,
+                    kind,
+                    reference,
+                    payload: serde_json::from_str(&payload).ok()?,
+                })
+            })
+            .collect())
+    }
+
+    fn list_loan_settings(&self) -> Result<Vec<(String, Option<String>)>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rows = loan_settings::table
+            .select((loan_settings::loan_key, loan_settings::first_due))
+            .load::<(String, Option<String>)>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows)
+    }
+
+    async fn set_loan_first_due(&self, loan_key: &str, first_due: Option<String>) -> Result<()> {
+        let key = loan_key.to_string();
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                match first_due {
+                    Some(day) => {
+                        diesel::replace_into(loan_settings::table)
+                            .values((
+                                loan_settings::loan_key.eq(&key),
+                                loan_settings::first_due.eq(Some(day)),
+                                loan_settings::updated_at.eq(chrono::Utc::now().to_rfc3339()),
+                            ))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                    None => {
+                        diesel::delete(loan_settings::table.find(&key))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
                 }
                 Ok(())
             })

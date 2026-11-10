@@ -2,12 +2,21 @@
 //! operations become cash activities, their originals are kept, and the account holder's identity (name,
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
+mod loans;
+mod loans_plan;
 mod statements_coverage;
 mod statements_model;
 mod statements_review;
 mod statements_service;
 mod statements_traits;
 
+pub use loans::{
+    assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
+};
+pub use loans_plan::{
+    build_plan, DatedRow, EventData, LoanInput, OfferData, OfferRow, Plan, PlanCheck, PlanRow,
+    PlanSummary, Saved, ScheduleData,
+};
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,

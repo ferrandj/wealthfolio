@@ -305,3 +305,75 @@ export interface OutdatedDocuments {
   currentVersion: string;
   documentIds: string[];
 }
+
+export interface LoanPlanRow {
+  kind: "installment" | "prepayment";
+  date: string | null;
+  number: number | null;
+  capital: number | string;
+  interest: number | string;
+  insurance: number | string;
+  total: number | string;
+  remaining: number | string;
+  source: string;
+  status: "paid" | "next" | "future";
+  note: string;
+}
+
+export interface LoanPlanCheck {
+  status: "ok" | "warn" | "info";
+  text: string;
+}
+
+export interface LoanSaved {
+  interest: number | string;
+  insurance: number | string;
+  months: number;
+}
+
+export interface LoanPlanSummary {
+  asOf: string;
+  owed: number | string | null;
+  endDate: string | null;
+  paidCount: number;
+  remainingCount: number;
+  totalCount: number;
+  next: LoanPlanRow | null;
+  dated: boolean;
+  futureInterest: number | string;
+  futureInsurance: number | string;
+  futureTotal: number | string;
+  paidTotal: number | string;
+  paidInterest: number | string;
+  lifetimeInterest: number | string;
+  repaidEarly: number | string;
+  saved: LoanSaved | null;
+}
+
+export interface LoanPlan {
+  rows: LoanPlanRow[];
+  checks: LoanPlanCheck[];
+  summary: LoanPlanSummary | null;
+}
+
+export interface LoanDocumentRef {
+  documentId: string;
+  kind: string;
+  fileName: string;
+  status: string;
+}
+
+export interface LoanView {
+  key: string;
+  label: string;
+  borrower: string | null;
+  product: string | null;
+  principal: number | string | null;
+  duration: number | null;
+  rate: number | string | null;
+  taeg: number | string | null;
+  documents: LoanDocumentRef[];
+  firstDue: string | null;
+  inferredFirstDue: string | null;
+  plan: LoanPlan;
+}

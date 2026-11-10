@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 
+use super::loans::LoanDocumentData;
 use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview,
@@ -37,6 +38,14 @@ pub trait StatementRepositoryTrait: Send + Sync {
     /// Months (account, "YYYY-MM") without a statement that the person called normal.
     fn list_gap_marks(&self) -> Result<Vec<(String, String)>>;
     async fn set_gap_mark(&self, account_id: &str, month: &str, normal: bool) -> Result<()>;
+
+    /// What a loan paper says, kept with its document (replaced when the document is read again).
+    async fn save_loan_document(&self, data: LoanDocumentData) -> Result<()>;
+    async fn delete_loan_document(&self, document_id: &str) -> Result<()>;
+    fn list_loan_documents(&self) -> Result<Vec<LoanDocumentData>>;
+    /// loan key -> date of instalment n°1 typed by the person
+    fn list_loan_settings(&self) -> Result<Vec<(String, Option<String>)>>;
+    async fn set_loan_first_due(&self, loan_key: &str, first_due: Option<String>) -> Result<()>;
 }
 
 /// What the statements feature needs from the spending module, which sits next to core and cannot be depended
@@ -107,4 +116,14 @@ pub trait StatementServiceTrait: Send + Sync {
     fn outdated_documents(&self) -> Result<OutdatedDocuments>;
     /// Mark a month without a statement as normal (or not).
     async fn set_month_normal(&self, account_id: &str, month: &str, normal: bool) -> Result<()>;
+
+    /// The loans rebuilt from the bank papers kept as documents.
+    fn loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>>;
+
+    /// Type the date of instalment n°1 of a loan (`None` forgets it).
+    async fn set_loan_first_due(
+        &self,
+        loan_key: &str,
+        first_due: Option<chrono::NaiveDate>,
+    ) -> Result<()>;
 }

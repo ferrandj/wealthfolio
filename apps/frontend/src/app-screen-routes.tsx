@@ -33,6 +33,7 @@ import AgentAccessPage from "./pages/settings/agent-access/agent-access-page";
 import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
 import ContactsPage from "./pages/settings/contacts/contacts-page";
+import LoansPage from "./pages/settings/loans/loans-page";
 import RatesPage from "./pages/settings/rates/rates-page";
 import DocumentsPage from "./pages/settings/documents/documents-page";
 import { ContributionLimitDetailPage } from "./pages/settings/contribution-limits/contribution-limit-detail-page";
@@ -140,6 +141,7 @@ export const AppScreenRoutes = memo(function AppScreenRoutes({ location }: AppSc
         <Route path="contribution-limits/:limitId" element={<ContributionLimitDetailPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="contacts" element={<ContactsPage />} />
+        <Route path="loans" element={<LoansPage />} />
         <Route path="rates" element={<RatesPage />} />
         <Route path="spending" element={<SpendingSettingsPage />} />
         <Route path="spending/categories" element={<SpendingSettingsCategoriesPage />} />

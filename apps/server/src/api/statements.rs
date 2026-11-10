@@ -229,6 +229,38 @@ async fn set_month_normal(
     Ok(Json(state.statement_service.coverage()?))
 }
 
+async fn loans(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::LoanView>>> {
+    Ok(Json(
+        state
+            .statement_service
+            .loans(chrono::Utc::now().date_naive())?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FirstDueBody {
+    first_due: Option<chrono::NaiveDate>,
+}
+
+async fn set_loan_first_due(
+    Path(key): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<FirstDueBody>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::LoanView>>> {
+    state
+        .statement_service
+        .set_loan_first_due(&key, body.first_due)
+        .await?;
+    Ok(Json(
+        state
+            .statement_service
+            .loans(chrono::Utc::now().date_naive())?,
+    ))
+}
+
 async fn supported() -> Json<Vec<SupportedInstitution>> {
     Json(supported_documents())
 }
@@ -246,6 +278,8 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/supported", get(supported))
         .route("/statements/coverage", get(coverage))
         .route("/statements/outdated", get(outdated))
+        .route("/statements/loans", get(loans))
+        .route("/statements/loans/{key}/first-due", put(set_loan_first_due))
         .route(
             "/statements/coverage/{account_id}/{month}",
             put(set_month_normal),

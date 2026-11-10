@@ -1018,6 +1018,7 @@ impl StatementService {
             updated.opening_balance = document.opening_balance.clone();
             updated.closing_balance = document.closing_balance.clone();
             let stored = self.repository.update_document(updated).await?;
+            self.record_loan(&stored, head.map(|p| &p.extra)).await;
             return Ok(StatementImportResult {
                 document: Some(stored),
                 already_imported: false,
@@ -1040,6 +1041,13 @@ impl StatementService {
                     .await?,
             )
         };
+        if let Some(stored) = &stored {
+            self.record_loan(stored, head.map(|p| &p.extra)).await;
+        }
+        let stored = match stored {
+            Some(d) => self.repository.get_document(&d.id)?.or(Some(d)),
+            None => None,
+        };
         Ok(StatementImportResult {
             document: stored,
             already_imported: false,
@@ -1049,6 +1057,83 @@ impl StatementService {
 }
 
 impl StatementService {
+    /// Keep what a loan paper says, then bring the status of every loan paper in line with the rebuilt loans.
+    async fn record_loan(&self, document: &StatementDocument, extra: Option<&serde_json::Value>) {
+        let Some(kind) = document
+            .document_kind
+            .as_deref()
+            .filter(|k| super::is_loan_kind(k))
+        else {
+            return;
+        };
+        if let Some(loan) = extra.and_then(|e| e.get("loan")) {
+            let reference = loan
+                .get("reference")
+                .and_then(|r| r.as_str())
+                .filter(|r| !r.is_empty())
+                .map(str::to_string);
+            let saved = self
+                .repository
+                .save_loan_document(super::LoanDocumentData {
+                    document_id: document.id.clone(),
+                    kind: kind.to_string(),
+                    reference,
+                    payload: loan.clone(),
+                })
+                .await;
+            if let Err(e) = saved {
+                warn!(
+                    "could not keep the loan data of {}: {e}",
+                    document.file_name
+                );
+            }
+        }
+        if let Err(e) = self.sync_loan_statuses().await {
+            warn!("could not update the loan documents: {e}");
+        }
+    }
+
+    fn build_loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
+        Ok(super::assemble_loans(
+            &self.repository.list_loan_documents()?,
+            &self.repository.list_documents()?,
+            &self.repository.list_loan_settings()?,
+            today,
+        ))
+    }
+
+    /// A loan paper is validated when the loan rebuilt from all the papers holds together; otherwise it waits for
+    /// review with the problems found.
+    async fn sync_loan_statuses(&self) -> Result<()> {
+        let views = self.build_loans(Utc::now().date_naive())?;
+        for document in self.repository.list_documents()? {
+            if !document
+                .document_kind
+                .as_deref()
+                .map(super::is_loan_kind)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let Some(problems) = super::document_problems(&views, &document.id) else {
+                continue;
+            };
+            let reason = ReviewReason {
+                doubts: 0,
+                balance_gap: None,
+                warnings: (document.warnings.len() + problems.len()) as u32,
+            };
+            let mut updated = document.clone();
+            apply_reason(&mut updated, &reason);
+            if updated.status == document.status && updated.review_reason == document.review_reason
+            {
+                continue;
+            }
+            self.repository.update_document(updated).await?;
+        }
+        Ok(())
+    }
+
     /// Read a stored original again.
     async fn read_stored(
         &self,
@@ -1500,7 +1585,11 @@ impl StatementServiceTrait for StatementService {
                 }
             }
         }
-        self.repository.delete_document(id).await
+        self.repository.delete_document(id).await?;
+        if let Err(e) = self.sync_loan_statuses().await {
+            warn!("could not update the loan documents: {e}");
+        }
+        Ok(())
     }
 
     async fn link_document(
@@ -1728,6 +1817,24 @@ impl StatementServiceTrait for StatementService {
             &self.repository.list_documents()?,
             &marked,
         ))
+    }
+
+    fn loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
+        self.build_loans(today)
+    }
+
+    async fn set_loan_first_due(
+        &self,
+        loan_key: &str,
+        first_due: Option<chrono::NaiveDate>,
+    ) -> Result<()> {
+        self.repository
+            .set_loan_first_due(
+                loan_key,
+                first_due.map(|d| d.format("%Y-%m-%d").to_string()),
+            )
+            .await?;
+        self.sync_loan_statuses().await
     }
 
     async fn set_month_normal(&self, account_id: &str, month: &str, normal: bool) -> Result<()> {

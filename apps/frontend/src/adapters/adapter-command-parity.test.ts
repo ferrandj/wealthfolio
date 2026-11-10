@@ -939,6 +939,21 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/coverage", method: "GET" });
   });
 
+  it("reads the loans rebuilt from the bank papers", async () => {
+    const mock = stubFetch([]);
+    await invoke("get_statement_loans");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/loans", method: "GET" });
+  });
+
+  it("types the date of the first instalment of a loan", async () => {
+    const mock = stubFetch([]);
+    await invoke("set_statement_loan_first_due", { key: "FT1", firstDue: "2025-03-15" });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/statements/loans/FT1/first-due");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ firstDue: "2025-03-15" });
+  });
+
   it("marks a month without statement as normal", async () => {
     const mock = stubFetch([]);
     await invoke("set_statement_month_normal", {
