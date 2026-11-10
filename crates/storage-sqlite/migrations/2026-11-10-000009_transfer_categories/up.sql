@@ -33,9 +33,10 @@ INSERT INTO taxonomy_categories (id, taxonomy_id, parent_id, name, key, color, i
   ('cat_income_benefits',          'income_sources', 'cat_income_other',     'Benefits & Allowances',     'income_benefits',          '#9C998E', 'Wallet',         6),
   ('cat_income_pension',           'income_sources', 'cat_income_employment','Pension',                   'income_pension',           '#5A7A3E', 'Briefcase',      4);
 
-INSERT INTO budget_group_assignments (id, group_id, taxonomy_id, category_id, is_system) VALUES
-  ('7ccc571d-ca1f-4cfb-a6d2-f7606a47e0d0', '032ecb02-5912-42e8-9724-2cd566fc08d5', 'spending_categories', 'cat_taxes', 1),
-  ('bfef11b5-6991-4b65-85d4-086e886d441d', '032ecb02-5912-42e8-9724-2cd566fc08d5', 'spending_categories', 'cat_children', 1),
-  ('bf20d095-bac7-4a98-ba3d-f4707e43909e', 'a409e0d6-9152-49c8-a5b4-a147a8ac636e', 'spending_categories', 'cat_pets', 1),
-  ('591182ce-552a-4b03-ad5b-9509319240be', '6e25d097-0c73-4521-9407-d47e8dfb73e2', 'spending_categories', 'cat_transfers', 1),
-  ('16a01358-6fd8-44d2-bbee-b799fb136154', '6e25d097-0c73-4521-9407-d47e8dfb73e2', 'spending_categories', 'cat_cash_withdrawal', 1);
+-- Fixed timestamps: databases created at different times must hold identical seeded rows (sync convergence).
+INSERT INTO budget_group_assignments (id, group_id, taxonomy_id, category_id, is_system, created_at, updated_at) VALUES
+  ('7ccc571d-ca1f-4cfb-a6d2-f7606a47e0d0', '032ecb02-5912-42e8-9724-2cd566fc08d5', 'spending_categories', 'cat_taxes', 1, '2026-11-10T00:00:00.000Z', '2026-11-10T00:00:00.000Z'),
+  ('bfef11b5-6991-4b65-85d4-086e886d441d', '032ecb02-5912-42e8-9724-2cd566fc08d5', 'spending_categories', 'cat_children', 1, '2026-11-10T00:00:00.000Z', '2026-11-10T00:00:00.000Z'),
+  ('bf20d095-bac7-4a98-ba3d-f4707e43909e', 'a409e0d6-9152-49c8-a5b4-a147a8ac636e', 'spending_categories', 'cat_pets', 1, '2026-11-10T00:00:00.000Z', '2026-11-10T00:00:00.000Z'),
+  ('591182ce-552a-4b03-ad5b-9509319240be', '6e25d097-0c73-4521-9407-d47e8dfb73e2', 'spending_categories', 'cat_transfers', 1, '2026-11-10T00:00:00.000Z', '2026-11-10T00:00:00.000Z'),
+  ('16a01358-6fd8-44d2-bbee-b799fb136154', '6e25d097-0c73-4521-9407-d47e8dfb73e2', 'spending_categories', 'cat_cash_withdrawal', 1, '2026-11-10T00:00:00.000Z', '2026-11-10T00:00:00.000Z');
