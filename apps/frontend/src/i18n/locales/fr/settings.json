@@ -2112,7 +2112,8 @@
     "coverage_undo_normal": "Annuler",
     "coverage_break": "Le solde d'ouverture ({{found}}) ne reprend pas le solde de clôture du relevé précédent ({{expected}}).",
     "reader_outdated": "Lecteur périmé",
-    "update_reader": "Actualiser à la dernière version ({{count}})"
+    "update_reader": "Actualiser à la dernière version ({{count}})",
+    "review_remember": "Retenir ces choix pour toutes les opérations équivalentes (même bénéficiaire)"
   },
   "identity": {
     "title": "Coordonnées du compte",

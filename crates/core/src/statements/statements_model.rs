@@ -260,6 +260,10 @@ pub struct ReviewDecision {
     pub activity_id: String,
     pub taxonomy_id: String,
     pub category_id: String,
+    /// Give the same category to the other operations with an equivalent label (same payee), unless a person
+    /// chose theirs by hand.
+    #[serde(default)]
+    pub remember: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -2029,7 +2029,8 @@
     "coverage_undo_normal": "Undo",
     "coverage_break": "The opening balance ({{found}}) does not pick up the previous statement's closing balance ({{expected}}).",
     "reader_outdated": "Outdated reader",
-    "update_reader": "Update to the latest version ({{count}})"
+    "update_reader": "Update to the latest version ({{count}})",
+    "review_remember": "Remember these choices for all equivalent operations (same payee)"
   },
   "identity": {
     "title": "Account details",

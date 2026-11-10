@@ -260,6 +260,8 @@ export interface ReviewDecision {
   activityId: string;
   taxonomyId: string;
   categoryId: string;
+  /** Carry the category to the other operations with an equivalent label. */
+  remember?: boolean;
 }
 
 export interface RevalidationOutcome {

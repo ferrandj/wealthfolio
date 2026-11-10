@@ -78,6 +78,21 @@ fn looks_like_card_or_debit(note: &str) -> bool {
         .any(|p| n.starts_with(p))
 }
 
+/// What two operations of the same payee have in common: the label in capitals, without digits, dates and
+/// punctuation ("CARTE 12/09 CARREFOUR 4521" and "CARTE 03/10 CARREFOUR 7788" are the same payee).
+fn equivalence_key(label: &str) -> Option<String> {
+    let key: String = label
+        .to_uppercase()
+        .chars()
+        .map(|c| if c.is_alphabetic() { c } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .filter(|w| w.len() > 1)
+        .collect::<Vec<_>>()
+        .join(" ");
+    (key.chars().filter(|c| c.is_alphabetic()).count() >= 4).then_some(key)
+}
+
 fn clean(value: &Option<String>) -> Option<String> {
     value
         .as_ref()
@@ -1048,6 +1063,58 @@ impl StatementService {
         self.enrich(reading)
     }
 
+    /// The category a person chose, carried to the other operations with an equivalent label. A category chosen by
+    /// hand on one of them is never replaced.
+    async fn equivalent_assignments(
+        &self,
+        decisions: &[ReviewDecision],
+        in_document: &HashSet<String>,
+    ) -> Result<Vec<CategoryAssignment>> {
+        let wanted: Vec<&ReviewDecision> = decisions.iter().filter(|d| d.remember).collect();
+        if wanted.is_empty() {
+            return Ok(Vec::new());
+        }
+        let activities = self.activity_service.get_activities()?;
+        let label_of: HashMap<&str, Option<String>> = activities
+            .iter()
+            .map(|a| (a.id.as_str(), a.notes.as_deref().and_then(equivalence_key)))
+            .collect();
+        // one choice per payee: the last one made wins
+        let mut by_key: HashMap<String, &ReviewDecision> = HashMap::new();
+        for d in &wanted {
+            if let Some(Some(key)) = label_of.get(d.activity_id.as_str()) {
+                by_key.insert(key.clone(), d);
+            }
+        }
+        let mut candidates: Vec<(String, &ReviewDecision)> = Vec::new();
+        for a in &activities {
+            if in_document.contains(&a.id) || a.notes.as_deref() == Some(OPENING_BALANCE_NOTE) {
+                continue;
+            }
+            if let Some(Some(key)) = label_of.get(a.id.as_str()) {
+                if let Some(d) = by_key.get(key) {
+                    candidates.push((a.id.clone(), d));
+                }
+            }
+        }
+        let ids: Vec<String> = candidates.iter().map(|(id, _)| id.clone()).collect();
+        let current = self.category_assigner.current(&ids).await?;
+        Ok(candidates
+            .into_iter()
+            .filter(|(id, d)| {
+                !current.iter().any(|c| {
+                    &c.activity_id == id && c.taxonomy_id == d.taxonomy_id && c.source == "manual"
+                })
+            })
+            .map(|(activity_id, d)| CategoryAssignment {
+                activity_id,
+                taxonomy_id: d.taxonomy_id.clone(),
+                category_id: d.category_id.clone(),
+                source: "rule".to_string(),
+            })
+            .collect())
+    }
+
     /// Money moved between the user's own accounts is not spent or earned: a withdrawal on one account and a deposit
     /// of the same amount, on the same day, in the same currency, on another account of the statements are linked
     /// as one internal transfer. Only an unambiguous pair is linked (one withdrawal and one deposit for that day and
@@ -1531,8 +1598,12 @@ impl StatementServiceTrait for StatementService {
                 ));
             }
         }
+        let remembered = self.equivalent_assignments(&decisions, &seen).await?;
         if !items.is_empty() {
             self.category_assigner.assign(items).await?;
+        }
+        if !remembered.is_empty() {
+            self.category_assigner.assign(remembered).await?;
         }
         let mut document = review.document;
         apply_reason(&mut document, &ReviewReason::default());
@@ -1769,6 +1840,19 @@ mod tests {
             confidence: "high".into(),
             extra: serde_json::Value::Null,
         }
+    }
+
+    #[test]
+    fn the_same_payee_has_the_same_key_whatever_the_date_and_the_number() {
+        assert_eq!(
+            equivalence_key("CARTE 12/09 CARREFOUR 4521"),
+            equivalence_key("carte 03/10 Carrefour 7788")
+        );
+        assert_ne!(
+            equivalence_key("CARTE 12/09 CARREFOUR"),
+            equivalence_key("CARTE 12/09 LECLERC")
+        );
+        assert_eq!(equivalence_key("12/09 45"), None);
     }
 
     #[test]

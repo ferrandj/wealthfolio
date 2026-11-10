@@ -121,6 +121,7 @@ function ReviewBody({
   const names = useCategoryNames();
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [onlyDoubts, setOnlyDoubts] = useState<boolean | null>(null);
+  const [remember, setRemember] = useState(true);
 
   const {
     data: review,
@@ -139,6 +140,7 @@ function ReviewBody({
         activityId,
         taxonomyId: c.taxonomyId,
         categoryId: c.categoryId,
+        remember,
       }));
       return validateStatementDocument(id, decisions);
     },
@@ -268,7 +270,11 @@ function ReviewBody({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3">
+      <label className="text-muted-foreground flex items-center gap-2 border-t pt-3 text-sm">
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        {t("settings:documents.review_remember")}
+      </label>
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
         <Button variant="ghost" onClick={onClose}>
           {t("settings:documents.review_close")}
         </Button>
