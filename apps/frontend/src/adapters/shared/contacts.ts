@@ -1,5 +1,6 @@
 // Contacts: beneficiaries, debtors and people
 import type {
+  BeneficiarySpending,
   ContactDetail,
   ContactInput,
   ContactSummary,
@@ -60,4 +61,11 @@ export const listUnresolvedCounterparties = async (
   includeShops = false,
 ): Promise<UnresolvedCounterparty[]> => {
   return invoke<UnresolvedCounterparty[]>("list_unresolved_counterparties", { includeShops });
+};
+
+export const getSpendingByBeneficiary = async (
+  from?: string,
+  to?: string,
+): Promise<BeneficiarySpending[]> => {
+  return invoke<BeneficiarySpending[]>("get_spending_by_beneficiary", { from, to });
 };

@@ -24,6 +24,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { ContactDialog } from "./components/contact-dialog";
+import { SpendingByBeneficiary } from "./components/spending-by-beneficiary";
 import { UnresolvedList } from "./components/unresolved-list";
 import {
   CONTACT_KINDS,
@@ -85,6 +86,7 @@ export default function ContactsPage() {
       <Tabs defaultValue="contacts">
         <TabsList>
           <TabsTrigger value="contacts">{t("settings:contacts.tab_contacts")}</TabsTrigger>
+          <TabsTrigger value="spending">{t("settings:contacts.tab_spending")}</TabsTrigger>
           <TabsTrigger value="unidentified">
             {t("settings:contacts.tab_unidentified")}
             {(unresolved.data ?? []).length > 0 ? (
@@ -201,6 +203,19 @@ export default function ContactsPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="spending">
+          <SpendingByBeneficiary
+            onIdentify={(name) =>
+              setDialog({
+                initial: {
+                  form: { displayName: name },
+                  identifiers: [{ kind: "name", value: name }],
+                },
+              })
+            }
+          />
         </TabsContent>
 
         <TabsContent value="unidentified">

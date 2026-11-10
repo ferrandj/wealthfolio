@@ -139,3 +139,16 @@ pub async fn list_unresolved_counterparties(
         .unresolved(include_shops.unwrap_or(false))
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_spending_by_beneficiary(
+    from: Option<String>,
+    to: Option<String>,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::contacts::BeneficiarySpending>, String> {
+    let context = state.context()?;
+    context
+        .contacts_service()
+        .spending_by_beneficiary(from.as_deref(), to.as_deref())
+        .map_err(|e| e.to_string())
+}

@@ -266,6 +266,7 @@ export {
   linkContactAccount,
   listContacts,
   listUnresolvedCounterparties,
+  getSpendingByBeneficiary,
   mergeContacts,
   removeContactIdentifier,
   unlinkContactAccount,

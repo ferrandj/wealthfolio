@@ -451,3 +451,57 @@ async fn a_reference_taken_for_an_iban_is_not_kept() {
     let todo = env.service.unresolved(true).unwrap();
     assert_eq!(todo[0].kind, "name");
 }
+
+#[tokio::test]
+async fn spending_by_beneficiary_groups_by_contact_and_leaves_own_transfers_out() {
+    let env = setup();
+    seed_operations(&env);
+    // a transfer to another own account: one leg is linked, it must not count as spending
+    activity(
+        &env,
+        "a5",
+        "acc1",
+        "TRANSFER_OUT",
+        "200",
+        "2026-09-14",
+        "VIR Livret",
+    );
+    sql(
+        &env,
+        "UPDATE activities SET source_group_id = 'g1' WHERE id = 'a5'",
+    );
+    record_all(&env).await;
+    env.service
+        .record(vec![counterparty(
+            "a5",
+            Some("Livret"),
+            None,
+            Some("transfer"),
+        )])
+        .await
+        .unwrap();
+    let mut new = person("Jean", "Dupont");
+    new.identifiers = vec![iban(IBAN_A), name("DUPONT JEAN")];
+    let jean = env.service.create(new).await.unwrap();
+
+    let rows = env.service.spending_by_beneficiary(None, None).unwrap();
+    let names: Vec<_> = rows.iter().map(|r| r.name.clone()).collect();
+    assert!(!names.contains(&"Livret".to_string()), "{names:?}");
+    // biggest spending first: Jean Dupont (50 out, 20 in), then Netflix, then the bakery
+    assert_eq!(
+        rows[0].contact_id.as_deref(),
+        Some(jean.summary.contact.id.as_str())
+    );
+    assert_eq!(rows[0].count, 2);
+    assert_eq!(rows[0].total_out.to_string(), "50");
+    assert_eq!(rows[0].total_in.to_string(), "20");
+    assert_eq!(rows[1].name, "Netflix");
+
+    // a period keeps only what happened in it
+    let rows = env
+        .service
+        .spending_by_beneficiary(Some("2026-09-11"), Some("2026-09-30"))
+        .unwrap();
+    assert!(rows.iter().all(|r| r.name != "Jean Dupont"));
+    assert_eq!(rows.len(), 2);
+}

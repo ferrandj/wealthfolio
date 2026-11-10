@@ -6,8 +6,8 @@ mod contacts_service;
 mod contacts_traits;
 
 pub use contacts_model::{
-    Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation, ContactSummary,
-    NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
+    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation,
+    ContactSummary, NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
     UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME, KINDS, KIND_ORGANIZATION, KIND_OTHER,
     KIND_PERSON, KIND_SELF, ROLES, ROLE_BENEFICIARY, ROLE_BOTH, ROLE_DEBTOR, ROLE_NONE,
 };

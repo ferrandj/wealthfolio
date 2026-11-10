@@ -446,6 +446,7 @@ pub fn run() {
             commands::contacts::link_contact_account,
             commands::contacts::unlink_contact_account,
             commands::contacts::list_unresolved_counterparties,
+            commands::contacts::get_spending_by_beneficiary,
             commands::statements::analyze_statement,
             commands::statements::import_statement,
             commands::statements::list_statement_documents,

@@ -753,6 +753,15 @@ describe("contribution limit details and exclusions", () => {
 });
 
 describe("contacts", () => {
+  it("reads the spending by beneficiary over a period", async () => {
+    const mock = stubFetch([]);
+    await invoke("get_spending_by_beneficiary", { from: "2026-01-01", to: "2026-03-31" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/contacts/spending?from=2026-01-01&to=2026-03-31",
+      method: "GET",
+    });
+  });
+
   it("lists contacts and reads one by id", async () => {
     const mock = stubFetch([]);
     await invoke("list_contacts");

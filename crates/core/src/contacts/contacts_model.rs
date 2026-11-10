@@ -175,4 +175,20 @@ pub struct StoredOperation {
     pub amount: Option<String>,
     pub currency: String,
     pub label: String,
+    /// One leg of a transfer between two of the person's own accounts.
+    pub internal_transfer: bool,
+}
+
+/// What went out to (and came in from) one beneficiary or payer over a period: the "who" of the spending.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeneficiarySpending {
+    /// None when no contact recognises the counterparty yet.
+    pub contact_id: Option<String>,
+    pub name: String,
+    pub currency: String,
+    pub count: u32,
+    pub total_in: Decimal,
+    pub total_out: Decimal,
+    pub last_date: String,
 }

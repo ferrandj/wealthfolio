@@ -104,3 +104,13 @@ export interface UnresolvedCounterparty {
   /** Set when the IBAN is that of an account already in Wealthfolio. */
   ownAccountId: string | null;
 }
+
+export interface BeneficiarySpending {
+  contactId: string | null;
+  name: string;
+  currency: string;
+  count: number;
+  totalIn: number | string;
+  totalOut: number | string;
+  lastDate: string;
+}

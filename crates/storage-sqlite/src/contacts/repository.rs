@@ -273,6 +273,7 @@ impl ContactsRepositoryTrait for ContactsRepository {
                 activities::amount,
                 activities::currency,
                 activities::notes,
+                activities::source_group_id,
             ))
             .load::<(
                 ActivityCounterpartyDB,
@@ -282,12 +283,22 @@ impl ContactsRepositoryTrait for ContactsRepository {
                 Option<String>,
                 String,
                 Option<String>,
+                Option<String>,
             )>(&mut conn)
             .map_err(StorageError::from)?;
         Ok(rows
             .into_iter()
             .map(
-                |(counterparty, account_id, date, activity_type, amount, currency, notes)| {
+                |(
+                    counterparty,
+                    account_id,
+                    date,
+                    activity_type,
+                    amount,
+                    currency,
+                    notes,
+                    group,
+                )| {
                     StoredOperation {
                         counterparty: OperationCounterparty::from(counterparty),
                         account_id,
@@ -297,6 +308,7 @@ impl ContactsRepositoryTrait for ContactsRepository {
                         amount,
                         currency,
                         label: notes.unwrap_or_default(),
+                        internal_transfer: group.is_some(),
                     }
                 },
             )

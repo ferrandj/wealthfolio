@@ -3,8 +3,9 @@
 use async_trait::async_trait;
 
 use super::contacts_model::{
-    Contact, ContactDetail, ContactIdentifier, ContactInput, ContactSummary, NewContact,
-    NewContactIdentifier, OperationCounterparty, StoredOperation, UnresolvedCounterparty,
+    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactSummary,
+    NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
+    UnresolvedCounterparty,
 };
 use crate::errors::Result;
 
@@ -64,6 +65,13 @@ pub trait ContactsServiceTrait: Send + Sync {
     async fn remove_identifier(&self, identifier_id: &str) -> Result<ContactDetail>;
     async fn link_account(&self, contact_id: &str, account_id: &str) -> Result<ContactDetail>;
     async fn unlink_account(&self, contact_id: &str, account_id: &str) -> Result<ContactDetail>;
+    /// Who the money went to (and came from) between two days, biggest spending first. Transfers between the
+    /// person's own accounts are left out.
+    fn spending_by_beneficiary(
+        &self,
+        from: Option<&str>,
+        to: Option<&str>,
+    ) -> Result<Vec<BeneficiarySpending>>;
     /// Counterparties of imported operations that no contact recognises, most frequent first.
     fn unresolved(&self, include_shops: bool) -> Result<Vec<UnresolvedCounterparty>>;
 }

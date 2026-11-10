@@ -12,9 +12,9 @@ use uuid::Uuid;
 use wealthfolio_statement_import::adapters::common::{iban_valid, name_key};
 
 use super::contacts_model::{
-    Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation, ContactSummary,
-    NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
-    UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME, KINDS, ROLES, ROLE_NONE,
+    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation,
+    ContactSummary, NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
+    UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME, KINDS, KIND_SELF, ROLES, ROLE_NONE,
 };
 use super::contacts_traits::{
     ContactsRepositoryTrait, ContactsServiceTrait, CounterpartyRecorderTrait,
@@ -539,6 +539,89 @@ impl ContactsServiceTrait for ContactsService {
             .await?;
         self.relink().await?;
         self.detail(contact_id)
+    }
+
+    fn spending_by_beneficiary(
+        &self,
+        from: Option<&str>,
+        to: Option<&str>,
+    ) -> Result<Vec<BeneficiarySpending>> {
+        let contacts: HashMap<String, Contact> = self
+            .repository
+            .list_contacts()?
+            .into_iter()
+            .map(|c| (c.id.clone(), c))
+            .collect();
+        let own: HashSet<String> = self
+            .repository
+            .account_ibans()?
+            .into_iter()
+            .map(|(_, iban)| normalize_iban(&iban))
+            .collect();
+        // contact (or printed name / IBAN) and currency
+        let mut groups: HashMap<(String, String), BeneficiarySpending> = HashMap::new();
+        for op in self.repository.list_operations()? {
+            if op.internal_transfer
+                || from.is_some_and(|f| op.date.as_str() < f)
+                || to.is_some_and(|t| op.date.as_str() > t)
+            {
+                continue;
+            }
+            let c = &op.counterparty;
+            let iban = c
+                .counterparty_iban
+                .as_deref()
+                .map(normalize_iban)
+                .filter(|i| !i.is_empty());
+            if iban.as_ref().is_some_and(|i| own.contains(i)) {
+                continue;
+            }
+            let contact = c.contact_id.as_ref().and_then(|id| contacts.get(id));
+            if contact.is_some_and(|k| k.kind == KIND_SELF) {
+                continue;
+            }
+            let printed = c
+                .counterparty_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(str::to_string);
+            let (key, name) = match (contact, &printed, &iban) {
+                (Some(k), _, _) => (format!("c:{}", k.id), k.display_name.clone()),
+                (None, Some(n), _) => (format!("n:{}", name_key(n)), n.clone()),
+                (None, None, Some(i)) => (format!("i:{i}"), i.clone()),
+                (None, None, None) => continue,
+            };
+            let amount = signed(&op);
+            let group =
+                groups
+                    .entry((key, op.currency.clone()))
+                    .or_insert_with(|| BeneficiarySpending {
+                        contact_id: contact.map(|k| k.id.clone()),
+                        name,
+                        currency: op.currency.clone(),
+                        count: 0,
+                        total_in: Decimal::ZERO,
+                        total_out: Decimal::ZERO,
+                        last_date: op.date.clone(),
+                    });
+            group.count += 1;
+            if amount >= Decimal::ZERO {
+                group.total_in += amount;
+            } else {
+                group.total_out += -amount;
+            }
+            if op.date > group.last_date {
+                group.last_date = op.date.clone();
+            }
+        }
+        let mut out: Vec<BeneficiarySpending> = groups.into_values().collect();
+        out.sort_by(|a, b| {
+            b.total_out
+                .cmp(&a.total_out)
+                .then_with(|| a.name.cmp(&b.name))
+        });
+        Ok(out)
     }
 
     fn unresolved(&self, include_shops: bool) -> Result<Vec<UnresolvedCounterparty>> {

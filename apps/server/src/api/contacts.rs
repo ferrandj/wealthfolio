@@ -10,8 +10,8 @@ use axum::{
 };
 use serde::Deserialize;
 use wealthfolio_core::contacts::{
-    ContactDetail, ContactInput, ContactSummary, NewContact, NewContactIdentifier,
-    UnresolvedCounterparty,
+    BeneficiarySpending, ContactDetail, ContactInput, ContactSummary, NewContact,
+    NewContactIdentifier, UnresolvedCounterparty,
 };
 
 use crate::{error::ApiResult, main_lib::AppState};
@@ -43,6 +43,22 @@ async fn unresolved(
     Ok(Json(
         state.contacts_service.unresolved(query.include_shops)?,
     ))
+}
+
+#[derive(Deserialize)]
+struct SpendingQuery {
+    from: Option<String>,
+    to: Option<String>,
+}
+
+async fn spending(
+    Query(query): Query<SpendingQuery>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<BeneficiarySpending>>> {
+    Ok(Json(state.contacts_service.spending_by_beneficiary(
+        query.from.as_deref(),
+        query.to.as_deref(),
+    )?))
 }
 
 async fn get_contact(
@@ -134,6 +150,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/contacts", get(list_contacts).post(create_contact))
         .route("/contacts/unresolved", get(unresolved))
+        .route("/contacts/spending", get(spending))
         .route(
             "/contacts/{id}",
             get(get_contact).put(update_contact).delete(delete_contact),

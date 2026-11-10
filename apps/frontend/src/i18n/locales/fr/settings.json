@@ -2223,6 +2223,13 @@
     "unresolved_create": "Créer un contact",
     "unresolved_attach": "Ajouter",
     "unresolved_attach_placeholder": "Ajouter à un contact…",
-    "unresolved_own_account": "Votre compte {{name}}"
+    "unresolved_own_account": "Votre compte {{name}}",
+    "tab_spending": "Chez qui",
+    "spending_hint": "Où part l'argent, par bénéficiaire. Les virements entre vos propres comptes et le contact « Moi » sont exclus.",
+    "spending_from": "Du",
+    "spending_to": "Au",
+    "spending_empty": "Aucune opération sur la période.",
+    "spending_count": "{{count}} opération(s)",
+    "spending_identify": "Identifier"
   }
 }

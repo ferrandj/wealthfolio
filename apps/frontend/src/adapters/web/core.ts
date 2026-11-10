@@ -169,6 +169,7 @@ export const COMMANDS: CommandMap = {
   link_contact_account: { method: "PUT", path: "/contacts" },
   unlink_contact_account: { method: "DELETE", path: "/contacts" },
   list_unresolved_counterparties: { method: "GET", path: "/contacts/unresolved" },
+  get_spending_by_beneficiary: { method: "GET", path: "/contacts/spending" },
 
   // Bank statements & account documents
   analyze_statement: { method: "POST", path: "/statements/analyze" },
@@ -1090,6 +1091,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "unlink_contact_account": {
       const { id, accountId } = payload as { id: string; accountId: string };
       url += `/${encodeURIComponent(id)}/accounts/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "get_spending_by_beneficiary": {
+      const { from, to } = (payload ?? {}) as { from?: string; to?: string };
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
       break;
     }
     case "list_unresolved_counterparties": {

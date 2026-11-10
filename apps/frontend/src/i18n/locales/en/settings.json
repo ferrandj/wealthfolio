@@ -2167,6 +2167,13 @@
     "unresolved_create": "Create a contact",
     "unresolved_attach": "Add",
     "unresolved_attach_placeholder": "Add to a contact…",
-    "unresolved_own_account": "Your account {{name}}"
+    "unresolved_own_account": "Your account {{name}}",
+    "tab_spending": "Spent at",
+    "spending_hint": "Where the money goes, by beneficiary. Transfers between your own accounts and the \"Me\" contact are left out.",
+    "spending_from": "From",
+    "spending_to": "To",
+    "spending_empty": "No operations in this period.",
+    "spending_count": "{{count}} operation(s)",
+    "spending_identify": "Identify"
   }
 }
