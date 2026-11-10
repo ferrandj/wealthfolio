@@ -7,6 +7,7 @@ import {
   listContacts,
   mergeContacts,
   removeContactIdentifier,
+  setContactAccountShare,
   unlinkContactAccount,
   updateContact,
 } from "@/adapters";
@@ -57,6 +58,7 @@ import {
   type ContactForm as ContactFormValue,
 } from "../contacts-utils";
 import { ContactForm } from "./contact-form";
+import { PersonOverviewSection } from "./person-overview";
 
 const message = (e: unknown) =>
   e && typeof e === "object" && "message" in e
@@ -70,6 +72,41 @@ function money(value: string | number, currency: string): string {
   } catch {
     return n.toFixed(2);
   }
+}
+
+/** The share (percent) a person holds of an account: 100 unless it is a joint account. */
+function ShareField({
+  value,
+  onSave,
+}: {
+  value: number | string;
+  onSave: (share: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(String(toNumber(value)));
+  useEffect(() => setText(String(toNumber(value))), [value]);
+  const commit = () => {
+    const share = Number(text.replace(",", "."));
+    if (Number.isFinite(share) && share >= 0 && share <= 100 && share !== toNumber(value)) {
+      onSave(share);
+    } else {
+      setText(String(toNumber(value)));
+    }
+  };
+  return (
+    <span className="ml-auto flex items-center gap-1">
+      <Input
+        className="w-20 text-right"
+        inputMode="decimal"
+        value={text}
+        aria-label={t("settings:contacts.share_label")}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      />
+      <span className="text-muted-foreground text-sm">%</span>
+    </span>
+  );
 }
 
 export interface ContactDialogProps {
@@ -201,6 +238,15 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
     onSuccess: afterChange,
     onError: fail,
   });
+  const setShare = useMutation({
+    mutationFn: (v: { accountId: string; share: number }) =>
+      setContactAccountShare(contactId!, v.accountId, v.share),
+    onSuccess: (next) => {
+      afterChange(next);
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PERSON_OVERVIEW] });
+    },
+    onError: fail,
+  });
   const unlink = useMutation({
     mutationFn: (accountId: string) => unlinkContactAccount(contactId!, accountId),
     onSuccess: afterChange,
@@ -298,6 +344,15 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
                         <Icons.CreditCard className="text-muted-foreground size-4" />
                         {accountName(accountId)}
                       </span>
+                      {contactId && (
+                        <ShareField
+                          value={
+                            detail.data?.accountShares.find((s) => s.accountId === accountId)
+                              ?.sharePercent ?? 100
+                          }
+                          onSave={(share) => setShare.mutate({ accountId, share })}
+                        />
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -342,6 +397,7 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
 
             {contactId && detail.data ? (
               <>
+                {linked.length > 0 && <PersonOverviewSection contactId={contactId} />}
                 <section className="grid gap-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold">

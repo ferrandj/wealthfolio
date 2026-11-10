@@ -6,10 +6,12 @@ mod contacts_service;
 mod contacts_traits;
 
 pub use contacts_model::{
-    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation,
-    ContactSummary, NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
-    UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME, KINDS, KIND_ORGANIZATION, KIND_OTHER,
-    KIND_PERSON, KIND_SELF, ROLES, ROLE_BENEFICIARY, ROLE_BOTH, ROLE_DEBTOR, ROLE_NONE,
+    AccountInfo, AccountShare, BeneficiarySpending, CoHolder, Contact, ContactDetail,
+    ContactIdentifier, ContactInput, ContactOperation, ContactSummary, CurrencyTotal,
+    MissingOwnAccount, NewContact, NewContactIdentifier, OperationCounterparty, PersonAccount,
+    PersonOverview, StoredOperation, UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME,
+    KINDS, KIND_ORGANIZATION, KIND_OTHER, KIND_PERSON, KIND_SELF, ROLES, ROLE_BENEFICIARY,
+    ROLE_BOTH, ROLE_DEBTOR, ROLE_NONE,
 };
 pub use contacts_service::{normalize_iban, ContactsService};
 pub use contacts_traits::{

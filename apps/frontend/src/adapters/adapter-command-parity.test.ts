@@ -791,6 +791,30 @@ describe("contacts", () => {
     });
   });
 
+  it("sets the share a person holds of a joint account", async () => {
+    const mock = stubFetch({});
+    await invoke("set_contact_account_share", { id: "c1", accountId: "a/1", sharePercent: 60 });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/contacts/c1/accounts/a%2F1/share");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ sharePercent: 60 });
+  });
+
+  it("reads the money of a person over a period and the missing own accounts", async () => {
+    let mock = stubFetch({});
+    await invoke("get_person_overview", { id: "c1", from: "2026-01-01", to: "2026-03-31" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/contacts/c1/overview?from=2026-01-01&to=2026-03-31",
+      method: "GET",
+    });
+    mock = stubFetch([]);
+    await invoke("list_missing_own_accounts");
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/contacts/missing-accounts",
+      method: "GET",
+    });
+  });
+
   it("lists contacts and reads one by id", async () => {
     const mock = stubFetch([]);
     await invoke("list_contacts");

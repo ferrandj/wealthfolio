@@ -152,3 +152,43 @@ pub async fn get_spending_by_beneficiary(
         .spending_by_beneficiary(from.as_deref(), to.as_deref())
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn set_contact_account_share(
+    id: String,
+    account_id: String,
+    share_percent: rust_decimal::Decimal,
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::contacts::ContactDetail, String> {
+    let context = state.context()?;
+    context
+        .contacts_service()
+        .set_account_share(&id, &account_id, share_percent)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_person_overview(
+    id: String,
+    from: Option<String>,
+    to: Option<String>,
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::contacts::PersonOverview, String> {
+    let context = state.context()?;
+    context
+        .contacts_service()
+        .person_overview(&id, from.as_deref(), to.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_missing_own_accounts(
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::contacts::MissingOwnAccount>, String> {
+    let context = state.context()?;
+    context
+        .contacts_service()
+        .missing_own_accounts()
+        .map_err(|e| e.to_string())
+}

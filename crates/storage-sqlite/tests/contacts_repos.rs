@@ -505,3 +505,127 @@ async fn spending_by_beneficiary_groups_by_contact_and_leaves_own_transfers_out(
     assert!(rows.iter().all(|r| r.name != "Jean Dupont"));
     assert_eq!(rows.len(), 2);
 }
+
+#[tokio::test]
+async fn a_joint_account_is_split_between_its_holders_and_each_sees_their_part() {
+    let env = setup();
+    seed_operations(&env);
+    record_all(&env).await;
+    let marie = env.service.create(person("Marie", "Martin")).await.unwrap();
+    let paul = env.service.create(person("Paul", "Martin")).await.unwrap();
+    let (marie_id, paul_id) = (
+        marie.summary.contact.id.clone(),
+        paul.summary.contact.id.clone(),
+    );
+    // a lone holder owns all of the account
+    let marie = env.service.link_account(&marie_id, "acc1").await.unwrap();
+    assert_eq!(
+        marie.summary.account_shares[0].share_percent.to_string(),
+        "100"
+    );
+    // a second holder: the account is split evenly
+    let paul = env.service.link_account(&paul_id, "acc1").await.unwrap();
+    assert_eq!(
+        paul.summary.account_shares[0].share_percent.to_string(),
+        "50"
+    );
+    let marie = env.service.get(&marie_id).unwrap();
+    assert_eq!(
+        marie.summary.account_shares[0].share_percent.to_string(),
+        "50"
+    );
+    // shares are typed by the person; out of range is refused
+    assert!(env
+        .service
+        .set_account_share(&marie_id, "acc1", rust_decimal::Decimal::from(101))
+        .await
+        .is_err());
+    env.service
+        .set_account_share(&marie_id, "acc1", rust_decimal::Decimal::from(70))
+        .await
+        .unwrap();
+    // 70 + 50 does not add up to 100: said so
+    sql(
+        &env,
+        "INSERT INTO statement_documents (id,account_id,file_name,stored_name,content_type,size_bytes,sha256,document_kind,period_start,period_end,status,created_at,content,closing_balance)
+         VALUES ('d1','acc1','r.pdf','r.pdf','application/pdf',1,'h1','statement','2026-09-01','2026-09-30','VALIDATED','2026-10-01',x'00','1000.00')",
+    );
+    let overview = env.service.person_overview(&marie_id, None, None).unwrap();
+    assert_eq!(
+        overview.unbalanced_accounts,
+        vec!["Compte acc1".to_string()]
+    );
+    let account = &overview.accounts[0];
+    assert!(account.joint);
+    assert_eq!(account.co_holders[0].name, "Paul Martin");
+    // 70 % of the 1 000 € of the latest statement
+    assert_eq!(account.balance.unwrap().to_string(), "700.00");
+    // 70 % of the 20 € that came in and of the 62.90 € that went out
+    assert_eq!(account.income.to_string(), "14.00");
+    assert_eq!(account.spending.to_string(), "44.03");
+    // unlinking Paul gives the whole account back to Marie
+    env.service.unlink_account(&paul_id, "acc1").await.unwrap();
+    assert_eq!(
+        env.service.get(&marie_id).unwrap().summary.account_shares[0]
+            .share_percent
+            .to_string(),
+        "100"
+    );
+}
+
+#[tokio::test]
+async fn a_transfer_to_an_own_account_that_wealthfolio_does_not_have_is_reported_as_missing() {
+    let env = setup();
+    seed_operations(&env);
+    account(&env, "acc2");
+    activity(
+        &env,
+        "t1",
+        "acc1",
+        "TRANSFER_OUT",
+        "100",
+        "2026-09-20",
+        "VIR Livret A",
+    );
+    activity(
+        &env,
+        "t2",
+        "acc1",
+        "TRANSFER_OUT",
+        "50",
+        "2026-09-25",
+        "VIR Livret A",
+    );
+    let mut me = person("Moi", "Même");
+    me.card.kind = "self".into();
+    me.identifiers = vec![NewContactIdentifier {
+        label: Some("Livret A".into()),
+        ..iban(IBAN_B)
+    }];
+    let me = env.service.create(me).await.unwrap();
+    env.service
+        .record(vec![
+            counterparty("t1", Some("Livret A"), Some(IBAN_B), Some("transfer")),
+            counterparty("t2", Some("Livret A"), Some(IBAN_B), Some("transfer")),
+        ])
+        .await
+        .unwrap();
+    let missing = env.service.missing_own_accounts().unwrap();
+    assert_eq!(missing.len(), 1);
+    assert_eq!(missing[0].contact_id, me.summary.contact.id);
+    assert_eq!(missing[0].label.as_deref(), Some("Livret A"));
+    assert_eq!(missing[0].count, 2);
+    assert_eq!(missing[0].total_out.to_string(), "150");
+    assert_eq!(missing[0].account_ids, vec!["acc1".to_string()]);
+    // they are transfers: neither spending nor income
+    let rows = env.service.spending_by_beneficiary(None, None).unwrap();
+    assert!(rows.iter().all(|r| r.name != "Livret A"));
+    // once the account exists in Wealthfolio with this IBAN, nothing is missing any more
+    sql(
+        &env,
+        &format!(
+            "INSERT INTO account_identities (account_id, iban, updated_at) VALUES ('acc2', '{IBAN_B}', '2026-10-01')"
+        ),
+    );
+    assert!(env.service.missing_own_accounts().unwrap().is_empty());
+}

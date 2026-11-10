@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 
 use super::contacts_model::{
-    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactSummary,
-    NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
-    UnresolvedCounterparty,
+    AccountInfo, BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput,
+    ContactSummary, MissingOwnAccount, NewContact, NewContactIdentifier, OperationCounterparty,
+    PersonOverview, StoredOperation, UnresolvedCounterparty,
 };
 use crate::errors::Result;
 
@@ -26,6 +26,11 @@ pub trait ContactsRepositoryTrait: Send + Sync {
     /// Every (contact id, account id) link.
     fn list_linked_accounts(&self) -> Result<Vec<(String, String)>>;
     async fn link_account(&self, contact_id: &str, account_id: &str) -> Result<()>;
+    /// Every (contact id, account id, share in percent) link.
+    fn list_account_shares(&self) -> Result<Vec<(String, String, String)>>;
+    async fn set_account_shares(&self, shares: Vec<(String, String, String)>) -> Result<()>;
+    /// Name, currency and the balance of the latest statement of every account.
+    fn account_infos(&self) -> Result<Vec<AccountInfo>>;
     async fn unlink_account(&self, contact_id: &str, account_id: &str) -> Result<()>;
     /// The IBAN stored with each account's identity (account id, iban).
     fn account_ibans(&self) -> Result<Vec<(String, String)>>;
@@ -72,6 +77,24 @@ pub trait ContactsServiceTrait: Send + Sync {
         from: Option<&str>,
         to: Option<&str>,
     ) -> Result<Vec<BeneficiarySpending>>;
+    /// Set the share (percent) a person holds of an account they are linked to.
+    async fn set_account_share(
+        &self,
+        contact_id: &str,
+        account_id: &str,
+        share_percent: rust_decimal::Decimal,
+    ) -> Result<ContactDetail>;
+    /// The money of a person: their part of each account, the balances at the latest statements and the flows over
+    /// a period (transfers between own accounts left out).
+    fn person_overview(
+        &self,
+        contact_id: &str,
+        from: Option<&str>,
+        to: Option<&str>,
+    ) -> Result<PersonOverview>;
+    /// Accounts of the person (the contact "Moi") that transfers go to or come from but that Wealthfolio does not
+    /// have: they must be created or imported.
+    fn missing_own_accounts(&self) -> Result<Vec<MissingOwnAccount>>;
     /// Counterparties of imported operations that no contact recognises, most frequent first.
     fn unresolved(&self, include_shops: bool) -> Result<Vec<UnresolvedCounterparty>>;
 }

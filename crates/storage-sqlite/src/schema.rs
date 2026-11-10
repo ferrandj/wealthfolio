@@ -1047,6 +1047,7 @@ diesel::table! {
     contact_linked_accounts (contact_id, account_id) {
         contact_id -> Text,
         account_id -> Text,
+        share_percent -> Text,
     }
 }
 

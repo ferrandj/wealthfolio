@@ -12,9 +12,11 @@ use uuid::Uuid;
 use wealthfolio_statement_import::adapters::common::{iban_valid, name_key};
 
 use super::contacts_model::{
-    BeneficiarySpending, Contact, ContactDetail, ContactIdentifier, ContactInput, ContactOperation,
-    ContactSummary, NewContact, NewContactIdentifier, OperationCounterparty, StoredOperation,
-    UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME, KINDS, KIND_SELF, ROLES, ROLE_NONE,
+    AccountInfo, AccountShare, BeneficiarySpending, CoHolder, Contact, ContactDetail,
+    ContactIdentifier, ContactInput, ContactOperation, ContactSummary, CurrencyTotal,
+    MissingOwnAccount, NewContact, NewContactIdentifier, OperationCounterparty, PersonAccount,
+    PersonOverview, StoredOperation, UnresolvedCounterparty, IDENTIFIER_IBAN, IDENTIFIER_NAME,
+    KINDS, KIND_SELF, ROLES, ROLE_NONE,
 };
 use super::contacts_traits::{
     ContactsRepositoryTrait, ContactsServiceTrait, CounterpartyRecorderTrait,
@@ -83,6 +85,32 @@ fn compose_name(first: &Option<String>, last: &Option<String>) -> String {
         .flatten()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// What each of `n` holders owns when an account is split evenly: percentages to the cent that add up to 100, the
+/// first holder taking the rounding.
+pub fn equal_shares(n: usize) -> Vec<Decimal> {
+    if n == 0 {
+        return Vec::new();
+    }
+    let hundred = Decimal::from(100);
+    let base = (hundred / Decimal::from(n as u64))
+        .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::ToZero);
+    let mut shares = vec![base; n];
+    shares[0] = hundred - base * Decimal::from((n - 1) as u64);
+    shares
+}
+
+fn equal_shares_for(
+    account_id: &str,
+    repository: &Arc<dyn ContactsRepositoryTrait>,
+) -> Result<Vec<Decimal>> {
+    let n = repository
+        .list_account_shares()?
+        .iter()
+        .filter(|(_, a, _)| a == account_id)
+        .count();
+    Ok(equal_shares(n))
 }
 
 type Index = HashMap<(&'static str, String), String>;
@@ -298,7 +326,15 @@ impl ContactsService {
             identifiers.entry(i.contact_id.clone()).or_default().push(i);
         }
         let mut links: HashMap<String, Vec<String>> = HashMap::new();
-        for (contact_id, account_id) in self.repository.list_linked_accounts()? {
+        let mut shares: HashMap<String, Vec<AccountShare>> = HashMap::new();
+        for (contact_id, account_id, share) in self.repository.list_account_shares()? {
+            shares
+                .entry(contact_id.clone())
+                .or_default()
+                .push(AccountShare {
+                    account_id: account_id.clone(),
+                    share_percent: Decimal::from_str(&share).unwrap_or(Decimal::from(100)),
+                });
             links.entry(contact_id).or_default().push(account_id);
         }
         let mut operations: HashMap<String, Vec<(ContactOperation, Decimal)>> = HashMap::new();
@@ -337,6 +373,7 @@ impl ContactsService {
             let summary = ContactSummary {
                 identifiers: identifiers.remove(&contact.id).unwrap_or_default(),
                 linked_account_ids: links.remove(&contact.id).unwrap_or_default(),
+                account_shares: shares.remove(&contact.id).unwrap_or_default(),
                 operation_count: ops.len() as u32,
                 total_in,
                 total_out,
@@ -346,6 +383,28 @@ impl ContactsService {
             out.push((summary, ops.into_iter().map(|o| o.0).collect()));
         }
         Ok(out)
+    }
+
+    /// Split an account evenly between the people linked to it (a lone holder owns all of it). Called when a person
+    /// is linked or unlinked; shares typed afterwards stay as typed.
+    async fn rebalance_shares(&self, account_id: &str) -> Result<()> {
+        let mut holders: Vec<String> = self
+            .repository
+            .list_account_shares()?
+            .into_iter()
+            .filter(|(_, a, _)| a == account_id)
+            .map(|(c, _, _)| c)
+            .collect();
+        holders.sort();
+        let rows = holders
+            .into_iter()
+            .zip(equal_shares_for(account_id, &self.repository)?)
+            .map(|(c, share)| (c, account_id.to_string(), share.normalize().to_string()))
+            .collect::<Vec<_>>();
+        if rows.is_empty() {
+            return Ok(());
+        }
+        self.repository.set_account_shares(rows).await
     }
 
     fn detail(&self, id: &str) -> Result<ContactDetail> {
@@ -528,7 +587,15 @@ impl ContactsServiceTrait for ContactsService {
         if !self.repository.account_exists(account_id)? {
             return Err(invalid("This account does not exist"));
         }
+        let already = self
+            .repository
+            .list_account_shares()?
+            .iter()
+            .any(|(c, a, _)| c == contact_id && a == account_id);
         self.repository.link_account(contact_id, account_id).await?;
+        if !already {
+            self.rebalance_shares(account_id).await?;
+        }
         self.relink().await?;
         self.detail(contact_id)
     }
@@ -537,8 +604,257 @@ impl ContactsServiceTrait for ContactsService {
         self.repository
             .unlink_account(contact_id, account_id)
             .await?;
+        self.rebalance_shares(account_id).await?;
         self.relink().await?;
         self.detail(contact_id)
+    }
+
+    async fn set_account_share(
+        &self,
+        contact_id: &str,
+        account_id: &str,
+        share_percent: Decimal,
+    ) -> Result<ContactDetail> {
+        if share_percent < Decimal::ZERO || share_percent > Decimal::from(100) {
+            return Err(invalid("A share is between 0 and 100 %"));
+        }
+        let linked = self
+            .repository
+            .list_account_shares()?
+            .iter()
+            .any(|(c, a, _)| c == contact_id && a == account_id);
+        if !linked {
+            return Err(invalid("This account is not linked to the contact"));
+        }
+        self.repository
+            .set_account_shares(vec![(
+                contact_id.to_string(),
+                account_id.to_string(),
+                share_percent.round_dp(2).normalize().to_string(),
+            )])
+            .await?;
+        self.detail(contact_id)
+    }
+
+    fn person_overview(
+        &self,
+        contact_id: &str,
+        from: Option<&str>,
+        to: Option<&str>,
+    ) -> Result<PersonOverview> {
+        let contacts: HashMap<String, Contact> = self
+            .repository
+            .list_contacts()?
+            .into_iter()
+            .map(|c| (c.id.clone(), c))
+            .collect();
+        let person = contacts
+            .get(contact_id)
+            .ok_or_else(|| not_found("Contact"))?;
+        let all_shares: Vec<(String, String, Decimal)> = self
+            .repository
+            .list_account_shares()?
+            .into_iter()
+            .map(|(c, a, s)| (c, a, Decimal::from_str(&s).unwrap_or(Decimal::from(100))))
+            .collect();
+        let infos: HashMap<String, AccountInfo> = self
+            .repository
+            .account_infos()?
+            .into_iter()
+            .map(|i| (i.account_id.clone(), i))
+            .collect();
+        let own_ibans: HashSet<String> = self
+            .repository
+            .account_ibans()?
+            .into_iter()
+            .map(|(_, iban)| normalize_iban(&iban))
+            .collect();
+        let mut accounts: Vec<PersonAccount> = Vec::new();
+        let mut unbalanced = Vec::new();
+        let mine: Vec<&(String, String, Decimal)> = all_shares
+            .iter()
+            .filter(|(c, _, _)| c == contact_id)
+            .collect();
+        let operations = self.repository.list_operations()?;
+        for (_, account_id, share) in mine {
+            let Some(info) = infos.get(account_id) else {
+                continue;
+            };
+            let holders: Vec<&(String, String, Decimal)> = all_shares
+                .iter()
+                .filter(|(_, a, _)| a == account_id)
+                .collect();
+            let total: Decimal = holders.iter().map(|(_, _, s)| *s).sum();
+            if holders.len() > 1 && total != Decimal::from(100) {
+                unbalanced.push(info.name.clone());
+            }
+            let factor = *share / Decimal::from(100);
+            let mut income = Decimal::ZERO;
+            let mut spending = Decimal::ZERO;
+            let mut count = 0u32;
+            for op in operations.iter().filter(|o| &o.account_id == account_id) {
+                if op.internal_transfer
+                    || from.is_some_and(|f| op.date.as_str() < f)
+                    || to.is_some_and(|t| op.date.as_str() > t)
+                {
+                    continue;
+                }
+                let c = &op.counterparty;
+                let iban = c
+                    .counterparty_iban
+                    .as_deref()
+                    .map(normalize_iban)
+                    .filter(|i| !i.is_empty());
+                if iban.as_ref().is_some_and(|i| own_ibans.contains(i)) {
+                    continue;
+                }
+                if c.contact_id
+                    .as_ref()
+                    .and_then(|id| contacts.get(id))
+                    .is_some_and(|k| k.kind == KIND_SELF)
+                {
+                    continue;
+                }
+                let amount = signed(op) * factor;
+                count += 1;
+                if amount >= Decimal::ZERO {
+                    income += amount;
+                } else {
+                    spending += -amount;
+                }
+            }
+            accounts.push(PersonAccount {
+                account_id: account_id.clone(),
+                name: info.name.clone(),
+                currency: info.currency.clone(),
+                share_percent: *share,
+                joint: holders.len() > 1,
+                co_holders: holders
+                    .iter()
+                    .filter(|(c, _, _)| c != contact_id)
+                    .map(|(c, _, s)| CoHolder {
+                        contact_id: c.clone(),
+                        name: contacts
+                            .get(c)
+                            .map(|k| k.display_name.clone())
+                            .unwrap_or_default(),
+                        share_percent: *s,
+                    })
+                    .collect(),
+                balance: info
+                    .balance
+                    .as_deref()
+                    .and_then(|b| Decimal::from_str(b).ok())
+                    .map(|b| (b * factor).round_dp(2)),
+                balance_date: info.balance_date.clone(),
+                income: income.round_dp(2),
+                spending: spending.round_dp(2),
+                operation_count: count,
+            });
+        }
+        accounts.sort_by_key(|a| a.name.to_lowercase());
+        let mut totals: Vec<CurrencyTotal> = Vec::new();
+        for a in &accounts {
+            let slot = match totals.iter_mut().find(|t| t.currency == a.currency) {
+                Some(t) => t,
+                None => {
+                    totals.push(CurrencyTotal {
+                        currency: a.currency.clone(),
+                        balance: Decimal::ZERO,
+                        income: Decimal::ZERO,
+                        spending: Decimal::ZERO,
+                    });
+                    totals.last_mut().unwrap_or_else(|| unreachable!())
+                }
+            };
+            slot.balance += a.balance.unwrap_or_default();
+            slot.income += a.income;
+            slot.spending += a.spending;
+        }
+        Ok(PersonOverview {
+            contact_id: contact_id.to_string(),
+            name: person.display_name.clone(),
+            accounts,
+            totals,
+            unbalanced_accounts: unbalanced,
+        })
+    }
+
+    fn missing_own_accounts(&self) -> Result<Vec<MissingOwnAccount>> {
+        let contacts: HashMap<String, Contact> = self
+            .repository
+            .list_contacts()?
+            .into_iter()
+            .map(|c| (c.id.clone(), c))
+            .collect();
+        let own: HashSet<String> = self
+            .repository
+            .account_ibans()?
+            .into_iter()
+            .map(|(_, iban)| normalize_iban(&iban))
+            .collect();
+        let labels: HashMap<String, String> = self
+            .repository
+            .list_identifiers()?
+            .into_iter()
+            .filter(|i| i.kind == IDENTIFIER_IBAN)
+            .filter_map(|i| i.label.map(|l| (i.value, l)))
+            .collect();
+        let mut groups: HashMap<(String, String), MissingOwnAccount> = HashMap::new();
+        for op in self.repository.list_operations()? {
+            let c = &op.counterparty;
+            let Some(contact) = c
+                .contact_id
+                .as_ref()
+                .and_then(|id| contacts.get(id))
+                .filter(|k| k.kind == KIND_SELF)
+            else {
+                continue;
+            };
+            let Some(iban) = c
+                .counterparty_iban
+                .as_deref()
+                .map(normalize_iban)
+                .filter(|i| !i.is_empty())
+            else {
+                continue;
+            };
+            if own.contains(&iban) {
+                continue;
+            }
+            let amount = signed(&op);
+            let group = groups
+                .entry((contact.id.clone(), iban.clone()))
+                .or_insert_with(|| MissingOwnAccount {
+                    contact_id: contact.id.clone(),
+                    contact_name: contact.display_name.clone(),
+                    iban: Some(iban.clone()),
+                    label: labels
+                        .get(&iban)
+                        .cloned()
+                        .or_else(|| c.counterparty_name.clone()),
+                    count: 0,
+                    total_in: Decimal::ZERO,
+                    total_out: Decimal::ZERO,
+                    last_date: op.date.clone(),
+                    account_ids: Vec::new(),
+                });
+            group.count += 1;
+            if !group.account_ids.contains(&op.account_id) {
+                group.account_ids.push(op.account_id.clone());
+            }
+            if amount >= Decimal::ZERO {
+                group.total_in += amount;
+            } else {
+                group.total_out += -amount;
+            }
+            if op.date > group.last_date {
+                group.last_date = op.date.clone();
+            }
+        }
+        let mut out: Vec<MissingOwnAccount> = groups.into_values().collect();
+        out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.iban.cmp(&b.iban)));
+        Ok(out)
     }
 
     fn spending_by_beneficiary(

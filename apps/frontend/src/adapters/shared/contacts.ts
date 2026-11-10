@@ -4,8 +4,10 @@ import type {
   ContactDetail,
   ContactInput,
   ContactSummary,
+  MissingOwnAccount,
   NewContact,
   NewContactIdentifier,
+  PersonOverview,
   UnresolvedCounterparty,
 } from "@/lib/types/contacts";
 
@@ -68,4 +70,24 @@ export const getSpendingByBeneficiary = async (
   to?: string,
 ): Promise<BeneficiarySpending[]> => {
   return invoke<BeneficiarySpending[]>("get_spending_by_beneficiary", { from, to });
+};
+
+export const setContactAccountShare = async (
+  id: string,
+  accountId: string,
+  sharePercent: number | string,
+): Promise<ContactDetail> => {
+  return invoke<ContactDetail>("set_contact_account_share", { id, accountId, sharePercent });
+};
+
+export const getPersonOverview = async (
+  id: string,
+  from?: string,
+  to?: string,
+): Promise<PersonOverview> => {
+  return invoke<PersonOverview>("get_person_overview", { id, from, to });
+};
+
+export const listMissingOwnAccounts = async (): Promise<MissingOwnAccount[]> => {
+  return invoke<MissingOwnAccount[]>("list_missing_own_accounts");
 };

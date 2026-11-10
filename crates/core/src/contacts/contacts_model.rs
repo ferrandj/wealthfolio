@@ -105,6 +105,9 @@ pub struct ContactSummary {
     pub contact: Contact,
     pub identifiers: Vec<ContactIdentifier>,
     pub linked_account_ids: Vec<String>,
+    /// The share of each linked account the person holds (100 % unless the account is joint).
+    #[serde(default)]
+    pub account_shares: Vec<AccountShare>,
     pub operation_count: u32,
     pub total_in: Decimal,
     pub total_out: Decimal,
@@ -191,4 +194,92 @@ pub struct BeneficiarySpending {
     pub total_in: Decimal,
     pub total_out: Decimal,
     pub last_date: String,
+}
+
+/// The part of an account that a person holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountShare {
+    pub account_id: String,
+    /// Percent, 0 to 100.
+    pub share_percent: Decimal,
+}
+
+/// What a Wealthfolio account looks like to the person's money view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountInfo {
+    pub account_id: String,
+    pub name: String,
+    pub currency: String,
+    /// The closing balance of the latest statement and its date.
+    pub balance: Option<String>,
+    pub balance_date: Option<String>,
+}
+
+/// One account in a person's money view, already multiplied by the person's share.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonAccount {
+    pub account_id: String,
+    pub name: String,
+    pub currency: String,
+    pub share_percent: Decimal,
+    /// More than one person holds the account.
+    pub joint: bool,
+    /// Who else holds it (their share, in percent).
+    pub co_holders: Vec<CoHolder>,
+    /// The person's part of the balance at the latest statement.
+    pub balance: Option<Decimal>,
+    pub balance_date: Option<String>,
+    pub income: Decimal,
+    pub spending: Decimal,
+    pub operation_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoHolder {
+    pub contact_id: String,
+    pub name: String,
+    pub share_percent: Decimal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrencyTotal {
+    pub currency: String,
+    pub balance: Decimal,
+    pub income: Decimal,
+    pub spending: Decimal,
+}
+
+/// The money of one person: their part of every account they hold, with the balances at the latest statements and
+/// what came in and went out over a period (transfers between own accounts left out).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonOverview {
+    pub contact_id: String,
+    pub name: String,
+    pub accounts: Vec<PersonAccount>,
+    pub totals: Vec<CurrencyTotal>,
+    /// Joint accounts whose shares do not add up to 100 %.
+    pub unbalanced_accounts: Vec<String>,
+}
+
+/// An account of the person that Wealthfolio does not have: transfers go to it (or come from it) but it was
+/// neither created nor imported.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissingOwnAccount {
+    pub contact_id: String,
+    pub contact_name: String,
+    pub iban: Option<String>,
+    /// The label of the identifier ("Livret A"...) or the name printed by the bank.
+    pub label: Option<String>,
+    pub count: u32,
+    pub total_in: Decimal,
+    pub total_out: Decimal,
+    pub last_date: String,
+    /// Wealthfolio accounts the transfers were seen in.
+    pub account_ids: Vec<String>,
 }

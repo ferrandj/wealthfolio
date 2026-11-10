@@ -26,6 +26,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { ContactDialog } from "./components/contact-dialog";
+import { MissingAccountsAlert } from "./components/missing-accounts-alert";
 import { SpendingByBeneficiary } from "./components/spending-by-beneficiary";
 import { UnresolvedList } from "./components/unresolved-list";
 import {
@@ -85,6 +86,8 @@ export default function ContactsPage() {
           {t("settings:contacts.new")}
         </Button>
       </SettingsHeader>
+
+      <MissingAccountsAlert />
 
       <Tabs defaultValue="contacts">
         <TabsList>

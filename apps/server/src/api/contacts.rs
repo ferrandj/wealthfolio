@@ -10,8 +10,8 @@ use axum::{
 };
 use serde::Deserialize;
 use wealthfolio_core::contacts::{
-    BeneficiarySpending, ContactDetail, ContactInput, ContactSummary, NewContact,
-    NewContactIdentifier, UnresolvedCounterparty,
+    BeneficiarySpending, ContactDetail, ContactInput, ContactSummary, MissingOwnAccount,
+    NewContact, NewContactIdentifier, PersonOverview, UnresolvedCounterparty,
 };
 
 use crate::{error::ApiResult, main_lib::AppState};
@@ -146,11 +146,54 @@ async fn unlink_account(
     ))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareBody {
+    share_percent: rust_decimal::Decimal,
+}
+
+async fn set_account_share(
+    Path((id, account_id)): Path<(String, String)>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<ShareBody>,
+) -> ApiResult<Json<ContactDetail>> {
+    Ok(Json(
+        state
+            .contacts_service
+            .set_account_share(&id, &account_id, body.share_percent)
+            .await?,
+    ))
+}
+
+async fn person_overview(
+    Path(id): Path<String>,
+    Query(query): Query<SpendingQuery>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<PersonOverview>> {
+    Ok(Json(state.contacts_service.person_overview(
+        &id,
+        query.from.as_deref(),
+        query.to.as_deref(),
+    )?))
+}
+
+async fn missing_own_accounts(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<MissingOwnAccount>>> {
+    Ok(Json(state.contacts_service.missing_own_accounts()?))
+}
+
 pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/contacts", get(list_contacts).post(create_contact))
         .route("/contacts/unresolved", get(unresolved))
         .route("/contacts/spending", get(spending))
+        .route("/contacts/missing-accounts", get(missing_own_accounts))
+        .route("/contacts/{id}/overview", get(person_overview))
+        .route(
+            "/contacts/{id}/accounts/{account_id}/share",
+            axum::routing::put(set_account_share),
+        )
         .route(
             "/contacts/{id}",
             get(get_contact).put(update_contact).delete(delete_contact),

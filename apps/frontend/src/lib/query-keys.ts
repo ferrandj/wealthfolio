@@ -11,6 +11,8 @@ export const QueryKeys = {
   RATES: "rates",
   RATES_REVIEW: "rates_review",
   BENEFICIARY_SPENDING: "beneficiary_spending",
+  PERSON_OVERVIEW: "person_overview",
+  MISSING_OWN_ACCOUNTS: "missing_own_accounts",
   UNRESOLVED_COUNTERPARTIES: "unresolved_counterparties",
 
   // Bank statements & account documents

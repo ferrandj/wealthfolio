@@ -68,6 +68,8 @@ export interface ContactSummary {
   contact: Contact;
   identifiers: ContactIdentifier[];
   linkedAccountIds: string[];
+  /** The part of each linked account the person holds (100 unless the account is joint). */
+  accountShares: AccountShare[];
   operationCount: number;
   totalIn: string | number;
   totalOut: string | number;
@@ -113,4 +115,60 @@ export interface BeneficiarySpending {
   totalIn: number | string;
   totalOut: number | string;
   lastDate: string;
+}
+
+export interface AccountShare {
+  accountId: string;
+  /** Percent, 0 to 100. */
+  sharePercent: number | string;
+}
+
+export interface CoHolder {
+  contactId: string;
+  name: string;
+  sharePercent: number | string;
+}
+
+export interface PersonAccount {
+  accountId: string;
+  name: string;
+  currency: string;
+  sharePercent: number | string;
+  joint: boolean;
+  coHolders: CoHolder[];
+  /** The person's part of the balance at the latest statement. */
+  balance: number | string | null;
+  balanceDate: string | null;
+  income: number | string;
+  spending: number | string;
+  operationCount: number;
+}
+
+export interface CurrencyTotal {
+  currency: string;
+  balance: number | string;
+  income: number | string;
+  spending: number | string;
+}
+
+export interface PersonOverview {
+  contactId: string;
+  name: string;
+  accounts: PersonAccount[];
+  totals: CurrencyTotal[];
+  /** Joint accounts whose shares do not add up to 100 %. */
+  unbalancedAccounts: string[];
+}
+
+/** An account of the person that Wealthfolio does not have: it must be created or imported. */
+export interface MissingOwnAccount {
+  contactId: string;
+  contactName: string;
+  iban: string | null;
+  label: string | null;
+  count: number;
+  totalIn: number | string;
+  totalOut: number | string;
+  lastDate: string;
+  accountIds: string[];
 }

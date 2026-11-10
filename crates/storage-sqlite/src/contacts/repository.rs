@@ -5,7 +5,8 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use wealthfolio_core::contacts::{
-    Contact, ContactIdentifier, ContactsRepositoryTrait, OperationCounterparty, StoredOperation,
+    AccountInfo, Contact, ContactIdentifier, ContactsRepositoryTrait, OperationCounterparty,
+    StoredOperation,
 };
 use wealthfolio_core::Result;
 
@@ -14,7 +15,7 @@ use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{
     account_identities, accounts, activities, activity_counterparties, contact_identifiers,
-    contact_linked_accounts, contacts,
+    contact_linked_accounts, contacts, statement_documents,
 };
 
 pub struct ContactsRepository {
@@ -169,6 +170,89 @@ impl ContactsRepositoryTrait for ContactsRepository {
             .await
     }
 
+    fn list_account_shares(&self) -> Result<Vec<(String, String, String)>> {
+        let mut conn = get_connection(&self.pool)?;
+        Ok(contact_linked_accounts::table
+            .select((
+                contact_linked_accounts::contact_id,
+                contact_linked_accounts::account_id,
+                contact_linked_accounts::share_percent,
+            ))
+            .load::<(String, String, String)>(&mut conn)
+            .map_err(StorageError::from)?)
+    }
+
+    async fn set_account_shares(&self, shares: Vec<(String, String, String)>) -> Result<()> {
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                for (contact_id, account_id, share) in shares {
+                    diesel::update(
+                        contact_linked_accounts::table
+                            .filter(contact_linked_accounts::contact_id.eq(&contact_id))
+                            .filter(contact_linked_accounts::account_id.eq(&account_id)),
+                    )
+                    .set(contact_linked_accounts::share_percent.eq(&share))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                }
+                Ok(())
+            })
+            .await
+    }
+
+    fn account_infos(&self) -> Result<Vec<AccountInfo>> {
+        let mut conn = get_connection(&self.pool)?;
+        let accounts: Vec<(String, String, String)> = accounts::table
+            .select((accounts::id, accounts::name, accounts::currency))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+        // the latest statement of each account that states a closing balance
+        let documents: Vec<(Option<String>, Option<String>, Option<String>)> =
+            statement_documents::table
+                .filter(statement_documents::closing_balance.is_not_null())
+                .filter(statement_documents::account_id.is_not_null())
+                .filter(statement_documents::period_end.is_not_null())
+                .filter(
+                    statement_documents::document_kind
+                        .is_null()
+                        .or(statement_documents::document_kind.eq("statement")),
+                )
+                .select((
+                    statement_documents::account_id,
+                    statement_documents::closing_balance,
+                    statement_documents::period_end,
+                ))
+                .load(&mut conn)
+                .map_err(StorageError::from)?;
+        let mut latest: std::collections::HashMap<String, (String, String)> =
+            std::collections::HashMap::new();
+        for (account_id, balance, end) in documents {
+            let (Some(account_id), Some(balance), Some(end)) = (account_id, balance, end) else {
+                continue;
+            };
+            let newer = latest
+                .get(&account_id)
+                .map(|(_, e)| end > *e)
+                .unwrap_or(true);
+            if newer {
+                latest.insert(account_id, (balance, end));
+            }
+        }
+        Ok(accounts
+            .into_iter()
+            .map(|(account_id, name, currency)| {
+                let found = latest.remove(&account_id);
+                AccountInfo {
+                    account_id,
+                    name,
+                    currency,
+                    balance: found.as_ref().map(|(b, _)| b.clone()),
+                    balance_date: found.map(|(_, e)| e),
+                }
+            })
+            .collect())
+    }
+
     async fn unlink_account(&self, contact_id: &str, account_id: &str) -> Result<()> {
         let (contact_id, account_id) = (contact_id.to_string(), account_id.to_string());
         self.writer
@@ -226,16 +310,21 @@ impl ContactsRepositoryTrait for ContactsRepository {
                     .select(contact_linked_accounts::account_id)
                     .load(conn)
                     .map_err(StorageError::from)?;
-                let moving: Vec<String> = contact_linked_accounts::table
+                let moving: Vec<(String, String)> = contact_linked_accounts::table
                     .filter(contact_linked_accounts::contact_id.eq(&source))
-                    .select(contact_linked_accounts::account_id)
+                    .select((
+                        contact_linked_accounts::account_id,
+                        contact_linked_accounts::share_percent,
+                    ))
                     .load(conn)
                     .map_err(StorageError::from)?;
-                for account_id in moving.into_iter().filter(|a| !existing.contains(a)) {
+                for (account_id, share) in moving.into_iter().filter(|(a, _)| !existing.contains(a))
+                {
                     diesel::insert_into(contact_linked_accounts::table)
                         .values((
                             contact_linked_accounts::contact_id.eq(&target.id),
                             contact_linked_accounts::account_id.eq(account_id),
+                            contact_linked_accounts::share_percent.eq(share),
                         ))
                         .execute(conn)
                         .map_err(StorageError::from)?;

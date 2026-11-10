@@ -32,6 +32,7 @@ const summary = (c: Contact, identifiers: ContactSummary["identifiers"] = []): C
   contact: c,
   identifiers,
   linkedAccountIds: [],
+  accountShares: [],
   operationCount: 0,
   totalIn: "0",
   totalOut: "0",

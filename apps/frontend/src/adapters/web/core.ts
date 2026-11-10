@@ -175,6 +175,9 @@ export const COMMANDS: CommandMap = {
   get_rates_review: { method: "GET", path: "/rates-review" },
   confirm_rates: { method: "POST", path: "/rates-review" },
   get_spending_by_beneficiary: { method: "GET", path: "/contacts/spending" },
+  set_contact_account_share: { method: "PUT", path: "/contacts" },
+  get_person_overview: { method: "GET", path: "/contacts" },
+  list_missing_own_accounts: { method: "GET", path: "/contacts/missing-accounts" },
 
   // Bank statements & account documents
   analyze_statement: { method: "POST", path: "/statements/analyze" },
@@ -1109,6 +1112,26 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "delete_rate": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "set_contact_account_share": {
+      const { id, accountId, sharePercent } = payload as {
+        id: string;
+        accountId: string;
+        sharePercent: number | string;
+      };
+      url += `/${encodeURIComponent(id)}/accounts/${encodeURIComponent(accountId)}/share`;
+      body = JSON.stringify({ sharePercent });
+      break;
+    }
+    case "get_person_overview": {
+      const { id, from, to } = payload as { id: string; from?: string; to?: string };
+      url += `/${encodeURIComponent(id)}/overview`;
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString();
+      if (qs) url += `?${qs}`;
       break;
     }
     case "get_spending_by_beneficiary": {
