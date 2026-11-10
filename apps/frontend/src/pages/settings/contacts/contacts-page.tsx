@@ -1,4 +1,6 @@
 import { listContacts, listUnresolvedCounterparties } from "@/adapters";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import type { ContactKind, ContactRole, NewContactIdentifier } from "@/lib/types/contacts";
 import { useQuery } from "@tanstack/react-query";
@@ -46,6 +48,7 @@ interface DialogState {
 
 export default function ContactsPage() {
   const { t } = useTranslation();
+  const { isBalanceHidden } = useBalancePrivacy();
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<ContactKind | "all">("all");
   const [role, setRole] = useState<ContactRole | "all">("all");
@@ -165,7 +168,9 @@ export default function ContactsPage() {
                   onClick={() => setDialog({ contactId: s.contact.id })}
                 >
                   <div className="grid min-w-0 gap-1">
-                    <span className="truncate font-medium">{s.contact.displayName}</span>
+                    <span className="truncate font-medium">
+                      {isBalanceHidden ? maskText(s.contact.displayName) : s.contact.displayName}
+                    </span>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">
                         {t(`settings:contacts.kind_${s.contact.kind}`)}

@@ -41,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { base64ToBytes, formatBytes } from "../statement-files";
 import { logicalOrder, parseReviewReason } from "../statement-review";
 import { DocumentReviewDialog } from "./document-review-dialog";
+import { matchesHolderFilter, type HolderFilter } from "../holders";
 
 const NO_ACCOUNT = "none";
 
@@ -51,6 +52,7 @@ export function DocumentsLibrary() {
   const [toDelete, setToDelete] = useState<StatementDocument | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
+  const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
 
   const { data: documents, isLoading } = useQuery({
     queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
@@ -79,7 +81,13 @@ export function DocumentsLibrary() {
   });
   const outdatedIds = useMemo(() => new Set(outdated?.documentIds ?? []), [outdated]);
 
-  const ordered = useMemo(() => [...(documents ?? [])].sort(logicalOrder), [documents]);
+  const ordered = useMemo(
+    () =>
+      [...(documents ?? [])]
+        .filter((d) => matchesHolderFilter(d.holderName, holderFilter))
+        .sort(logicalOrder),
+    [documents, holderFilter],
+  );
   const pending = ordered.filter((d) => d.status === "PENDING");
 
   const revalidateOne = useMutation({
@@ -168,6 +176,12 @@ export function DocumentsLibrary() {
     return <p className="text-muted-foreground text-sm">{t("settings:documents.library_empty")}</p>;
   }
 
+  const holderItems = [
+    { value: "all", label: t("settings:documents.holder_all") },
+    { value: "joint", label: t("settings:documents.holder_joint") },
+    { value: "individual", label: t("settings:documents.holder_individual") },
+  ];
+
   const accountItems = [
     { value: NO_ACCOUNT, label: t("settings:documents.no_account") },
     ...accounts.map((a) => ({ value: a.id, label: a.name })),
@@ -176,6 +190,22 @@ export function DocumentsLibrary() {
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        <Select
+          items={holderItems}
+          value={holderFilter}
+          onValueChange={(v) => v && setHolderFilter(v as HolderFilter)}
+        >
+          <SelectTrigger className="w-44" aria-label={t("settings:documents.holder_filter")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {holderItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           type="button"
           variant="outline"

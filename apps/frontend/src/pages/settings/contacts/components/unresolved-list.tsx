@@ -1,5 +1,7 @@
 import { addContactIdentifier, listContacts, listUnresolvedCounterparties } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { maskIban, maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import type { NewContactIdentifier, UnresolvedCounterparty } from "@/lib/types/contacts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +37,7 @@ const amount = (value: string | number) =>
 /** Who the imported operations were with, that no contact recognises yet: create a card or attach to one. */
 export function UnresolvedList({ onCreate }: Props) {
   const { t } = useTranslation();
+  const { isBalanceHidden: hidden } = useBalancePrivacy();
   const queryClient = useQueryClient();
   const { accounts } = useAccounts({ filterActive: false, includeArchived: true });
   const [shops, setShops] = useState(false);
@@ -105,11 +108,17 @@ export function UnresolvedList({ onCreate }: Props) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="grid min-w-0 gap-1">
                       <span className="font-medium">
-                        {item.name ?? formatIban(item.iban ?? "")}
+                        {item.name
+                          ? hidden
+                            ? maskText(item.name)
+                            : item.name
+                          : hidden
+                            ? maskIban(item.iban ?? "")
+                            : formatIban(item.iban ?? "")}
                       </span>
                       {item.iban ? (
                         <code className="text-muted-foreground text-xs">
-                          {formatIban(item.iban)}
+                          {hidden ? maskIban(item.iban) : formatIban(item.iban)}
                         </code>
                       ) : null}
                       <div className="flex flex-wrap items-center gap-2">

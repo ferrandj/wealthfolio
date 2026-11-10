@@ -1,4 +1,6 @@
 import { getSpendingByBeneficiary } from "@/adapters";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, CardContent, Input, Skeleton } from "@wealthfolio/ui";
@@ -23,6 +25,7 @@ interface Props {
 /** Who the money went to over a period, biggest first. Transfers between own accounts are left out. */
 export function SpendingByBeneficiary({ onIdentify }: Props) {
   const { t } = useTranslation();
+  const { isBalanceHidden } = useBalancePrivacy();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const { data, isLoading } = useQuery({
@@ -59,7 +62,9 @@ export function SpendingByBeneficiary({ onIdentify }: Props) {
           <Card key={`${r.contactId ?? r.name}-${r.currency}`}>
             <CardContent className="flex items-center gap-3 p-3">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{r.name}</div>
+                <div className="truncate font-medium">
+                  {isBalanceHidden ? maskText(r.name) : r.name}
+                </div>
                 <div className="text-muted-foreground text-xs">
                   {t("settings:contacts.spending_count", { count: r.count })} · {r.lastDate}
                 </div>

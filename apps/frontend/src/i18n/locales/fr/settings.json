@@ -2115,7 +2115,11 @@
     "coverage_break": "Le solde d'ouverture ({{found}}) ne reprend pas le solde de clôture du relevé précédent ({{expected}}).",
     "reader_outdated": "Lecteur périmé",
     "update_reader": "Actualiser à la dernière version ({{count}})",
-    "review_remember": "Retenir ces choix pour toutes les opérations équivalentes (même bénéficiaire)"
+    "review_remember": "Retenir ces choix pour toutes les opérations équivalentes (même bénéficiaire)",
+    "holder_filter": "Titulaires",
+    "holder_all": "Tous les comptes",
+    "holder_joint": "Comptes joints",
+    "holder_individual": "Comptes individuels"
   },
   "identity": {
     "title": "Coordonnées du compte",

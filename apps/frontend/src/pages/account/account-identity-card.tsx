@@ -1,4 +1,6 @@
 import { getAccountIdentity, saveAccountIdentity } from "@/adapters";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { maskAddress, maskIban, maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AccountIdentity, AccountIdentityInput } from "@/lib/types/statements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,6 +34,14 @@ export function AccountIdentityCard({ accountId }: { accountId: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AccountIdentityInput>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const { isBalanceHidden } = useBalancePrivacy();
+  const shown = (field: IdentityField, text: string) => {
+    if (!isBalanceHidden) return displayValue(field, text);
+    if (field === "iban") return maskIban(text);
+    if (field === "holderAddress") return maskAddress(text);
+    if (field === "holderName") return maskText(text);
+    return displayValue(field, text);
+  };
 
   const { data: identity } = useQuery<AccountIdentity | null>({
     queryKey: [QueryKeys.ACCOUNT_IDENTITIES, accountId],
@@ -144,7 +154,7 @@ export function AccountIdentityCard({ accountId }: { accountId: string }) {
                   <dd
                     className={`text-sm break-words whitespace-pre-line ${f === "iban" ? "font-mono" : ""}`}
                   >
-                    {displayValue(f, value(f))}
+                    {shown(f, value(f))}
                   </dd>
                 </div>
                 <Button
