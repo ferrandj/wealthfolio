@@ -2,6 +2,7 @@ import {
   deleteStatementDocument,
   getStatementDocumentContent,
   getStatementOutdated,
+  invalidateAllStatementDocuments,
   linkStatementDocument,
   listStatementDocuments,
   openFileSaveDialog,
@@ -51,6 +52,7 @@ export function DocumentsLibrary() {
   const { accounts } = useAccounts({ filterActive: false, includeArchived: true });
   const [toDelete, setToDelete] = useState<StatementDocument | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [confirmInvalidate, setConfirmInvalidate] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "tree">("list");
@@ -118,6 +120,29 @@ export function DocumentsLibrary() {
     },
     onError: (e) => {
       setConfirmAll(false);
+      toast({
+        title: t("settings:documents.error"),
+        description: String(e),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const invalidateAll = useMutation({
+    mutationFn: invalidateAllStatementDocuments,
+    onSuccess: async (count) => {
+      setConfirmInvalidate(false);
+      await Promise.all([
+        refresh(),
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE] }),
+      ]);
+      toast({
+        title: t("settings:documents.invalidate_all_done"),
+        description: t("settings:documents.invalidate_all_summary", { count }),
+      });
+    },
+    onError: (e) => {
+      setConfirmInvalidate(false);
       toast({
         title: t("settings:documents.error"),
         description: String(e),
@@ -388,6 +413,16 @@ export function DocumentsLibrary() {
           type="button"
           variant="outline"
           size="sm"
+          disabled={invalidateAll.isPending || !documents.some((d) => d.status === "VALIDATED")}
+          onClick={() => setConfirmInvalidate(true)}
+        >
+          <Icons.AlertTriangle className="mr-1 size-4" />
+          {t("settings:documents.invalidate_all")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
           disabled={revalidateAll.isPending}
           onClick={() => setConfirmAll(true)}
         >
@@ -402,6 +437,23 @@ export function DocumentsLibrary() {
         </Button>
       </div>
       <div className="space-y-2">{viewMode === "list" ? ordered.map(renderDoc) : renderTree()}</div>
+
+      <AlertDialog open={confirmInvalidate} onOpenChange={setConfirmInvalidate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("settings:documents.invalidate_all_title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings:documents.invalidate_all_description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
+            <Button disabled={invalidateAll.isPending} onClick={() => invalidateAll.mutate()}>
+              {t("settings:documents.invalidate_all_confirm")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
         <AlertDialogContent>

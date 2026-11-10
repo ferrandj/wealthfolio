@@ -179,6 +179,17 @@ pub(crate) fn classify_activity_for_aggregation(
 pub(crate) fn classify_activity(activity: &Activity, account_type: &str) -> SpendingClassification {
     let activity_type = activity.effective_type();
 
+    // money moved to or from another account of the person, which is not in the app (a crypto account, a broker):
+    // neither spent nor earned
+    if activity.is_own_account_transfer()
+        && matches!(
+            activity_type,
+            "DEPOSIT" | "WITHDRAWAL" | "TRANSFER_IN" | "TRANSFER_OUT"
+        )
+    {
+        return SpendingClassification::InternalTransfer;
+    }
+
     if matches!(activity_type, "TRANSFER_IN" | "TRANSFER_OUT") && activity.source_group_id.is_some()
     {
         return SpendingClassification::InternalTransfer;
@@ -757,5 +768,45 @@ mod tests {
             .count();
             prop_assert!(non_zero <= 1, "{classification:?} fills {non_zero} buckets");
         }
+    }
+    #[test]
+    fn money_moved_to_an_own_account_outside_the_app_is_neutral() {
+        let flagged = |kind: &str| {
+            let mut a = activity(kind, None);
+            a.metadata = Some(serde_json::json!({ "transfer": { "own_account": true } }));
+            a
+        };
+        for kind in ["WITHDRAWAL", "DEPOSIT", "TRANSFER_OUT", "TRANSFER_IN"] {
+            assert_eq!(
+                classify_activity(&flagged(kind), account_types::CASH),
+                SpendingClassification::InternalTransfer,
+                "{kind}"
+            );
+            assert_eq!(
+                classify_activity_for_aggregation(
+                    &flagged(kind),
+                    account_types::CASH,
+                    &HashSet::new()
+                ),
+                SpendingClassification::InternalTransfer,
+                "{kind}"
+            );
+        }
+        // the same rows without the mark are spent and earned as before
+        assert_eq!(
+            classify_activity(&activity("WITHDRAWAL", None), account_types::CASH),
+            SpendingClassification::Expense
+        );
+        assert_eq!(
+            classify_activity(&activity("DEPOSIT", None), account_types::CASH),
+            SpendingClassification::Income
+        );
+        // a mark that was cleared
+        let mut cleared = activity("WITHDRAWAL", None);
+        cleared.metadata = Some(serde_json::json!({ "transfer": { "own_account": false } }));
+        assert_eq!(
+            classify_activity(&cleared, account_types::CASH),
+            SpendingClassification::Expense
+        );
     }
 }

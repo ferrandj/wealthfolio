@@ -1,4 +1,15 @@
-import type { StatementDocument, StatementReviewReason } from "@/lib/types/statements";
+import type {
+  ReviewedOperation,
+  StatementDocument,
+  StatementReview,
+  StatementReviewReason,
+} from "@/lib/types/statements";
+
+/** A category picked for an operation during the review. */
+export interface ReviewChoice {
+  taxonomyId: string;
+  categoryId: string;
+}
 
 /**
  * The logical order to look at documents: account by account, oldest period first, so that each statement's
@@ -34,4 +45,41 @@ export function parseReviewReason(value: string | null | undefined): StatementRe
   } catch {
     return null;
   }
+}
+
+/** "Account to account": money moved between the person's own accounts, neither spent nor earned. */
+export function ownTransferChoice(amount: string): ReviewChoice {
+  return Number(amount) < 0
+    ? { taxonomyId: "spending_categories", categoryId: "cat_transfers_own" }
+    : { taxonomyId: "income_sources", categoryId: "cat_income_transfers_own" };
+}
+
+/** The category the reader suggests for an operation, when it has one. */
+export function suggestedChoice(op: ReviewedOperation): ReviewChoice | null {
+  const taxonomyId = op.taxonomyId ?? op.suggestedTaxonomyId;
+  const categoryId = op.categoryId ?? op.suggestedCategoryId;
+  return taxonomyId && categoryId ? { taxonomyId, categoryId } : null;
+}
+
+/** The doubtful operations of a review that nobody has decided yet (those that can be changed: they have an activity). */
+export function doubtfulOperations(
+  statements: StatementReview[],
+  choices: Record<string, ReviewChoice>,
+): ReviewedOperation[] {
+  return statements.flatMap((s) =>
+    s.operations.filter((o) => o.needsReview && o.activityId && !choices[o.activityId]),
+  );
+}
+
+/** Confirm every doubtful operation as the reader suggests it. */
+export function confirmDoubts(
+  statements: StatementReview[],
+  choices: Record<string, ReviewChoice>,
+): Record<string, ReviewChoice> {
+  const next = { ...choices };
+  for (const op of doubtfulOperations(statements, choices)) {
+    const choice = suggestedChoice(op);
+    if (choice && op.activityId) next[op.activityId] = choice;
+  }
+  return next;
 }

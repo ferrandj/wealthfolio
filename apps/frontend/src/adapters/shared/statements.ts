@@ -102,6 +102,11 @@ export const revalidateAllStatementDocuments = async (): Promise<RevalidationRes
   return invoke<RevalidationResult>("revalidate_all_statement_documents");
 };
 
+/** Every validated statement goes back to waiting for review; returns how many. */
+export const invalidateAllStatementDocuments = async (): Promise<number> => {
+  return invoke<number>("invalidate_all_statement_documents");
+};
+
 export const getStatementOutdated = async (): Promise<OutdatedDocuments> => {
   return invoke<OutdatedDocuments>("get_statement_outdated");
 };

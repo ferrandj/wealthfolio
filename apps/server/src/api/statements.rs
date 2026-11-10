@@ -174,6 +174,12 @@ async fn revalidate_all(
     Ok(Json(result))
 }
 
+async fn invalidate_all(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<u32>> {
+    Ok(Json(state.statement_service.invalidate_all().await?))
+}
+
 async fn list_identities(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AccountIdentity>>> {
@@ -291,6 +297,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         )
         .route("/statements/review-queue", get(review_queue))
         .route("/statements/revalidate", post(revalidate_all))
+        .route("/statements/invalidate", post(invalidate_all))
         .route("/statements/documents/{id}/review", get(review_document))
         .route(
             "/statements/documents/{id}/validate",

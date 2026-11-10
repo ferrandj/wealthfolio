@@ -960,6 +960,12 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
   });
 
+  it("sends every validated statement back to review", async () => {
+    const mock = stubFetch(3);
+    await invoke("invalidate_all_statement_documents");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/invalidate", method: "POST" });
+  });
+
   it("lists the documents read by an older reader", async () => {
     const mock = stubFetch({ currentVersion: "x", documentIds: [] });
     await invoke("get_statement_outdated");

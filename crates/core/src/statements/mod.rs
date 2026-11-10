@@ -26,7 +26,10 @@ pub use statements_model::{
     StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
     DOCUMENT_STATUS_VALIDATED,
 };
-pub use statements_review::{balance_gap, logical_order, ReviewReason};
+pub use statements_review::{
+    balance_gap, is_generic_category, is_own_transfer_category, logical_order,
+    suggestion_replaces_kept, ReviewReason,
+};
 pub use statements_service::{StatementService, MAX_DOCUMENT_BYTES, OPENING_BALANCE_NOTE};
 pub use statements_traits::{
     CategoryAssignerTrait, StatementRepositoryTrait, StatementServiceTrait,

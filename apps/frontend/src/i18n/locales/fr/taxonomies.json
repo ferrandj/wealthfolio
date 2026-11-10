@@ -731,7 +731,21 @@
       "cat_fees_bank": "Frais bancaires",
       "cat_fees_atm": "Frais de guichet automatique",
       "cat_fees_interest": "Frais d'intérêt",
-      "cat_fees_late": "Frais de retard"
+      "cat_fees_late": "Frais de retard",
+      "cat_transfers": "Virements entre mes comptes",
+      "cat_cash_withdrawal": "Retraits d'espèces",
+      "cat_taxes": "Impôts et taxes",
+      "cat_pets": "Animaux",
+      "cat_children": "Enfants",
+      "cat_transfers_own": "Compte à compte",
+      "cat_transfers_crypto": "Vers un compte crypto",
+      "cat_transfers_broker": "Vers un compte-titres / courtier",
+      "cat_transfers_savings": "Vers un compte d'épargne",
+      "cat_taxes_income": "Impôt sur le revenu",
+      "cat_taxes_property": "Taxe foncière / habitation",
+      "cat_taxes_fines": "Amendes",
+      "cat_housing_loan": "Remboursement de prêt immobilier",
+      "cat_bills_insurance": "Autres assurances"
     },
     "savings_categories": {
       "cat_savings_emergency": "Fonds d'urgence",
@@ -759,7 +773,15 @@
       "cat_income_gifts": "Cadeaux reçus",
       "cat_income_refunds": "Remboursements",
       "cat_income_reimbursements": "Remboursements",
-      "cat_income_tax_refund": "Remboursement d'impôt"
+      "cat_income_tax_refund": "Remboursement d'impôt",
+      "cat_income_transfers": "Virements entre mes comptes",
+      "cat_income_transfers_own": "Compte à compte",
+      "cat_income_transfers_crypto": "Depuis un compte crypto",
+      "cat_income_transfers_broker": "Depuis un compte-titres / courtier",
+      "cat_income_transfers_savings": "Depuis un compte d'épargne",
+      "cat_income_prime": "Primes et offres",
+      "cat_income_benefits": "Aides et allocations",
+      "cat_income_pension": "Pension et retraite"
     }
   },
   "unknown": "Inconnu"

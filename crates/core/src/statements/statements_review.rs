@@ -98,6 +98,40 @@ pub fn apply_reason(document: &mut StatementDocument, reason: &ReviewReason) {
     }
 }
 
+/// Whether a category says that the money moved between the person's own accounts: such an operation is neither
+/// spent nor earned, whatever the other account is (a crypto account, a broker, a savings account).
+pub fn is_own_transfer_category(taxonomy_id: &str, category_id: &str) -> bool {
+    match taxonomy_id {
+        "spending_categories" => {
+            category_id == "cat_transfers" || category_id.starts_with("cat_transfers_")
+        }
+        "income_sources" => {
+            category_id == "cat_income_transfers"
+                || category_id.starts_with("cat_income_transfers_")
+        }
+        _ => false,
+    }
+}
+
+/// The catch-all categories: a category a person kept by validating (rather than one they picked on purpose) says
+/// nothing more than "not recognised".
+pub fn is_generic_category(category_id: &str) -> bool {
+    matches!(category_id, "cat_other_expense" | "cat_income_other")
+}
+
+/// A category kept from an earlier validation is replaced by the one the reader suggests now when it was only the
+/// catch-all and the reader now recognises the operation: this is how better rules reach operations that were
+/// validated before. A category chosen on purpose (anything but the catch-all) is never replaced.
+pub fn suggestion_replaces_kept(
+    kept_category: &str,
+    suggested_category: Option<&str>,
+    confidence: &str,
+) -> bool {
+    is_generic_category(kept_category)
+        && confidence != "low"
+        && suggested_category.is_some_and(|c| c != kept_category)
+}
+
 /// The logical order to look at documents: account by account, oldest period first, so that each statement's opening
 /// balance is the previous one's closing balance.
 pub fn logical_order(a: &StatementDocument, b: &StatementDocument) -> Ordering {
@@ -277,5 +311,76 @@ mod tests {
             doubtful.review_reason.as_deref(),
             Some(r#"{"doubts":2,"balanceGap":null,"warnings":0}"#)
         );
+    }
+}
+
+#[cfg(test)]
+mod transfer_tests {
+    use super::*;
+
+    #[test]
+    fn transfer_categories_are_told_by_their_ids() {
+        assert!(is_own_transfer_category(
+            "spending_categories",
+            "cat_transfers"
+        ));
+        assert!(is_own_transfer_category(
+            "spending_categories",
+            "cat_transfers_crypto"
+        ));
+        assert!(is_own_transfer_category(
+            "income_sources",
+            "cat_income_transfers_own"
+        ));
+        // the same id in the other taxonomy, or a lookalike, is not one
+        assert!(!is_own_transfer_category(
+            "income_sources",
+            "cat_transfers_own"
+        ));
+        assert!(!is_own_transfer_category(
+            "spending_categories",
+            "cat_transfersx"
+        ));
+        assert!(!is_own_transfer_category(
+            "savings_categories",
+            "cat_savings"
+        ));
+        assert!(!is_own_transfer_category(
+            "spending_categories",
+            "cat_other_expense"
+        ));
+    }
+
+    #[test]
+    fn only_the_catch_all_is_replaced_by_a_better_suggestion() {
+        assert!(suggestion_replaces_kept(
+            "cat_other_expense",
+            Some("cat_transfers_crypto"),
+            "medium"
+        ));
+        assert!(suggestion_replaces_kept(
+            "cat_income_other",
+            Some("cat_income_prime"),
+            "high"
+        ));
+        // a doubtful suggestion is no better than the catch-all
+        assert!(!suggestion_replaces_kept(
+            "cat_other_expense",
+            Some("cat_shopping"),
+            "low"
+        ));
+        // nothing better to put
+        assert!(!suggestion_replaces_kept("cat_other_expense", None, "high"));
+        assert!(!suggestion_replaces_kept(
+            "cat_other_expense",
+            Some("cat_other_expense"),
+            "high"
+        ));
+        // a category chosen on purpose stays
+        assert!(!suggestion_replaces_kept(
+            "cat_gifts",
+            Some("cat_transfers_own"),
+            "high"
+        ));
     }
 }

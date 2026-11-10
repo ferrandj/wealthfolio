@@ -98,6 +98,9 @@ pub trait StatementServiceTrait: Send + Sync {
     ) -> Result<StatementDocument>;
     /// Undo what one document brought in and read its stored original again.
     async fn revalidate_document(&self, id: &str) -> Result<StatementDocument>;
+    /// Every validated statement goes back to waiting for review. Nothing is changed in the operations: each one
+    /// is looked at again and validated again. Returns how many were invalidated.
+    async fn invalidate_all(&self) -> Result<u32>;
     /// Undo what every document brought in, then read all the stored originals again, oldest first. Obvious ones
     /// come back validated; the others wait for review with the reason. Categories chosen by hand are kept.
     async fn revalidate_all(&self) -> Result<RevalidationResult>;

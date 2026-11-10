@@ -66,12 +66,26 @@ fn rule(
 // Outgoing money. First match wins, so the specific merchants come before the generic keywords.
 static EXPENSE_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
-        // placements: money that leaves the account to be invested, not consumed
+        // the transfer a bank asks to open an account: money moved from or to the person's other account
         rule(
-            r"\b(KRAKEN|COINBASE|BINANCE|BITSTAMP|BITPANDA|LEDGER LIVE|TRADE REPUBLIC|DEGIRO|INTERACTIVE BROKERS|BOURSORAMA PLACEMENT|CRYPTO\.COM)\b",
-            "other_expense",
+            r"(VIREMENT CREATION COMPTE|VIREMENT D'?OUVERTURE|VIREMENT DE CREATION)",
+            "transfers_own",
             MEDIUM,
-            Some("Placement ou achat de crypto : ce n'est pas une dépense de consommation"),
+            Some("Virement d'ouverture de compte (compte à compte)"),
+        ),
+        // money that leaves the account for another account of the person (crypto exchange, broker): a transfer
+        // between own accounts, not something consumed
+        rule(
+            r"\b(KRAKEN|COINBASE|BINANCE|BITSTAMP|BITPANDA|LEDGER LIVE|CRYPTO\.COM)\b",
+            "transfers_crypto",
+            MEDIUM,
+            Some("Virement vers un compte crypto (compte à compte)"),
+        ),
+        rule(
+            r"\b(TRADE REPUBLIC|DEGIRO|INTERACTIVE BROKERS|BOURSORAMA PLACEMENT)\b",
+            "transfers_broker",
+            MEDIUM,
+            Some("Virement vers un compte-titres ou un courtier (compte à compte)"),
         ),
         rule(
             r"\b(UBER ?EATS|DELIVEROO|JUST ?EAT)\b",
@@ -283,15 +297,22 @@ static EXPENSE_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
             MEDIUM,
             Some("Don ou cotisation ?"),
         ),
+        rule(r"(AMENDE|ANTAI)", "taxes_fines", HIGH, None),
         rule(
-            r"(IMPOT|DGFIP|TRESOR PUBLIC|DIRECTION GENERALE DES FINANCES|URSSAF|TAXE|AMENDE|ANTAI)",
-            "bills",
+            r"(TAXE FONCIERE|TAXE D'?HABITATION)",
+            "taxes_property",
+            HIGH,
+            None,
+        ),
+        rule(
+            r"(IMPOT|DGFIP|TRESOR PUBLIC|DIRECTION GENERALE DES FINANCES|URSSAF|TAXE)",
+            "taxes",
             MEDIUM,
-            Some("Impôt, taxe ou amende"),
+            Some("Impôt ou taxe"),
         ),
         rule(
             r"(RETRAIT|DAB |DISTRIBUTEUR|CASH ?WITHDRAWAL|ATM )",
-            "other_expense",
+            "cash_withdrawal",
             MEDIUM,
             Some("Retrait d'espèces"),
         ),
@@ -313,6 +334,25 @@ static EXPENSE_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
 // Incoming money.
 static INCOME_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
+        // the transfer a bank asks to open an account: money moved from or to the person's other account
+        rule(
+            r"(VIREMENT CREATION COMPTE|VIREMENT D'?OUVERTURE|VIREMENT DE CREATION)",
+            "income_transfers_own",
+            MEDIUM,
+            Some("Virement d'ouverture de compte (compte à compte)"),
+        ),
+        rule(
+            r"\b(KRAKEN|COINBASE|BINANCE|BITSTAMP|BITPANDA|LEDGER LIVE|CRYPTO\.COM)\b",
+            "income_transfers_crypto",
+            MEDIUM,
+            Some("Virement depuis un compte crypto (compte à compte)"),
+        ),
+        rule(
+            r"\b(TRADE REPUBLIC|DEGIRO|INTERACTIVE BROKERS|BOURSORAMA PLACEMENT)\b",
+            "income_transfers_broker",
+            MEDIUM,
+            Some("Virement depuis un compte-titres ou un courtier (compte à compte)"),
+        ),
         rule(
             r"(SALAIRE|PAIE |PAYE |PAYROLL|REMUNERATION|TRAITEMENT)",
             "income_salary",
@@ -321,7 +361,7 @@ static INCOME_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
         ),
         rule(
             r"(PRIME BRS|OFFRE MOBILITE|MOBILITE BANCAIRE|PARRAINAGE|PRIME DE BIENVENUE|BIENVENUE|PRIME )",
-            "income_other",
+            "income_prime",
             MEDIUM,
             Some("Prime ou offre d'une banque"),
         ),
@@ -353,7 +393,7 @@ static INCOME_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
         ),
         rule(
             r"(CAF |POLE EMPLOI|FRANCE TRAVAIL|ALLOCATION|ARE )",
-            "income_other",
+            "income_benefits",
             MEDIUM,
             Some("Aide ou allocation"),
         ),
@@ -513,7 +553,7 @@ pub fn suggest(input: &CategoryInput) -> CategorySuggestion {
     if kind == "loan_payment" && outgoing {
         return suggestion(
             taxonomy,
-            "housing_rent",
+            "housing_loan",
             MEDIUM,
             Some("Échéance de prêt : logement, auto ou conso ?".into()),
         );
@@ -568,20 +608,34 @@ pub fn suggest(input: &CategoryInput) -> CategorySuggestion {
     }
 
     if is_self_transfer {
-        let reason = match (outgoing, own) {
-            (true, SelfMatch::Full) => "Virement vers vous-même : s'il va vers un autre de vos comptes, ce n'est pas une dépense",
-            (false, SelfMatch::Full) => "Virement de vous-même : s'il vient d'un autre de vos comptes, ce n'est pas un revenu",
-            (true, _) => "Le nom ressemble au vôtre : virement vers un de vos comptes ?",
-            (false, _) => "Le nom ressemble au vôtre : virement depuis un de vos comptes ?",
+        // the holder's own name is a transfer between own accounts: sure when the whole name is there, to be
+        // looked at when only a part of it (or a name that looks like it) is
+        let (reason, confidence) = match (outgoing, own) {
+            (true, SelfMatch::Full) => (
+                "Virement vers vous-même : compte à compte, ce n'est pas une dépense",
+                MEDIUM,
+            ),
+            (false, SelfMatch::Full) => (
+                "Virement de vous-même : compte à compte, ce n'est pas un revenu",
+                MEDIUM,
+            ),
+            (true, _) => (
+                "Le nom ressemble au vôtre : virement vers un de vos comptes ?",
+                LOW,
+            ),
+            (false, _) => (
+                "Le nom ressemble au vôtre : virement depuis un de vos comptes ?",
+                LOW,
+            ),
         };
         return suggestion(
             taxonomy,
             if outgoing {
-                "other_expense"
+                "transfers_own"
             } else {
-                "income_other"
+                "income_transfers_own"
             },
-            LOW,
+            confidence,
             Some(reason.to_string()),
         );
     }
@@ -730,7 +784,11 @@ mod tests {
             "instant_transfer",
             -800.0,
         );
-        assert_eq!(s.confidence, LOW);
+        assert_eq!(s.category_id, "cat_transfers_own");
+        assert_eq!(
+            s.confidence, MEDIUM,
+            "the whole name is there: account to account"
+        );
         assert!(s.reason.unwrap().contains("vous-même"));
         let incoming = cat(
             "MR FERRAND JEREMIE",
@@ -739,7 +797,17 @@ mod tests {
             3000.0,
         );
         assert_eq!(incoming.taxonomy_id, INCOME_TAXONOMY);
-        assert_eq!(incoming.confidence, LOW);
+        assert_eq!(incoming.category_id, "cat_income_transfers_own");
+        assert_eq!(incoming.confidence, MEDIUM);
+        assert!(!incoming.needs_review());
+    }
+
+    #[test]
+    fn a_name_that_only_looks_like_the_holders_is_still_looked_at() {
+        let s = cat("1FERRAN", Some("1FERRAN"), "transfer", 120.0);
+        assert_eq!(s.category_id, "cat_income_transfers_own");
+        assert_eq!(s.confidence, LOW);
+        assert!(s.needs_review());
     }
 
     #[test]
@@ -776,15 +844,65 @@ mod tests {
     }
 
     #[test]
-    fn crypto_exchanges_are_flagged_as_placements() {
+    fn money_sent_to_a_crypto_exchange_is_a_transfer_between_own_accounts() {
         let s = cat(
             "Kraken Kraken — AA97 N84G HBIA MLLI kraken.com",
             Some("Kraken Kraken"),
             "transfer",
             -2000.0,
         );
+        assert_eq!(s.taxonomy_id, SPENDING_TAXONOMY);
+        assert_eq!(s.category_id, "cat_transfers_crypto");
         assert_eq!(s.confidence, MEDIUM);
-        assert!(s.reason.unwrap().contains("Placement"));
+        assert!(s.reason.unwrap().contains("crypto"));
+        let back = cat("Binance — retrait", Some("Binance"), "transfer", 500.0);
+        assert_eq!(back.taxonomy_id, INCOME_TAXONOMY);
+        assert_eq!(back.category_id, "cat_income_transfers_crypto");
+        let broker = cat("DEGIRO", Some("DEGIRO"), "transfer", -300.0);
+        assert_eq!(broker.category_id, "cat_transfers_broker");
+    }
+
+    #[test]
+    fn cash_taxes_and_loans_have_their_own_categories() {
+        assert_eq!(
+            cat("RETRAIT DAB PARIS", None, "card", -60.0).category_id,
+            "cat_cash_withdrawal"
+        );
+        assert_eq!(
+            cat("DGFIP PRELEVEMENT", None, "direct_debit", -120.0).category_id,
+            "cat_taxes"
+        );
+        assert_eq!(
+            cat("AMENDE ANTAI", None, "card", -35.0).category_id,
+            "cat_taxes_fines"
+        );
+        assert_eq!(
+            cat("ECHEANCE PRET", None, "loan_payment", -726.06).category_id,
+            "cat_housing_loan"
+        );
+        assert_eq!(
+            cat("CAF DE L'OISE", None, "transfer", 210.0).category_id,
+            "cat_income_benefits"
+        );
+    }
+
+    #[test]
+    fn the_transfer_that_opens_an_account_is_account_to_account() {
+        let funding = cat(
+            "VIREMENT CREATION COMPTE — BOURSORAMA",
+            Some("BOURSORAMA"),
+            "transfer",
+            2200.0,
+        );
+        assert_eq!(funding.category_id, "cat_income_transfers_own");
+        assert!(!funding.needs_review());
+        let check = cat(
+            "VIREMENT CREATION COMPTE — M FERRAND J",
+            Some("M FERRAND J"),
+            "transfer",
+            -10.0,
+        );
+        assert_eq!(check.category_id, "cat_transfers_own");
     }
 
     #[test]
@@ -802,11 +920,11 @@ mod tests {
     }
 
     #[test]
-    fn bank_welcome_bonuses_are_other_income() {
+    fn bank_welcome_bonuses_have_their_own_category() {
         let s = cat("Prime BRS80", None, "other", 80.0);
-        assert_eq!(s.category_id, "cat_income_other");
+        assert_eq!(s.category_id, "cat_income_prime");
         let s2 = cat("Offre Mobilite Bancaire", None, "other", 50.0);
-        assert_eq!(s2.category_id, "cat_income_other");
+        assert_eq!(s2.category_id, "cat_income_prime");
     }
 
     #[test]
@@ -823,59 +941,37 @@ mod tests {
 
     #[test]
     fn every_suggested_category_exists_in_the_seeded_taxonomies() {
-        let seeded: &[&str] = &[
-            "housing_rent",
-            "housing_utilities",
-            "housing_insurance",
-            "groceries",
-            "food_restaurants",
-            "food_delivery",
-            "transport",
-            "transport_gas",
-            "transport_parking",
-            "transport_public",
-            "transport_rideshare",
-            "shopping",
-            "shopping_clothing",
-            "shopping_electronics",
-            "shopping_home",
-            "shopping_online",
-            "entertainment_streaming",
-            "entertainment_movies",
-            "entertainment_games",
-            "bills",
-            "bills_phone",
-            "bills_internet",
-            "bills_subscriptions",
-            "bills_software",
-            "health_pharmacy",
-            "health_medical",
-            "health_dental",
-            "health_vision",
-            "health_fitness",
-            "health_insurance",
-            "travel",
-            "education",
-            "personal",
-            "gifts",
+        // the ids the migrations seed: `cat_<key>` is found quoted in one of them
+        let seeds = [
+            include_str!(
+                "../../storage-sqlite/migrations/2026-05-25-000001_spending_module/up.sql"
+            ),
+            include_str!(
+                "../../storage-sqlite/migrations/2026-11-10-000009_transfer_categories/up.sql"
+            ),
+        ]
+        .join("\n");
+        let mut keys: Vec<&str> = EXPENSE_RULES
+            .iter()
+            .chain(INCOME_RULES.iter())
+            .map(|r| r.category)
+            .collect();
+        keys.extend([
             "fees_bank",
             "fees_interest",
+            "housing_loan",
             "other_expense",
-            "income_salary",
-            "income_freelance",
-            "income_dividends",
-            "income_interest",
-            "income_rental",
-            "income_gifts",
-            "income_reimbursements",
-            "income_tax_refund",
             "income_other",
-        ];
-        for r in EXPENSE_RULES.iter().chain(INCOME_RULES.iter()) {
+            "income_interest",
+            "shopping",
+            "bills_subscriptions",
+            "transfers_own",
+            "income_transfers_own",
+        ]);
+        for key in keys {
             assert!(
-                seeded.contains(&r.category),
-                "unknown category {}",
-                r.category
+                seeds.contains(&format!("'cat_{key}'")),
+                "category cat_{key} is not seeded by a migration"
             );
         }
     }

@@ -283,6 +283,17 @@ impl Activity {
         self.explicit_external_transfer().unwrap_or(false)
     }
 
+    /// Whether the row was marked as money moved between the person's own accounts (`metadata.transfer.own_account`),
+    /// the other account not being in the app: it is neither spent nor earned.
+    pub fn is_own_account_transfer(&self) -> bool {
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("transfer"))
+            .and_then(|t| t.get("own_account"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+    }
+
     /// Check if this activity has a user override
     pub fn has_override(&self) -> bool {
         type_override(self.activity_type_override.as_deref()).is_some()

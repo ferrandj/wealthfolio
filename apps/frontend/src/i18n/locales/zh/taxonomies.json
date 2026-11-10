@@ -731,7 +731,21 @@
       "cat_fees_bank": "银行费用",
       "cat_fees_atm": "自动柜员机费用",
       "cat_fees_interest": "利息费用",
-      "cat_fees_late": "滞纳金"
+      "cat_fees_late": "滞纳金",
+      "cat_transfers": "Transfers Between Own Accounts",
+      "cat_cash_withdrawal": "Cash Withdrawals",
+      "cat_taxes": "Taxes",
+      "cat_pets": "Pets",
+      "cat_children": "Children",
+      "cat_transfers_own": "Account to Account",
+      "cat_transfers_crypto": "To a Crypto Account",
+      "cat_transfers_broker": "To a Brokerage Account",
+      "cat_transfers_savings": "To a Savings Account",
+      "cat_taxes_income": "Income Tax",
+      "cat_taxes_property": "Property Tax",
+      "cat_taxes_fines": "Fines",
+      "cat_housing_loan": "Home Loan Repayment",
+      "cat_bills_insurance": "Other Insurance"
     },
     "savings_categories": {
       "cat_savings_emergency": "应急基金",
@@ -759,7 +773,15 @@
       "cat_income_gifts": "收到的礼物",
       "cat_income_refunds": "退款",
       "cat_income_reimbursements": "报销",
-      "cat_income_tax_refund": "退税"
+      "cat_income_tax_refund": "退税",
+      "cat_income_transfers": "Transfers Between Own Accounts",
+      "cat_income_transfers_own": "Account to Account",
+      "cat_income_transfers_crypto": "From a Crypto Account",
+      "cat_income_transfers_broker": "From a Brokerage Account",
+      "cat_income_transfers_savings": "From a Savings Account",
+      "cat_income_prime": "Bonuses & Sign-up Offers",
+      "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_pension": "Pension"
     }
   },
   "unknown": "未知"

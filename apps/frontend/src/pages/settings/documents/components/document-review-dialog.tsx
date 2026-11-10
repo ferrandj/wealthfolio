@@ -25,12 +25,18 @@ import {
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  confirmDoubts,
+  ownTransferChoice,
+  suggestedChoice,
+  type ReviewChoice,
+} from "../statement-review";
 
 const SPENDING = "spending_categories";
 const INCOME = "income_sources";
 const SAVINGS = "savings_categories";
 
-type Choice = { taxonomyId: string; categoryId: string };
+type Choice = ReviewChoice;
 
 function money(value: string | null | undefined, currency: string): string {
   if (value == null) return "—";
@@ -81,7 +87,7 @@ export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogPr
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-3 overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-3 overflow-y-auto md:overflow-hidden">
         {currentId && (
           <ReviewBody
             key={currentId}
@@ -235,7 +241,11 @@ function ReviewBody({
         </div>
       )}
 
-      <div className="flex items-center gap-2 text-sm">
+      {doubtCount > 0 && (
+        <p className="text-muted-foreground text-sm">{t("settings:documents.review_help")}</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <Button
           size="sm"
           variant={showOnlyDoubts ? "default" : "outline"}
@@ -250,9 +260,20 @@ function ReviewBody({
         >
           {t("settings:documents.review_all")}
         </Button>
+        {doubtCount > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ms-auto"
+            onClick={() => setChoices((c) => confirmDoubts(review.statements, c))}
+          >
+            <Icons.Check className="mr-1 size-4" />
+            {t("settings:documents.review_confirm_all", { count: doubtCount })}
+          </Button>
+        )}
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <div className="shrink-0 space-y-4 pr-1 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto">
         {review.statements.length === 0 && (
           <p className="text-muted-foreground text-sm">
             {t("settings:documents.review_no_operations")}
@@ -379,6 +400,9 @@ function OperationRow({
   const taxonomyId = choice?.taxonomyId ?? op.taxonomyId ?? op.suggestedTaxonomyId;
   const categoryId = choice?.categoryId ?? op.categoryId ?? op.suggestedCategoryId;
   const doubtful = op.needsReview && !choice;
+  const suggestion = suggestedChoice(op);
+  const showCounterparty =
+    !!op.counterparty && !op.label.toLowerCase().includes(op.counterparty.toLowerCase());
   return (
     <li
       className={cn(
@@ -388,9 +412,10 @@ function OperationRow({
     >
       <div className="text-muted-foreground w-24 shrink-0 text-xs tabular-nums">{op.date}</div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium" title={op.label}>
-          {op.label}
-        </div>
+        <div className="text-sm font-medium break-words">{op.label}</div>
+        {showCounterparty && (
+          <div className="text-muted-foreground text-xs break-words">{op.counterparty}</div>
+        )}
         {op.reason && (doubtful || op.confidence !== "high") && (
           <div className={cn("text-xs", doubtful ? "text-amber-700" : "text-muted-foreground")}>
             {op.reason}
@@ -405,7 +430,7 @@ function OperationRow({
       >
         {money(op.amount, op.currency || currency)}
       </div>
-      <div className="flex w-full shrink-0 items-center gap-2 md:w-64">
+      <div className="flex w-full shrink-0 flex-wrap items-center gap-2 md:w-80">
         {doubtful ? (
           <Badge variant="outline" className="border-amber-500 text-amber-700">
             {t("settings:documents.review_doubt")}
@@ -421,14 +446,40 @@ function OperationRow({
             selectedCategoryId={categoryId}
             onSelect={(tax, cat) => onChoose(op.activityId!, { taxonomyId: tax, categoryId: cat })}
             trigger={
-              <Button variant="outline" size="sm" className="min-w-0 flex-1 justify-start truncate">
-                {taxonomyId && categoryId
-                  ? label(taxonomyId, categoryId)
-                  : t("settings:documents.review_category")}
+              <Button variant="outline" size="sm" className="min-w-0 flex-1 justify-start">
+                <span className="truncate">
+                  {taxonomyId && categoryId
+                    ? label(taxonomyId, categoryId)
+                    : t("settings:documents.review_category")}
+                </span>
+                <Icons.ChevronDown className="ms-auto size-3.5 shrink-0 opacity-60" />
               </Button>
             }
           />
         ) : null}
+        {doubtful && op.activityId && (
+          <div className="flex w-full flex-wrap gap-2">
+            {suggestion && (
+              <Button
+                size="sm"
+                onClick={() => onChoose(op.activityId!, suggestion)}
+                title={t("settings:documents.review_confirm_hint")}
+              >
+                <Icons.Check className="mr-1 size-4" />
+                {t("settings:documents.review_confirm")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onChoose(op.activityId!, ownTransferChoice(op.amount))}
+              title={t("settings:documents.review_own_transfer_hint")}
+            >
+              <Icons.ArrowRightLeft className="mr-1 size-4" />
+              {t("settings:documents.review_own_transfer")}
+            </Button>
+          </div>
+        )}
       </div>
     </li>
   );

@@ -22,10 +22,11 @@ use super::statements_model::{
     ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
     ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
     StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
-    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
+    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };
 use super::statements_review::{
-    apply_reason, assess, balance_gap, logical_order, operations_sum, ReviewReason,
+    apply_reason, assess, balance_gap, is_own_transfer_category, logical_order, operations_sum,
+    suggestion_replaces_kept, ReviewReason,
 };
 use super::statements_traits::{
     CategoryAssignerTrait, StatementRepositoryTrait, StatementServiceTrait,
@@ -35,8 +36,8 @@ use crate::accounts::{
     TrackingMode,
 };
 use crate::activities::{
-    ActivityBulkMutationRequest, ActivityImport, ActivityServiceTrait, ACTIVITY_TYPE_DEPOSIT,
-    ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_WITHDRAWAL,
+    ActivityBulkMutationRequest, ActivityImport, ActivityServiceTrait, ActivityUpdate,
+    ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_WITHDRAWAL,
 };
 use crate::contacts::{CounterpartyRecorderTrait, OperationCounterparty};
 use crate::errors::{Error, Result, ValidationError};
@@ -910,6 +911,8 @@ impl StatementService {
                         // a category for every operation that was added, and a flag on the doubtful ones
                         let mut items = Vec::new();
                         let mut doubts = 0u32;
+                        // guesses nobody has looked at yet: not taken for transfers between own accounts until confirmed
+                        let mut unsure: HashSet<String> = HashSet::new();
                         for persisted in &result.persisted_rows {
                             let Some(Some(position)) = source_of.get(persisted.index) else {
                                 continue;
@@ -917,9 +920,19 @@ impl StatementService {
                             let Some(op) = preview.transactions.get(*position) else {
                                 continue;
                             };
-                            if let Some((taxonomy, category)) =
-                                run.carry.get(&operation_key(&rows[persisted.index]))
-                            {
+                            // a category kept from before stays, unless it was only the catch-all and the reader now
+                            // recognises the operation
+                            let kept = run
+                                .carry
+                                .get(&operation_key(&rows[persisted.index]))
+                                .filter(|(_, category)| {
+                                    !suggestion_replaces_kept(
+                                        category,
+                                        op.category_id.as_deref(),
+                                        &op.category_confidence,
+                                    )
+                                });
+                            if let Some((taxonomy, category)) = kept {
                                 items.push(CategoryAssignment {
                                     activity_id: persisted.activity_id.clone(),
                                     taxonomy_id: taxonomy.clone(),
@@ -931,6 +944,7 @@ impl StatementService {
                             {
                                 if op.category_confidence == "low" {
                                     doubts += 1;
+                                    unsure.insert(persisted.activity_id.clone());
                                 }
                                 items.push(CategoryAssignment {
                                     activity_id: persisted.activity_id.clone(),
@@ -965,11 +979,18 @@ impl StatementService {
                         outcome.to_review = doubts;
                         reason.doubts += doubts;
                         if !items.is_empty() {
+                            let assigned: Vec<CategoryAssignment> = items
+                                .iter()
+                                .filter(|i| !unsure.contains(&i.activity_id))
+                                .cloned()
+                                .collect();
                             if let Err(e) = self.category_assigner.assign(items).await {
                                 warn!("could not categorize the imported operations: {e}");
                                 outcome.messages.push(format!(
                                     "The operations were imported but could not be categorized: {e}"
                                 ));
+                            } else if let Err(e) = self.mark_own_transfers(&assigned).await {
+                                warn!("could not mark the transfers between own accounts: {e}");
                             }
                         }
                     }
@@ -1255,6 +1276,76 @@ impl StatementService {
                 source: "rule".to_string(),
             })
             .collect())
+    }
+
+    /// An operation whose category says the money moved between the person's own accounts is marked as such, so it is
+    /// neither spent nor earned whatever the other account is (a crypto account or a broker that is not in the app);
+    /// the mark is removed when the category is changed to another one. A real pair of linked transfers is left alone.
+    async fn mark_own_transfers(&self, items: &[CategoryAssignment]) -> Result<()> {
+        if items.is_empty() {
+            return Ok(());
+        }
+        let wanted: HashMap<&str, bool> = items
+            .iter()
+            .map(|i| {
+                (
+                    i.activity_id.as_str(),
+                    is_own_transfer_category(&i.taxonomy_id, &i.category_id),
+                )
+            })
+            .collect();
+        let mut updates = Vec::new();
+        for a in self.activity_service.get_activities()? {
+            let Some(&want) = wanted.get(a.id.as_str()) else {
+                continue;
+            };
+            if a.is_own_account_transfer() == want || a.source_group_id.is_some() {
+                continue;
+            }
+            updates.push(ActivityUpdate {
+                unlink_transfer_pair_id: None,
+                split_review: None,
+                id: a.id.clone(),
+                account_id: a.account_id.clone(),
+                asset: None,
+                activity_type: a.effective_type().to_string(),
+                subtype: None,
+                activity_date: a.activity_date.to_rfc3339(),
+                quantity: None,
+                unit_price: None,
+                currency: a.currency.clone(),
+                fee: None,
+                tax: None,
+                amount: None,
+                status: None,
+                needs_review: None,
+                notes: a.notes.clone(),
+                fx_rate: None,
+                // only the key this writes: the rest of the stored metadata is kept
+                metadata: Some(
+                    serde_json::json!({ "transfer": { "own_account": want } }).to_string(),
+                ),
+            });
+        }
+        if updates.is_empty() {
+            return Ok(());
+        }
+        let result = self
+            .activity_service
+            .bulk_mutate_activities(ActivityBulkMutationRequest {
+                creates: vec![],
+                updates,
+                delete_ids: vec![],
+            })
+            .await?;
+        if let Some(first) = result.errors.first() {
+            return Err(Error::Unexpected(format!(
+                "{} transfer(s) between own accounts could not be marked: {}",
+                result.errors.len(),
+                first.message
+            )));
+        }
+        Ok(())
     }
 
     /// Money moved between the user's own accounts is not spent or earned: a withdrawal on one account and a deposit
@@ -1758,10 +1849,14 @@ impl StatementServiceTrait for StatementService {
         }
         let remembered = self.equivalent_assignments(&decisions, &seen).await?;
         if !items.is_empty() {
+            let assigned = items.clone();
             self.category_assigner.assign(items).await?;
+            self.mark_own_transfers(&assigned).await?;
         }
         if !remembered.is_empty() {
+            let assigned = remembered.clone();
             self.category_assigner.assign(remembered).await?;
+            self.mark_own_transfers(&assigned).await?;
         }
         let mut document = review.document;
         apply_reason(&mut document, &ReviewReason::default());
@@ -1777,6 +1872,24 @@ impl StatementServiceTrait for StatementService {
         self.check_readable(&document, content.clone()).await?;
         let carry = self.undo_document(&document).await?;
         self.reimport(&document, &content, carry).await
+    }
+
+    async fn invalidate_all(&self) -> Result<u32> {
+        let mut invalidated = 0;
+        for mut document in self.repository.list_documents()? {
+            // only the statements that were validated: letters and loan papers have nothing to look at again
+            if document.status != DOCUMENT_STATUS_VALIDATED
+                || !matches!(document.document_kind.as_deref(), None | Some("statement"))
+                || document.import_run_id.is_none()
+            {
+                continue;
+            }
+            document.status = DOCUMENT_STATUS_PENDING.to_string();
+            document.validated_at = None;
+            self.repository.update_document(document).await?;
+            invalidated += 1;
+        }
+        Ok(invalidated)
     }
 
     async fn revalidate_all(&self) -> Result<RevalidationResult> {

@@ -182,6 +182,16 @@ pub async fn revalidate_all_statement_documents(
 }
 
 #[tauri::command]
+pub async fn invalidate_all_statement_documents(state: ProfileAccess) -> Result<u32, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .invalidate_all()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_account_identities(state: ProfileAccess) -> Result<Vec<AccountIdentity>, String> {
     let context = state.context()?;
     context
