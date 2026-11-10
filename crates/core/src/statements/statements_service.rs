@@ -183,6 +183,7 @@ fn base_row(
         force_import: false,
         is_external: None,
         source_group_id: None,
+        charges: None,
     }
 }
 

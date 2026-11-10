@@ -30,9 +30,10 @@
       "unit_types": "types",
       "unit_currencies": "currencies",
       "unit_groups": "groups",
-      "other_units": "Other {{unit}}",
+      "other_units_one": "Other {{count}} item",
+      "other_units_other": "Other {{count}} items",
       "breakdown": "Breakdown",
-      "top_units": "Top {{unit}}",
+      "top_units": "Top {{count}} items",
       "show_less": "Show less",
       "show_all": "Show all"
     },
@@ -104,7 +105,8 @@
     "category_sheet": {
       "over_period": "over {{period}}",
       "trend_period": "Trend · {{period}}",
-      "items": "Items"
+      "items": "Items",
+      "view_details": "View details"
     },
     "trend": {
       "not_enough_history": "Not enough history"

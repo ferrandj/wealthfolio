@@ -34,6 +34,30 @@ pub trait SnapshotServiceTrait: Send + Sync {
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>>;
 
+    /// The latest saved keyframe of an account on or before `day` that reads
+    /// use, as stored (quantities are not carried across later splits).
+    fn get_latest_holdings_keyframe(
+        &self,
+        account_id: &str,
+        day: NaiveDate,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        Ok(self
+            .get_holdings_keyframes(account_id, None, Some(day))?
+            .into_iter()
+            .filter(|snapshot| snapshot.snapshot_date <= day)
+            .max_by_key(|snapshot| snapshot.snapshot_date))
+    }
+
+    /// The date of an account's first snapshot. The default reads its
+    /// metadata; the service asks the repository for the one date.
+    fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
+        Ok(self
+            .get_snapshot_metadata(account_id, None, None)?
+            .into_iter()
+            .filter_map(|meta| NaiveDate::parse_from_str(&meta.snapshot_date, "%Y-%m-%d").ok())
+            .min())
+    }
+
     /// Retrieves lightweight snapshot metadata, including malformed stored
     /// dates that cannot be represented by `AccountStateSnapshot`.
     fn get_snapshot_metadata(
@@ -453,6 +477,26 @@ impl SnapshotServiceTrait for SnapshotService {
         self.read_snapshots(account_id, start_date_opt, end_date_opt)
     }
 
+    fn get_latest_holdings_keyframe(
+        &self,
+        account_id: &str,
+        day: NaiveDate,
+    ) -> Result<Option<AccountStateSnapshot>> {
+        // One row of the source reads use for the account's mode (see
+        // [`is_read`]), never a scan of its history.
+        let repository = &self.snapshot_repository;
+        match self
+            .tracking_modes(&[account_id.to_string()])?
+            .remove(account_id)
+        {
+            Some(TrackingMode::Holdings) => {
+                repository.get_latest_saved_snapshot_on_or_before(account_id, day)
+            }
+            Some(_) => repository.get_latest_calculated_snapshot_on_or_before(account_id, day),
+            None => repository.get_latest_snapshot_before_date(account_id, day),
+        }
+    }
+
     fn get_holdings_timeline(
         &self,
         account_id: &str,
@@ -795,6 +839,11 @@ impl SnapshotServiceTrait for SnapshotService {
     ) -> Result<Vec<SnapshotMetadata>> {
         self.snapshot_repository
             .get_snapshot_metadata_by_account(account_id, start_date, end_date)
+    }
+
+    fn get_earliest_snapshot_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
+        self.snapshot_repository
+            .get_earliest_snapshot_date(account_id)
     }
 
     async fn delete_snapshot_for_account_by_id(

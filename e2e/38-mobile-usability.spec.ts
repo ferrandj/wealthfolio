@@ -125,6 +125,13 @@ test("Spending dashboard opens its transaction form directly", async ({ page }) 
   });
   expect(settings.ok).toBe(true);
   await gotoAppPath(page, "/?tab=spending");
+  // Spending joins the tabs once settings load; Investments' menu has its own
+  // "Add transaction", which opens the investment form instead.
+  await expect(
+    page.getByRole("button", { name: "Spending", exact: true }).filter({ visible: true }),
+  ).toHaveAttribute("aria-current", "page");
+  // Creation lives in the tab's overflow menu.
+  await page.getByRole("button", { name: "More options", exact: true }).first().click();
   await page.getByRole("button", { name: "Add transaction", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Add Transaction", exact: true });
   await expect(form).toBeVisible();
@@ -184,3 +191,46 @@ test("editor Save stays visible and dismissal preserves a draft until confirmed"
   await discard.getByRole("button", { name: "Discard", exact: true }).click();
   await expect(editor).toBeHidden();
 });
+
+for (const direction of ["ltr", "rtl"]) {
+  test(`Discard changes keeps its buttons' focus outline whole on a phone (${direction})`, async ({
+    page,
+  }) => {
+    await gotoAppPath(page, `/activities?dir=${direction}`);
+    await page.getByTitle("Add", { exact: true }).click();
+    await page.locator('label[for$="-DEPOSIT"]').click();
+    await page.getByRole("button", { name: /Next/ }).click();
+    await page.getByPlaceholder("0.00").first().fill("25");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    const discard = page.getByRole("alertdialog");
+    await expect(discard).toBeVisible();
+
+    for (const name of ["Keep Editing", "Discard"]) {
+      const button = discard.getByRole("button", { name, exact: true });
+      // Focus it by keyboard, so the outline shows as it does for a keyboard user.
+      for (let i = 0; i < 4; i++) {
+        await page.keyboard.press("Tab");
+        if (await button.evaluate((el) => el === document.activeElement)) break;
+      }
+      await expect(button).toBeFocused();
+      const clipped = await button.evaluate((el) => {
+        const style = getComputedStyle(el);
+        const reach = parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+        const box = el.getBoundingClientRect();
+        const clippers: string[] = [];
+        for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+          if (getComputedStyle(parent).overflowX === "visible") continue;
+          const bounds = parent.getBoundingClientRect();
+          if (box.left - reach < bounds.left || box.right + reach > bounds.right) {
+            clippers.push(parent.dataset.slot ?? parent.tagName);
+          }
+          if (parent.getAttribute("role") === "alertdialog") break;
+        }
+        return { outline: style.outlineStyle, reach, clippers };
+      });
+      expect(clipped.outline).not.toBe("none");
+      expect(clipped.reach).toBeGreaterThan(0);
+      expect(clipped.clippers).toEqual([]);
+    }
+  });
+}
