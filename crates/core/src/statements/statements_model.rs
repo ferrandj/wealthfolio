@@ -120,6 +120,21 @@ pub struct AnalyzedStatement {
     pub suggested_account_type: String,
     /// Operations already in the matched account (same date, amount and label).
     pub known_duplicates: usize,
+    /// Statements already stored for the same account whose period overlaps this one (another file). The person
+    /// decides at once what to do with them.
+    pub overlaps: Vec<StatementOverlap>,
+}
+
+/// A stored statement whose period overlaps the one being imported.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementOverlap {
+    pub document_id: String,
+    pub file_name: String,
+    pub period_start: Option<String>,
+    pub period_end: Option<String>,
+    pub status: String,
+    pub imported_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -157,6 +172,10 @@ pub struct StatementImportRequest {
     /// Import again a file whose exact bytes are already stored.
     #[serde(default)]
     pub allow_duplicate_document: bool,
+    /// Stored statements this one replaces (the person chose so after an overlap was shown): their operations are
+    /// removed first, the categories chosen by hand are kept for the same operations.
+    #[serde(default)]
+    pub replace_document_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

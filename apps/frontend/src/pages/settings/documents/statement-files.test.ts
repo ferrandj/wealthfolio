@@ -1,3 +1,4 @@
+import type { AnalyzedStatement } from "@/lib/types/statements";
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_AUTO,
@@ -5,7 +6,9 @@ import {
   base64ToBytes,
   fileToBase64,
   formatBytes,
+  needsOverlapDecision,
   overrideFor,
+  replacedDocumentIds,
 } from "./statement-files";
 
 describe("statement files", () => {
@@ -36,5 +39,38 @@ describe("statement files", () => {
   it("formats sizes", () => {
     expect(formatBytes(512)).toBe("512 B");
     expect(formatBytes(2048)).toBe("2.0 KB");
+  });
+});
+
+describe("overlapping statements", () => {
+  const statement = (overlaps: { documentId: string }[], matched = "acc1") =>
+    ({
+      preview: { index: 0 },
+      matchedAccount: { id: matched },
+      overlaps,
+    }) as unknown as AnalyzedStatement;
+  const auto = { account: "auto", newAccountName: "", skip: false };
+
+  it("asks for a decision until one is made", () => {
+    const s = statement([{ documentId: "d1" }]);
+    expect(needsOverlapDecision(s, undefined)).toBe(true);
+    expect(needsOverlapDecision(s, { ...auto, overlap: "keep" })).toBe(false);
+    expect(needsOverlapDecision(s, { ...auto, skip: true })).toBe(false);
+    expect(needsOverlapDecision(statement([]), undefined)).toBe(false);
+  });
+
+  it("does not matter when the statement goes to another account", () => {
+    const s = statement([{ documentId: "d1" }]);
+    expect(needsOverlapDecision(s, { ...auto, account: "other" })).toBe(false);
+    expect(needsOverlapDecision(s, { ...auto, account: "acc1" })).toBe(true);
+  });
+
+  it("lists the stored statements to replace", () => {
+    const s = statement([{ documentId: "d1" }, { documentId: "d2" }]);
+    expect(replacedDocumentIds([s], { 0: { ...auto, overlap: "replace" } })).toEqual(["d1", "d2"]);
+    expect(replacedDocumentIds([s], { 0: { ...auto, overlap: "keep" } })).toEqual([]);
+    expect(replacedDocumentIds([s], { 0: { ...auto, overlap: "replace", skip: true } })).toEqual(
+      [],
+    );
   });
 });

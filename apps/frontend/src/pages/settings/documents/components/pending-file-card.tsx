@@ -18,7 +18,14 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { ACCOUNT_AUTO, ACCOUNT_NEW, formatBytes, type StatementChoice } from "../statement-files";
+import {
+  ACCOUNT_AUTO,
+  ACCOUNT_NEW,
+  formatBytes,
+  needsOverlapDecision,
+  overlapsApply,
+  type StatementChoice,
+} from "../statement-files";
 
 export type PendingStatus = "analyzing" | "ready" | "importing" | "done" | "error";
 
@@ -111,6 +118,57 @@ function StatementBlock({
         </ul>
       )}
 
+      {overlapsApply(statement, choice) && (
+        <div
+          className="border-warning/50 bg-warning/10 space-y-2 rounded-md border p-3 text-sm"
+          role="alert"
+        >
+          <p className="font-medium">{t("settings:documents.overlap_title")}</p>
+          <ul className="list-disc ps-5">
+            {statement.overlaps.map((o) => (
+              <li key={o.documentId}>
+                {t("settings:documents.overlap_item", {
+                  name: o.fileName,
+                  start: o.periodStart ?? "?",
+                  end: o.periodEnd ?? "?",
+                  count: o.importedCount,
+                })}
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">{t("settings:documents.overlap_question")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled}
+              variant={choice.overlap === "replace" ? "default" : "outline"}
+              onClick={() => onChoose({ overlap: "replace" })}
+            >
+              {t("settings:documents.overlap_replace")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled}
+              variant={choice.overlap === "keep" ? "default" : "outline"}
+              onClick={() => onChoose({ overlap: "keep" })}
+            >
+              {t("settings:documents.overlap_keep")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={disabled}
+              onClick={() => onChoose({ skip: true })}
+            >
+              {t("settings:documents.overlap_skip")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
         <Select
           items={items}
@@ -193,7 +251,8 @@ export function PendingFileCard({
     file.status === "ready" &&
     !!analysis &&
     analysis.statements.length > 0 &&
-    (!existing || file.allowDuplicateDocument);
+    (!existing || file.allowDuplicateDocument) &&
+    !analysis.statements.some((s) => needsOverlapDecision(s, file.choices[s.preview.index]));
 
   return (
     <Card>

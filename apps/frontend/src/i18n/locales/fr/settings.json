@@ -2124,7 +2124,13 @@
     "holder_individual": "Comptes individuels",
     "view_tree": "Arborescence",
     "view_list": "Liste",
-    "revalidate_protected": "Document validé : encore {{left}} clic(s) pour le relire"
+    "revalidate_protected": "Document validé : encore {{left}} clic(s) pour le relire",
+    "overlap_title": "Ce relevé chevauche un relevé déjà importé sur ce compte",
+    "overlap_item": "{{name}} — du {{start}} au {{end}} ({{count}} opération(s) importée(s))",
+    "overlap_question": "Que faire ? Choisissez maintenant, rien n'est importé avant.",
+    "overlap_replace": "Remplacer l'ancien par celui-ci",
+    "overlap_keep": "Garder les deux (opérations identiques non doublées)",
+    "overlap_skip": "Ne pas importer celui-ci"
   },
   "identity": {
     "title": "Coordonnées du compte",

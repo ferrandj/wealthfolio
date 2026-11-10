@@ -2041,7 +2041,13 @@
     "holder_individual": "Individual accounts",
     "view_tree": "Tree view",
     "view_list": "List view",
-    "revalidate_protected": "Validated document: {{left}} more click(s) to read it again"
+    "revalidate_protected": "Validated document: {{left}} more click(s) to read it again",
+    "overlap_title": "This statement overlaps one already imported on this account",
+    "overlap_item": "{{name}} — from {{start}} to {{end}} ({{count}} operation(s) imported)",
+    "overlap_question": "What now? Decide here, nothing is imported before.",
+    "overlap_replace": "Replace the old one with this one",
+    "overlap_keep": "Keep both (identical operations are not duplicated)",
+    "overlap_skip": "Do not import this one"
   },
   "identity": {
     "title": "Account details",

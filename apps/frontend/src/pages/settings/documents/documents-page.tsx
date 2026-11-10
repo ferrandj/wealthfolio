@@ -12,7 +12,13 @@ import { CoverageCard } from "./components/coverage-card";
 import { DocumentsLibrary } from "./components/documents-library";
 import { PendingFileCard, type PendingFile } from "./components/pending-file-card";
 import { SupportedDocuments } from "./components/supported-documents";
-import { fileToBase64, overrideFor, type StatementChoice } from "./statement-files";
+import {
+  fileToBase64,
+  needsOverlapDecision,
+  overrideFor,
+  replacedDocumentIds,
+  type StatementChoice,
+} from "./statement-files";
 
 const message = (e: unknown) =>
   e && typeof e === "object" && "message" in e
@@ -91,6 +97,7 @@ export default function DocumentsPage() {
           adapterId: file.adapterId ?? null,
           overrides,
           allowDuplicateDocument: file.allowDuplicateDocument,
+          replaceDocumentIds: replacedDocumentIds(file.analysis?.statements ?? [], file.choices),
         });
         patchFile(file.id, { status: "done", result });
         await Promise.all([
@@ -116,7 +123,8 @@ export default function DocumentsPage() {
       f.status === "ready" &&
       f.analysis &&
       f.analysis.statements.length > 0 &&
-      (!f.analysis.existingDocument || f.allowDuplicateDocument),
+      (!f.analysis.existingDocument || f.allowDuplicateDocument) &&
+      !f.analysis.statements.some((s) => needsOverlapDecision(s, f.choices[s.preview.index])),
   );
 
   const importAll = async () => {

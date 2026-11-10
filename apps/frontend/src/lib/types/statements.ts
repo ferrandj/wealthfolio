@@ -156,6 +156,17 @@ export interface AnalyzedStatement {
   suggestedAccountName: string;
   suggestedAccountType: string;
   knownDuplicates: number;
+  /** Stored statements of the same account whose period overlaps this one (another file). */
+  overlaps: StatementOverlap[];
+}
+
+export interface StatementOverlap {
+  documentId: string;
+  fileName: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  status: string;
+  importedCount: number;
 }
 
 export interface StatementAnalysis {
@@ -178,6 +189,8 @@ export interface StatementImportRequest {
   adapterId?: string | null;
   overrides?: StatementOverride[];
   allowDuplicateDocument?: boolean;
+  /** Stored statements this one replaces (chosen after an overlap was shown). */
+  replaceDocumentIds?: string[];
 }
 
 export interface StatementImportOutcome {

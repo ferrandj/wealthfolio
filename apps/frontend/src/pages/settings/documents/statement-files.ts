@@ -1,4 +1,4 @@
-import type { StatementOverride } from "@/lib/types/statements";
+import type { AnalyzedStatement, StatementOverride } from "@/lib/types/statements";
 
 /** The bytes of a file as base64, without the data-URL prefix. */
 export function fileToBase64(file: Blob): Promise<string> {
@@ -24,10 +24,47 @@ export function base64ToBytes(base64: string): Uint8Array {
 export const ACCOUNT_AUTO = "auto";
 export const ACCOUNT_NEW = "new";
 
+/** What to do with the stored statements this one overlaps: replace them, or keep both. */
+export type OverlapDecision = "replace" | "keep";
+
 export interface StatementChoice {
   account: string;
   newAccountName: string;
   skip: boolean;
+  overlap?: OverlapDecision;
+}
+
+/** The overlap only matters while the statement goes to the account it was matched with. */
+export function overlapsApply(statement: AnalyzedStatement, choice: StatementChoice): boolean {
+  if (choice.skip || statement.overlaps.length === 0) return false;
+  return (
+    choice.account === ACCOUNT_AUTO ||
+    (!!statement.matchedAccount && choice.account === statement.matchedAccount.id)
+  );
+}
+
+/** A statement that overlaps another one is not imported until the person has said what to do. */
+export function needsOverlapDecision(
+  statement: AnalyzedStatement,
+  choice: StatementChoice | undefined,
+): boolean {
+  const c = choice ?? { account: ACCOUNT_AUTO, newAccountName: "", skip: false };
+  return overlapsApply(statement, c) && !c.overlap;
+}
+
+/** The stored statements to replace, for every statement of the file that chose so. */
+export function replacedDocumentIds(
+  statements: AnalyzedStatement[],
+  choices: Record<number, StatementChoice>,
+): string[] {
+  const ids = new Set<string>();
+  for (const s of statements) {
+    const choice = choices[s.preview.index];
+    if (choice?.overlap === "replace" && overlapsApply(s, choice)) {
+      for (const o of s.overlaps) ids.add(o.documentId);
+    }
+  }
+  return [...ids];
 }
 
 export function overrideFor(index: number, choice: StatementChoice): StatementOverride | null {

@@ -22,8 +22,9 @@ pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
     ImportMode, MatchedAccount, NewStatementDocument, OutdatedDocuments, RevalidationOutcome,
     RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
-    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
-    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
+    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverlap,
+    StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
+    DOCUMENT_STATUS_VALIDATED,
 };
 pub use statements_review::{balance_gap, logical_order, ReviewReason};
 pub use statements_service::{StatementService, MAX_DOCUMENT_BYTES, OPENING_BALANCE_NOTE};

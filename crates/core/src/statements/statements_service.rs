@@ -308,6 +308,36 @@ struct ImportRun {
     fallback_account: Option<String>,
 }
 
+/// The stored statements of an account (other files than `sha256`) whose period intersects `start..=end`.
+fn overlapping(
+    documents: Vec<StatementDocument>,
+    account_id: &str,
+    start: &str,
+    end: &str,
+    sha256: &str,
+) -> Vec<super::StatementOverlap> {
+    documents
+        .into_iter()
+        .filter(|d| d.account_id.as_deref() == Some(account_id) && d.sha256 != sha256)
+        .filter(|d| {
+            matches!(d.document_kind.as_deref(), None | Some("statement"))
+                && d.import_run_id.is_some()
+        })
+        .filter(|d| match (&d.period_start, &d.period_end) {
+            (Some(ds), Some(de)) => ds.as_str() <= end && start <= de.as_str(),
+            _ => false,
+        })
+        .map(|d| super::StatementOverlap {
+            document_id: d.id,
+            file_name: d.file_name,
+            period_start: d.period_start,
+            period_end: d.period_end,
+            status: d.status,
+            imported_count: d.imported_count,
+        })
+        .collect()
+}
+
 /// Merge what a document says (and what the user typed) into an account's identity.
 fn merge_identity(
     existing: Option<AccountIdentity>,
@@ -514,6 +544,12 @@ impl StatementService {
                     }
                     _ => 0,
                 };
+                let overlaps = self.overlaps_of(
+                    matched_account.as_ref().map(|a| a.id.as_str()),
+                    mode,
+                    preview,
+                    &analysis.sha256,
+                );
                 AnalyzedStatement {
                     preview: preview.clone(),
                     mode,
@@ -521,6 +557,7 @@ impl StatementService {
                     suggested_account_name: suggested_name(preview),
                     suggested_account_type: account_types::CASH.to_string(),
                     known_duplicates,
+                    overlaps,
                 }
             })
             .collect();
@@ -529,6 +566,26 @@ impl StatementService {
             statements,
             existing_document,
         })
+    }
+
+    /// The stored statements of the account whose period overlaps this statement's (a different file).
+    fn overlaps_of(
+        &self,
+        account_id: Option<&str>,
+        mode: ImportMode,
+        preview: &StatementPreview,
+        sha256: &str,
+    ) -> Vec<super::StatementOverlap> {
+        let (Some(account_id), ImportMode::Transactions) = (account_id, mode) else {
+            return Vec::new();
+        };
+        let (Some(start), Some(end)) = (&preview.period_start, &preview.period_end) else {
+            return Vec::new();
+        };
+        let Ok(documents) = self.repository.list_documents() else {
+            return Vec::new();
+        };
+        overlapping(documents, account_id, start, end, sha256)
     }
 
     /// How many operations of the statement the account already has (same day, amount and note).
@@ -1379,6 +1436,7 @@ impl StatementService {
                     adapter_id: document.adapter_id.clone(),
                     overrides: vec![],
                     allow_duplicate_document: true,
+                    replace_document_ids: vec![],
                 },
                 ImportRun {
                     reimport_of: Some(document.clone()),
@@ -1538,10 +1596,21 @@ impl StatementServiceTrait for StatementService {
     }
 
     async fn import(&self, request: StatementImportRequest) -> Result<StatementImportResult> {
+        // statements the person chose to replace go first; what was categorised by hand carries over
+        let mut carry = HashMap::new();
+        for id in &request.replace_document_ids {
+            let document = self
+                .repository
+                .get_document(id)?
+                .ok_or_else(|| invalid("The statement to replace was not found"))?;
+            carry.extend(self.undo_document(&document).await?);
+            self.repository.delete_document(id).await?;
+        }
         self.run_import(
             request,
             ImportRun {
                 create_accounts: true,
+                carry,
                 ..ImportRun::default()
             },
         )
@@ -2092,5 +2161,69 @@ mod tests {
             },
         );
         assert_eq!(identity.iban.as_deref(), Some("FR76123451234500"));
+    }
+
+    fn sample_document() -> StatementDocument {
+        StatementDocument {
+            id: String::new(),
+            account_id: None,
+            file_name: String::new(),
+            stored_name: String::new(),
+            content_type: "application/pdf".into(),
+            size_bytes: 0,
+            sha256: String::new(),
+            institution: None,
+            adapter_id: None,
+            document_kind: None,
+            account_type: None,
+            period_start: None,
+            period_end: None,
+            holder_name: None,
+            iban: None,
+            reader_version: None,
+            imported_count: 0,
+            duplicate_count: 0,
+            warnings: vec![],
+            import_run_id: None,
+            status: DOCUMENT_STATUS_STORED.into(),
+            created_at: String::new(),
+            review_reason: None,
+            to_review_count: 0,
+            validated_at: None,
+            opening_balance: None,
+            closing_balance: None,
+        }
+    }
+
+    #[test]
+    fn a_statement_overlaps_another_file_of_the_same_account_only() {
+        let doc = |id: &str, account: &str, start: &str, end: &str, sha: &str| StatementDocument {
+            id: id.into(),
+            account_id: Some(account.into()),
+            file_name: format!("{id}.pdf"),
+            sha256: sha.into(),
+            document_kind: Some("statement".into()),
+            period_start: Some(start.into()),
+            period_end: Some(end.into()),
+            import_run_id: Some("run".into()),
+            ..sample_document()
+        };
+        let docs = vec![
+            doc("jan", "a", "2026-01-01", "2026-01-31", "s1"),
+            doc("feb", "a", "2026-02-01", "2026-02-28", "s2"),
+            doc("other", "b", "2026-02-01", "2026-02-28", "s3"),
+            doc("same", "a", "2026-02-10", "2026-02-20", "me"),
+        ];
+        // 15 Feb - 15 Mar overlaps February only (and not the identical file, nor another account)
+        let found = overlapping(docs.clone(), "a", "2026-02-15", "2026-03-15", "me");
+        assert_eq!(
+            found
+                .iter()
+                .map(|o| o.document_id.as_str())
+                .collect::<Vec<_>>(),
+            ["feb"]
+        );
+        // consecutive statements do not overlap
+        assert!(overlapping(docs, "a", "2026-03-01", "2026-03-31", "me").is_empty());
     }
 }
