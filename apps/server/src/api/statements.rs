@@ -200,6 +200,12 @@ async fn save_identity(
     ))
 }
 
+async fn outdated(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<wealthfolio_core::statements::OutdatedDocuments>> {
+    Ok(Json(state.statement_service.outdated_documents()?))
+}
+
 async fn coverage(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AccountCoverage>>> {
@@ -239,6 +245,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         )
         .route("/statements/supported", get(supported))
         .route("/statements/coverage", get(coverage))
+        .route("/statements/outdated", get(outdated))
         .route(
             "/statements/coverage/{account_id}/{month}",
             put(set_month_normal),

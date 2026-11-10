@@ -1635,6 +1635,21 @@ impl StatementServiceTrait for StatementService {
         Ok(result)
     }
 
+    fn outdated_documents(&self) -> Result<super::OutdatedDocuments> {
+        let current = wealthfolio_statement_import::reader_version().to_string();
+        let document_ids = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| d.reader_version.as_deref() != Some(current.as_str()))
+            .map(|d| d.id)
+            .collect();
+        Ok(super::OutdatedDocuments {
+            current_version: current,
+            document_ids,
+        })
+    }
+
     fn coverage(&self) -> Result<Vec<super::AccountCoverage>> {
         let marked: HashSet<(String, String)> =
             self.repository.list_gap_marks()?.into_iter().collect();

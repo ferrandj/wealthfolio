@@ -298,3 +298,8 @@ export interface AccountCoverage {
   missingMonths: MissingMonth[];
   balanceBreaks: BalanceBreak[];
 }
+
+export interface OutdatedDocuments {
+  currentVersion: string;
+  documentIds: string[];
+}

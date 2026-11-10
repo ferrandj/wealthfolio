@@ -247,3 +247,14 @@ pub async fn set_statement_month_normal(
         .map_err(|e| e.to_string())?;
     service.coverage().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_statement_outdated(
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::statements::OutdatedDocuments, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .outdated_documents()
+        .map_err(|e| e.to_string())
+}

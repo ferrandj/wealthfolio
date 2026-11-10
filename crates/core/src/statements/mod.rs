@@ -11,8 +11,8 @@ mod statements_traits;
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
-    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    ImportMode, MatchedAccount, NewStatementDocument, OutdatedDocuments, RevalidationOutcome,
+    RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
     StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
     StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };

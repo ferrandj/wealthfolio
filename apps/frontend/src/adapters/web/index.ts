@@ -290,6 +290,7 @@ export {
   saveAccountIdentity,
   listSupportedStatements,
   getStatementCoverage,
+  getStatementOutdated,
   setStatementMonthNormal,
 } from "../shared/statements";
 

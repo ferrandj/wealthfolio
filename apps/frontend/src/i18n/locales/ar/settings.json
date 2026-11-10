@@ -2278,7 +2278,9 @@
     "coverage_missing": "Months without a statement:",
     "coverage_normal": "This is normal",
     "coverage_undo_normal": "Undo",
-    "coverage_break": "The opening balance ({{found}}) does not pick up the previous statement's closing balance ({{expected}})."
+    "coverage_break": "The opening balance ({{found}}) does not pick up the previous statement's closing balance ({{expected}}).",
+    "reader_outdated": "Outdated reader",
+    "update_reader": "Update to the latest version ({{count}})"
   },
   "identity": {
     "title": "Account details",

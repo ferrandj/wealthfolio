@@ -1,6 +1,7 @@
 // Bank statements & account documents
 import type {
   AccountCoverage,
+  OutdatedDocuments,
   AccountIdentity,
   AccountIdentityInput,
   DocumentReview,
@@ -98,6 +99,10 @@ export const revalidateStatementDocument = async (id: string): Promise<Statement
 
 export const revalidateAllStatementDocuments = async (): Promise<RevalidationResult> => {
   return invoke<RevalidationResult>("revalidate_all_statement_documents");
+};
+
+export const getStatementOutdated = async (): Promise<OutdatedDocuments> => {
+  return invoke<OutdatedDocuments>("get_statement_outdated");
 };
 
 export const getStatementCoverage = async (): Promise<AccountCoverage[]> => {

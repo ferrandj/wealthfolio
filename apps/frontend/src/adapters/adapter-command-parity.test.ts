@@ -898,6 +898,12 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
   });
 
+  it("lists the documents read by an older reader", async () => {
+    const mock = stubFetch({ currentVersion: "x", documentIds: [] });
+    await invoke("get_statement_outdated");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/outdated", method: "GET" });
+  });
+
   it("reads the statement coverage", async () => {
     const mock = stubFetch([]);
     await invoke("get_statement_coverage");

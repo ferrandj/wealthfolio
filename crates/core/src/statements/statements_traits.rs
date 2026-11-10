@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview,
-    NewStatementDocument, RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
-    StatementImportRequest, StatementImportResult,
+    NewStatementDocument, OutdatedDocuments, RevalidationResult, ReviewDecision, StatementAnalysis,
+    StatementDocument, StatementImportRequest, StatementImportResult,
 };
 use crate::errors::Result;
 
@@ -103,6 +103,8 @@ pub trait StatementServiceTrait: Send + Sync {
 
     /// Per account: months without a statement and statements whose balances do not follow each other.
     fn coverage(&self) -> Result<Vec<AccountCoverage>>;
+    /// The documents whose reading was done by an older reader than the current one.
+    fn outdated_documents(&self) -> Result<OutdatedDocuments>;
     /// Mark a month without a statement as normal (or not).
     async fn set_month_normal(&self, account_id: &str, month: &str, normal: bool) -> Result<()>;
 }

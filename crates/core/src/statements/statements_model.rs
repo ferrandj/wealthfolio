@@ -282,3 +282,11 @@ pub struct RevalidationResult {
     pub failed: usize,
     pub outcomes: Vec<RevalidationOutcome>,
 }
+
+/// The documents that were read by an older version of the reader than the current one.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutdatedDocuments {
+    pub current_version: String,
+    pub document_ids: Vec<String>,
+}

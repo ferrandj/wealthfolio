@@ -1,6 +1,7 @@
 import {
   deleteStatementDocument,
   getStatementDocumentContent,
+  getStatementOutdated,
   linkStatementDocument,
   listStatementDocuments,
   openFileSaveDialog,
@@ -60,6 +61,7 @@ export function DocumentsLibrary() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
       queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_OUTDATED] }),
     ]);
 
   const refreshOperations = async () => {
@@ -71,6 +73,12 @@ export function DocumentsLibrary() {
   };
 
   // oldest first, account by account: the order in which statements make sense one after the other
+  const { data: outdated } = useQuery({
+    queryKey: [QueryKeys.STATEMENT_OUTDATED],
+    queryFn: getStatementOutdated,
+  });
+  const outdatedIds = useMemo(() => new Set(outdated?.documentIds ?? []), [outdated]);
+
   const ordered = useMemo(() => [...(documents ?? [])].sort(logicalOrder), [documents]);
   const pending = ordered.filter((d) => d.status === "PENDING");
 
@@ -192,7 +200,9 @@ export function DocumentsLibrary() {
           />
           {revalidateAll.isPending
             ? t("settings:documents.revalidate_all_running")
-            : t("settings:documents.revalidate_all")}
+            : outdatedIds.size > 0
+              ? t("settings:documents.update_reader", { count: outdatedIds.size })
+              : t("settings:documents.revalidate_all")}
         </Button>
       </div>
       <div className="space-y-2">
@@ -220,6 +230,9 @@ export function DocumentsLibrary() {
                         {t("settings:documents.operations_added", { count: doc.importedCount })}
                       </Badge>
                       <StatusBadge doc={doc} />
+                      {outdatedIds.has(doc.id) && (
+                        <Badge variant="outline">{t("settings:documents.reader_outdated")}</Badge>
+                      )}
                     </>
                   )}
                 </div>

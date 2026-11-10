@@ -186,6 +186,7 @@ export const COMMANDS: CommandMap = {
   get_account_identity: { method: "GET", path: "/statements/identities" },
   save_account_identity: { method: "PUT", path: "/statements/identities" },
   list_supported_statements: { method: "GET", path: "/statements/supported" },
+  get_statement_outdated: { method: "GET", path: "/statements/outdated" },
   get_statement_coverage: { method: "GET", path: "/statements/coverage" },
   set_statement_month_normal: { method: "PUT", path: "/statements/coverage" },
   // Asset profile

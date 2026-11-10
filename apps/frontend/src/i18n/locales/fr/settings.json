@@ -2110,7 +2110,9 @@
     "coverage_missing": "Mois sans relevé :",
     "coverage_normal": "C'est normal",
     "coverage_undo_normal": "Annuler",
-    "coverage_break": "Le solde d'ouverture ({{found}}) ne reprend pas le solde de clôture du relevé précédent ({{expected}})."
+    "coverage_break": "Le solde d'ouverture ({{found}}) ne reprend pas le solde de clôture du relevé précédent ({{expected}}).",
+    "reader_outdated": "Lecteur périmé",
+    "update_reader": "Actualiser à la dernière version ({{count}})"
   },
   "identity": {
     "title": "Coordonnées du compte",
