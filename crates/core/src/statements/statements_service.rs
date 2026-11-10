@@ -2,7 +2,7 @@
 //! through the regular activity import (so validation, duplicate detection and domain events stay in one place), keeps
 //! the original, and keeps the holder's identity.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -18,12 +18,18 @@ use wealthfolio_statement_import::{
 };
 
 use super::statements_model::{
-    AccountIdentity, AccountIdentityInput, AnalyzedStatement, ImportMode, MatchedAccount,
-    NewStatementDocument, StatementAnalysis, StatementDocument, StatementImportOutcome,
-    StatementImportRequest, StatementImportResult, StatementOverride, DOCUMENT_STATUS_IMPORTED,
-    DOCUMENT_STATUS_STORED,
+    AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
+    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
+    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
+    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
 };
-use super::statements_traits::{StatementRepositoryTrait, StatementServiceTrait};
+use super::statements_review::{
+    apply_reason, assess, balance_gap, logical_order, operations_sum, ReviewReason,
+};
+use super::statements_traits::{
+    CategoryAssignerTrait, StatementRepositoryTrait, StatementServiceTrait,
+};
 use crate::accounts::{
     account_types, default_group_for_account_type, Account, AccountServiceTrait, NewAccount,
     TrackingMode,
@@ -188,9 +194,21 @@ fn operation_rows(
     currency: &str,
     account_id: &str,
 ) -> Vec<ActivityImport> {
+    operation_rows_tagged(preview, currency, account_id)
+        .into_iter()
+        .map(|(row, _)| row)
+        .collect()
+}
+
+/// The same rows, each with the position of the statement operation it comes from.
+fn operation_rows_tagged(
+    preview: &StatementPreview,
+    currency: &str,
+    account_id: &str,
+) -> Vec<(ActivityImport, usize)> {
     let mut seen: HashMap<(String, String, String), u32> = HashMap::new();
     let mut rows = Vec::new();
-    for t in &preview.transactions {
+    for (position, t) in preview.transactions.iter().enumerate() {
         let Some(amount) = parse_decimal(&t.amount) else {
             continue;
         };
@@ -217,17 +235,52 @@ fn operation_rows(
         } else {
             t.currency.as_str()
         };
-        rows.push(base_row(
-            t.date.clone(),
-            activity_type_for(t, amount),
-            amount,
-            ccy,
-            note,
-            account_id,
-            rows.len() as i32 + 1,
+        rows.push((
+            base_row(
+                t.date.clone(),
+                activity_type_for(t, amount),
+                amount,
+                ccy,
+                note,
+                account_id,
+                rows.len() as i32 + 1,
+            ),
+            position,
         ));
     }
     rows
+}
+
+/// What identifies an operation of an account across imports: its day, amount and note.
+type OperationKey = (String, Decimal, String);
+
+fn operation_key(row: &ActivityImport) -> OperationKey {
+    (
+        row.date.clone(),
+        row.amount.unwrap_or_default(),
+        row.comment.clone().unwrap_or_default(),
+    )
+}
+
+fn activity_key(a: &crate::activities::Activity) -> Option<OperationKey> {
+    Some((
+        a.activity_date.date_naive().format("%Y-%m-%d").to_string(),
+        a.amount?.abs(),
+        a.notes.clone().unwrap_or_default(),
+    ))
+}
+
+/// How an import is run: a first import of a dropped file, or a document read again from its stored original.
+#[derive(Default)]
+struct ImportRun {
+    /// The stored document being read again (it is updated instead of a new one being stored).
+    reimport_of: Option<StatementDocument>,
+    /// May accounts be created for statements that match none? Not when a document is read again.
+    create_accounts: bool,
+    /// Categories chosen by hand before the operations were undone, to put back.
+    carry: HashMap<OperationKey, (String, String)>,
+    /// The account of the document being read again, for a lone statement that no IBAN or number matches.
+    fallback_account: Option<String>,
 }
 
 /// Merge what a document says (and what the user typed) into an account's identity.
@@ -329,6 +382,7 @@ pub struct StatementService {
     repository: Arc<dyn StatementRepositoryTrait>,
     account_service: Arc<dyn AccountServiceTrait>,
     activity_service: Arc<dyn ActivityServiceTrait>,
+    category_assigner: Arc<dyn CategoryAssignerTrait>,
 }
 
 impl StatementService {
@@ -336,11 +390,13 @@ impl StatementService {
         repository: Arc<dyn StatementRepositoryTrait>,
         account_service: Arc<dyn AccountServiceTrait>,
         activity_service: Arc<dyn ActivityServiceTrait>,
+        category_assigner: Arc<dyn CategoryAssignerTrait>,
     ) -> Self {
         Self {
             repository,
             account_service,
             activity_service,
+            category_assigner,
         }
     }
 
@@ -557,7 +613,13 @@ impl StatementService {
                 existing.iter().map(|a| a.id.clone()).collect()
             }
             Some(_) => return Ok((None, vec![])),
-            None if !activities.is_empty() => return Ok((None, vec![])),
+            // something already happened before this statement starts: the balance is already carried
+            None if activities
+                .iter()
+                .any(|a| a.activity_date.date_naive() < date) =>
+            {
+                return Ok((None, vec![]))
+            }
             None => vec![],
         };
         if opening.is_zero() {
@@ -583,24 +645,18 @@ impl StatementService {
     }
 }
 
-#[async_trait]
-impl StatementServiceTrait for StatementService {
-    fn analyze(
+impl StatementService {
+    async fn run_import(
         &self,
-        file_name: &str,
-        content: &[u8],
-        adapter_id: Option<&str>,
-    ) -> Result<StatementAnalysis> {
-        self.analyze_content(file_name, content, adapter_id)
-    }
-
-    async fn import(&self, request: StatementImportRequest) -> Result<StatementImportResult> {
+        request: StatementImportRequest,
+        run: ImportRun,
+    ) -> Result<StatementImportResult> {
         let content = base64::engine::general_purpose::STANDARD
             .decode(request.content_base64.trim())
             .map_err(|_| invalid("The file content is not valid base64"))?;
         Self::check_size(&content)?;
         let sha = sha256_hex(&content);
-        if !request.allow_duplicate_document {
+        if run.reimport_of.is_none() && !request.allow_duplicate_document {
             if let Some(existing) = self.repository.find_document_by_sha256(&sha)? {
                 return Ok(StatementImportResult {
                     document: Some(existing),
@@ -644,6 +700,8 @@ impl StatementServiceTrait for StatementService {
         let mut first_run: Option<String> = None;
         let mut first_account: Option<String> = None;
         let (mut imported_total, mut duplicate_total) = (0u32, 0u32);
+        let mut reason = ReviewReason::default();
+        let mut tracked_any = false;
 
         for item in &analyzed.statements {
             let preview = &item.preview;
@@ -665,6 +723,8 @@ impl StatementServiceTrait for StatementService {
                 duplicates: 0,
                 skipped: 0,
                 opening_balance_added: false,
+                categorized: 0,
+                to_review: 0,
                 messages: vec![],
             };
 
@@ -673,7 +733,10 @@ impl StatementServiceTrait for StatementService {
                 Some(id) => Some(self.account_service.get_account(&id)?),
                 None => match &item.matched_account {
                     Some(m) => Some(self.account_service.get_account(&m.id)?),
-                    None => None,
+                    None => match (&run.fallback_account, analyzed.statements.len()) {
+                        (Some(id), 1) => self.account_service.get_account(id).ok(),
+                        _ => None,
+                    },
                 },
             };
 
@@ -696,6 +759,13 @@ impl StatementServiceTrait for StatementService {
                     }
                 }
                 ImportMode::Transactions => {
+                    if target.is_none() && !run.create_accounts {
+                        outcome
+                            .messages
+                            .push("Not imported: no account matches this statement".to_string());
+                        outcomes.push(outcome);
+                        continue;
+                    }
                     let (account, created) = match target {
                         Some(a) => (a, false),
                         None => {
@@ -710,7 +780,12 @@ impl StatementServiceTrait for StatementService {
                     outcome.created_account = created;
 
                     let currency = account.currency.clone();
-                    let mut rows = operation_rows(preview, &currency, &account.id);
+                    let tagged = operation_rows_tagged(preview, &currency, &account.id);
+                    let mut rows: Vec<ActivityImport> =
+                        tagged.iter().map(|(row, _)| row.clone()).collect();
+                    // the statement operation each row comes from (the opening balance comes from none)
+                    let mut source_of: Vec<Option<usize>> =
+                        tagged.iter().map(|(_, position)| Some(*position)).collect();
                     let (opening, remove) =
                         self.opening_balance_row(&account.id, preview, &currency)?;
                     if !remove.is_empty() {
@@ -725,10 +800,14 @@ impl StatementServiceTrait for StatementService {
                     if let Some(row) = opening {
                         outcome.opening_balance_added = true;
                         rows.insert(0, row);
+                        source_of.insert(0, None);
                     }
 
                     if !rows.is_empty() {
-                        let result = self.activity_service.import_activities(rows).await?;
+                        let result = self
+                            .activity_service
+                            .import_activities(rows.clone())
+                            .await?;
                         outcome.imported = result.summary.imported;
                         outcome.duplicates = result.summary.duplicates;
                         outcome.skipped = result.summary.skipped;
@@ -742,7 +821,57 @@ impl StatementServiceTrait for StatementService {
                         }
                         imported_total += outcome.imported;
                         duplicate_total += outcome.duplicates;
+
+                        // a category for every operation that was added, and a flag on the doubtful ones
+                        let mut items = Vec::new();
+                        let mut doubts = 0u32;
+                        for persisted in &result.persisted_rows {
+                            let Some(Some(position)) = source_of.get(persisted.index) else {
+                                continue;
+                            };
+                            let Some(op) = preview.transactions.get(*position) else {
+                                continue;
+                            };
+                            if let Some((taxonomy, category)) =
+                                run.carry.get(&operation_key(&rows[persisted.index]))
+                            {
+                                items.push(CategoryAssignment {
+                                    activity_id: persisted.activity_id.clone(),
+                                    taxonomy_id: taxonomy.clone(),
+                                    category_id: category.clone(),
+                                    source: "manual".to_string(),
+                                });
+                            } else if let (Some(category), Some(taxonomy)) =
+                                (&op.category_id, &op.category_taxonomy_id)
+                            {
+                                if op.category_confidence == "low" {
+                                    doubts += 1;
+                                }
+                                items.push(CategoryAssignment {
+                                    activity_id: persisted.activity_id.clone(),
+                                    taxonomy_id: taxonomy.clone(),
+                                    category_id: category.clone(),
+                                    source: "import".to_string(),
+                                });
+                            }
+                        }
+                        outcome.categorized = items.len() as u32;
+                        outcome.to_review = doubts;
+                        reason.doubts += doubts;
+                        if !items.is_empty() {
+                            if let Err(e) = self.category_assigner.assign(items).await {
+                                warn!("could not categorize the imported operations: {e}");
+                                outcome.messages.push(format!(
+                                    "The operations were imported but could not be categorized: {e}"
+                                ));
+                            }
+                        }
                     }
+                    if let Err(e) = self.category_assigner.track_account(&account.id).await {
+                        warn!("could not include the account in spending: {e}");
+                    }
+                    tracked_any = true;
+                    reason.merge(assess(preview, 0));
 
                     let existing = self.repository.get_identity(&account.id)?;
                     let identity = merge_identity(
@@ -802,16 +931,42 @@ impl StatementServiceTrait for StatementService {
             duplicate_count: duplicate_total as i32,
             warnings,
             import_run_id: first_run,
-            status: if outcomes.iter().any(|o| {
-                o.account_id.is_some()
-                    && (o.imported > 0 || o.duplicates > 0 || o.opening_balance_added)
-            }) {
-                DOCUMENT_STATUS_IMPORTED.to_string()
-            } else {
-                DOCUMENT_STATUS_STORED.to_string()
-            },
+            status: DOCUMENT_STATUS_STORED.to_string(),
+            review_reason: None,
+            to_review_count: 0,
+            validated_at: None,
             created_at: Utc::now().to_rfc3339(),
         };
+        let mut document = document;
+        let has_operations = outcomes.iter().any(|o| {
+            o.account_id.is_some()
+                && (o.imported > 0 || o.duplicates > 0 || o.opening_balance_added)
+        });
+        if has_operations {
+            apply_reason(&mut document, &reason);
+        }
+        let _ = tracked_any;
+        if let Some(previous) = &run.reimport_of {
+            // the stored file stays as it is; what changes is what was read from it
+            let mut updated = previous.clone();
+            updated.account_id = document.account_id.clone().or(previous.account_id.clone());
+            updated.adapter_id = document.adapter_id.clone();
+            updated.reader_version = document.reader_version.clone();
+            updated.imported_count = document.imported_count;
+            updated.duplicate_count = document.duplicate_count;
+            updated.warnings = document.warnings.clone();
+            updated.import_run_id = document.import_run_id.clone();
+            updated.status = document.status.clone();
+            updated.review_reason = document.review_reason.clone();
+            updated.to_review_count = document.to_review_count;
+            updated.validated_at = document.validated_at.clone();
+            let stored = self.repository.update_document(updated).await?;
+            return Ok(StatementImportResult {
+                document: Some(stored),
+                already_imported: false,
+                outcomes,
+            });
+        }
         let stored = if request.allow_duplicate_document
             && self
                 .repository
@@ -833,6 +988,252 @@ impl StatementServiceTrait for StatementService {
             already_imported: false,
             outcomes,
         })
+    }
+}
+
+impl StatementService {
+    /// Read a stored original again.
+    async fn read_stored(
+        &self,
+        document: &StatementDocument,
+        content: Vec<u8>,
+    ) -> Result<StatementAnalysis> {
+        let (name, adapter) = (document.file_name.clone(), document.adapter_id.clone());
+        let reading =
+            tokio::task::spawn_blocking(move || analyze(&name, &content, adapter.as_deref()))
+                .await
+                .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?;
+        self.enrich(reading)
+    }
+
+    /// Remove the operations a document brought in, and return the categories chosen by hand on them.
+    async fn undo_document(
+        &self,
+        document: &StatementDocument,
+    ) -> Result<HashMap<OperationKey, (String, String)>> {
+        let mut carry = HashMap::new();
+        let Some(run) = &document.import_run_id else {
+            return Ok(carry);
+        };
+        let activities: Vec<_> = self
+            .activity_service
+            .get_activities()?
+            .into_iter()
+            .filter(|a| a.import_run_id.as_deref() == Some(run.as_str()))
+            .collect();
+        if activities.is_empty() {
+            return Ok(carry);
+        }
+        let ids: Vec<String> = activities.iter().map(|a| a.id.clone()).collect();
+        let assignments = self
+            .category_assigner
+            .current(&ids)
+            .await
+            .unwrap_or_default();
+        for a in &activities {
+            let Some(key) = activity_key(a) else { continue };
+            if let Some(chosen) = assignments
+                .iter()
+                .find(|c| c.activity_id == a.id && c.source == "manual")
+            {
+                carry.insert(
+                    key,
+                    (chosen.taxonomy_id.clone(), chosen.category_id.clone()),
+                );
+            }
+        }
+        self.activity_service
+            .bulk_mutate_activities(ActivityBulkMutationRequest {
+                creates: vec![],
+                updates: vec![],
+                delete_ids: ids,
+            })
+            .await?;
+        Ok(carry)
+    }
+
+    /// Read a document's stored original again and add its operations, with the categories chosen before.
+    async fn reimport(
+        &self,
+        document: &StatementDocument,
+        content: &[u8],
+        carry: HashMap<OperationKey, (String, String)>,
+    ) -> Result<StatementDocument> {
+        let result = self
+            .run_import(
+                StatementImportRequest {
+                    file_name: document.file_name.clone(),
+                    content_base64: base64::engine::general_purpose::STANDARD.encode(content),
+                    adapter_id: document.adapter_id.clone(),
+                    overrides: vec![],
+                    allow_duplicate_document: true,
+                },
+                ImportRun {
+                    reimport_of: Some(document.clone()),
+                    create_accounts: false,
+                    carry,
+                    fallback_account: document.account_id.clone(),
+                },
+            )
+            .await?;
+        result
+            .document
+            .ok_or_else(|| Error::Unexpected("The document was not updated".to_string()))
+    }
+
+    /// Check that a stored original can still be read into statements before anything is undone.
+    async fn check_readable(&self, document: &StatementDocument, content: Vec<u8>) -> Result<()> {
+        let analyzed = self.read_stored(document, content).await?;
+        if let Some(error) = analyzed.analysis.error {
+            return Err(invalid(error));
+        }
+        if analyzed.statements.is_empty() {
+            return Err(invalid("Nothing could be read from this file"));
+        }
+        Ok(())
+    }
+
+    /// A document's statements, each operation matched with the activity it became.
+    async fn review_statements(
+        &self,
+        document: &StatementDocument,
+        content: Vec<u8>,
+    ) -> Result<(Vec<StatementReview>, Vec<String>)> {
+        let analyzed = self.read_stored(document, content).await?;
+        if let Some(error) = &analyzed.analysis.error {
+            return Err(invalid(error.clone()));
+        }
+        let mut reviews = Vec::new();
+        let mut warnings = Vec::new();
+        for item in analyzed
+            .statements
+            .iter()
+            .filter(|i| i.mode == ImportMode::Transactions)
+        {
+            let preview = &item.preview;
+            for w in &preview.warnings {
+                if !warnings.contains(w) {
+                    warnings.push(w.clone());
+                }
+            }
+            let account_id = item
+                .matched_account
+                .as_ref()
+                .map(|m| m.id.clone())
+                .or_else(|| {
+                    if analyzed.statements.len() == 1 {
+                        document.account_id.clone()
+                    } else {
+                        None
+                    }
+                });
+            let account = match &account_id {
+                Some(id) => self.account_service.get_account(id).ok(),
+                None => None,
+            };
+            let currency = account
+                .as_ref()
+                .map(|a| a.currency.clone())
+                .unwrap_or_else(|| preview.currency.clone());
+
+            let mut by_key: HashMap<OperationKey, Vec<crate::activities::Activity>> =
+                HashMap::new();
+            if let Some(id) = &account_id {
+                let mut activities = self.activity_service.get_activities_by_account_id(id)?;
+                activities.sort_by_key(|a| a.created_at);
+                for a in activities {
+                    if let Some(key) = activity_key(&a) {
+                        by_key.entry(key).or_default().push(a);
+                    }
+                }
+            }
+            let tagged =
+                operation_rows_tagged(preview, &currency, account_id.as_deref().unwrap_or(""));
+            let mut matched: Vec<Option<String>> = Vec::with_capacity(tagged.len());
+            for (row, _) in &tagged {
+                let list = by_key.get_mut(&operation_key(row));
+                matched.push(match list {
+                    Some(list) if !list.is_empty() => Some(list.remove(0).id),
+                    _ => None,
+                });
+            }
+            let ids: Vec<String> = matched.iter().flatten().cloned().collect();
+            let current = if ids.is_empty() {
+                vec![]
+            } else {
+                self.category_assigner.current(&ids).await?
+            };
+
+            let operations = tagged
+                .iter()
+                .zip(matched)
+                .map(|((_, position), activity_id)| {
+                    let t = &preview.transactions[*position];
+                    let assignment = activity_id
+                        .as_ref()
+                        .and_then(|id| current.iter().find(|c| &c.activity_id == id));
+                    let guessed = assignment.map(|a| a.source == "import").unwrap_or(true);
+                    ReviewedOperation {
+                        row: *position,
+                        activity_id,
+                        date: t.date.clone(),
+                        label: t.label.clone(),
+                        amount: t.amount.clone(),
+                        currency: t.currency.clone(),
+                        kind: t.kind.clone(),
+                        counterparty: t.counterparty.clone(),
+                        taxonomy_id: assignment.map(|a| a.taxonomy_id.clone()),
+                        category_id: assignment.map(|a| a.category_id.clone()),
+                        category_source: assignment.map(|a| a.source.clone()),
+                        suggested_taxonomy_id: t.category_taxonomy_id.clone(),
+                        suggested_category_id: t.category_id.clone(),
+                        confidence: t.category_confidence.clone(),
+                        reason: t.category_reason.clone(),
+                        needs_review: guessed && t.category_confidence == "low",
+                    }
+                })
+                .collect();
+
+            let opening = preview.opening_balance.as_deref().and_then(parse_decimal);
+            let computed = opening.map(|o| (o + operations_sum(preview)).round_dp(2));
+            reviews.push(StatementReview {
+                index: preview.index,
+                account_id,
+                account_name: account.map(|a| a.name),
+                currency,
+                period_start: preview.period_start.clone(),
+                period_end: preview.period_end.clone(),
+                opening_balance: preview.opening_balance.clone(),
+                closing_balance: preview.balance.clone(),
+                computed_balance: computed.map(|c| c.normalize().to_string()),
+                balance_gap: balance_gap(preview).map(|g| g.normalize().to_string()),
+                operations,
+            });
+        }
+        Ok((reviews, warnings))
+    }
+}
+
+#[async_trait]
+impl StatementServiceTrait for StatementService {
+    fn analyze(
+        &self,
+        file_name: &str,
+        content: &[u8],
+        adapter_id: Option<&str>,
+    ) -> Result<StatementAnalysis> {
+        self.analyze_content(file_name, content, adapter_id)
+    }
+
+    async fn import(&self, request: StatementImportRequest) -> Result<StatementImportResult> {
+        self.run_import(
+            request,
+            ImportRun {
+                create_accounts: true,
+                ..ImportRun::default()
+            },
+        )
+        .await
     }
 
     fn list_documents(&self) -> Result<Vec<StatementDocument>> {
@@ -884,6 +1285,194 @@ impl StatementServiceTrait for StatementService {
             self.account_service.get_account(account_id)?;
         }
         self.repository.set_document_account(id, account_id).await
+    }
+
+    fn review_queue(&self) -> Result<Vec<StatementDocument>> {
+        let mut pending: Vec<StatementDocument> = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| d.status == DOCUMENT_STATUS_PENDING)
+            .collect();
+        pending.sort_by(logical_order);
+        Ok(pending)
+    }
+
+    async fn review_document(&self, id: &str) -> Result<DocumentReview> {
+        let (document, content) = self
+            .repository
+            .get_document_content(id)?
+            .ok_or_else(|| invalid("Document not found"))?;
+        let (statements, warnings) = self.review_statements(&document, content).await?;
+        let mut earlier: Vec<StatementDocument> = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| {
+                d.id != document.id
+                    && d.account_id.is_some()
+                    && d.account_id == document.account_id
+                    && d.status == DOCUMENT_STATUS_PENDING
+                    && logical_order(d, &document) == std::cmp::Ordering::Less
+            })
+            .collect();
+        earlier.sort_by(logical_order);
+        Ok(DocumentReview {
+            document,
+            statements,
+            earlier_pending: earlier.into_iter().map(|d| d.id).collect(),
+            warnings,
+        })
+    }
+
+    async fn validate_document(
+        &self,
+        id: &str,
+        decisions: Vec<ReviewDecision>,
+    ) -> Result<StatementDocument> {
+        let review = self.review_document(id).await?;
+        let chosen: HashMap<&str, &ReviewDecision> = decisions
+            .iter()
+            .map(|d| (d.activity_id.as_str(), d))
+            .collect();
+        let mut items = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        for statement in &review.statements {
+            for op in &statement.operations {
+                let Some(activity_id) = &op.activity_id else {
+                    continue;
+                };
+                if !seen.insert(activity_id.clone()) {
+                    continue;
+                }
+                let (taxonomy, category) = match chosen.get(activity_id.as_str()) {
+                    Some(d) => (d.taxonomy_id.clone(), d.category_id.clone()),
+                    None => match (
+                        op.taxonomy_id.clone().or(op.suggested_taxonomy_id.clone()),
+                        op.category_id.clone().or(op.suggested_category_id.clone()),
+                    ) {
+                        (Some(t), Some(c)) => (t, c),
+                        _ => continue,
+                    },
+                };
+                items.push(CategoryAssignment {
+                    activity_id: activity_id.clone(),
+                    taxonomy_id: taxonomy,
+                    category_id: category,
+                    source: "manual".to_string(),
+                });
+            }
+        }
+        // a decision on an activity that is not in the document is refused rather than silently applied
+        for d in &decisions {
+            if !seen.contains(&d.activity_id) {
+                return Err(invalid(
+                    "A decision refers to an operation that is not in this document",
+                ));
+            }
+        }
+        if !items.is_empty() {
+            self.category_assigner.assign(items).await?;
+        }
+        let mut document = review.document;
+        apply_reason(&mut document, &ReviewReason::default());
+        self.repository.update_document(document).await
+    }
+
+    async fn revalidate_document(&self, id: &str) -> Result<StatementDocument> {
+        let (document, content) = self
+            .repository
+            .get_document_content(id)?
+            .ok_or_else(|| invalid("Document not found"))?;
+        // nothing is undone unless the file can still be read
+        self.check_readable(&document, content.clone()).await?;
+        let carry = self.undo_document(&document).await?;
+        self.reimport(&document, &content, carry).await
+    }
+
+    async fn revalidate_all(&self) -> Result<RevalidationResult> {
+        let mut documents = self.repository.list_documents()?;
+        documents.sort_by(logical_order);
+        let mut result = RevalidationResult {
+            total: documents.len(),
+            ..RevalidationResult::default()
+        };
+        let outcome_of =
+            |document: &StatementDocument, error: Option<String>| RevalidationOutcome {
+                document_id: document.id.clone(),
+                file_name: document.file_name.clone(),
+                status: document.status.clone(),
+                to_review_count: document.to_review_count,
+                review_reason: document.review_reason.clone(),
+                error,
+            };
+
+        // 1. only documents that can still be read are touched
+        let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
+        let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
+        for document in documents.iter() {
+            let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
+                continue;
+            };
+            match self.check_readable(&doc, content.clone()).await {
+                Ok(()) => readable.push((doc, content)),
+                Err(e) => {
+                    outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
+                }
+            }
+        }
+
+        // 2. every document's operations go first, so that the oldest statement of an account carries its
+        //    opening balance again when they are read back
+        let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
+        for (document, _) in &readable {
+            carries.insert(document.id.clone(), self.undo_document(document).await?);
+        }
+
+        // 3. oldest first
+        for (document, content) in &readable {
+            let carry = carries.remove(&document.id).unwrap_or_default();
+            match self.reimport(document, content, carry).await {
+                Ok(updated) => {
+                    outcomes.insert(updated.id.clone(), outcome_of(&updated, None));
+                }
+                Err(e) => {
+                    // its operations are gone: say so instead of leaving it looking validated
+                    let mut broken = document.clone();
+                    broken.import_run_id = None;
+                    broken.imported_count = 0;
+                    broken.duplicate_count = 0;
+                    apply_reason(
+                        &mut broken,
+                        &ReviewReason {
+                            doubts: 0,
+                            balance_gap: None,
+                            warnings: 1,
+                        },
+                    );
+                    let saved = self
+                        .repository
+                        .update_document(broken)
+                        .await
+                        .unwrap_or(document.clone());
+                    outcomes.insert(saved.id.clone(), outcome_of(&saved, Some(e.to_string())));
+                }
+            }
+        }
+
+        for document in &documents {
+            if let Some(outcome) = outcomes.remove(&document.id) {
+                if outcome.error.is_some() {
+                    result.failed += 1;
+                } else if outcome.status == DOCUMENT_STATUS_PENDING {
+                    result.pending += 1;
+                } else if outcome.status == super::statements_model::DOCUMENT_STATUS_VALIDATED {
+                    result.validated += 1;
+                }
+                result.outcomes.push(outcome);
+            }
+        }
+        Ok(result)
     }
 
     fn list_identities(&self) -> Result<Vec<AccountIdentity>> {
@@ -946,6 +1535,10 @@ mod tests {
                 counterparty_iban: None,
                 reference: None,
                 memo: None,
+                category_id: None,
+                category_taxonomy_id: None,
+                category_confidence: "high".into(),
+                category_reason: None,
             })
             .collect();
         p

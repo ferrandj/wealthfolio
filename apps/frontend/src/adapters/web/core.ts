@@ -159,6 +159,11 @@ export const COMMANDS: CommandMap = {
   get_statement_document_content: { method: "GET", path: "/statements/documents" },
   delete_statement_document: { method: "DELETE", path: "/statements/documents" },
   link_statement_document: { method: "PUT", path: "/statements/documents" },
+  get_statement_review_queue: { method: "GET", path: "/statements/review-queue" },
+  review_statement_document: { method: "GET", path: "/statements/documents" },
+  validate_statement_document: { method: "POST", path: "/statements/documents" },
+  revalidate_statement_document: { method: "POST", path: "/statements/documents" },
+  revalidate_all_statement_documents: { method: "POST", path: "/statements/revalidate" },
   list_account_identities: { method: "GET", path: "/statements/identities" },
   get_account_identity: { method: "GET", path: "/statements/identities" },
   save_account_identity: { method: "PUT", path: "/statements/identities" },
@@ -1036,6 +1041,22 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       const { id, removeOperations } = payload as { id: string; removeOperations?: boolean };
       url += `/${encodeURIComponent(id)}`;
       if (removeOperations) url += "?removeOperations=true";
+      break;
+    }
+    case "review_statement_document": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}/review`;
+      break;
+    }
+    case "validate_statement_document": {
+      const { id, decisions } = payload as { id: string; decisions?: unknown[] };
+      url += `/${encodeURIComponent(id)}/validate`;
+      body = JSON.stringify({ decisions: decisions ?? [] });
+      break;
+    }
+    case "revalidate_statement_document": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}/revalidate`;
       break;
     }
     case "link_statement_document": {

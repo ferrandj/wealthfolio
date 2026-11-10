@@ -40,6 +40,7 @@ pub mod events;
 mod fx;
 pub mod insight;
 pub mod settings;
+pub mod statement_categories;
 
 pub use error::SpendingError;
 

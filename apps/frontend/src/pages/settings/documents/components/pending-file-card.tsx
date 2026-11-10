@@ -307,6 +307,8 @@ export function PendingFileCard({
                   duplicates: o.duplicates,
                 })}`}
                 {o.openingBalanceAdded && ` · ${t("settings:documents.opening_balance")}`}
+                {o.toReview > 0 &&
+                  ` · ${t("settings:documents.review_to_check", { count: o.toReview })}`}
                 {o.messages.map((m) => (
                   <div key={m} className="text-muted-foreground text-xs">
                     {m}

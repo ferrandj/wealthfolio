@@ -14,7 +14,7 @@ use crate::adapters::pdftools::row_text;
 use crate::adapters::re::{search, sub};
 use crate::py;
 
-const ACCOUNT_ROW_RE: &str = r"\b(\d{2}/\d{2}/\d{4})\s+([0-9A-Z]{8,})\s+([A-Z]{3})\b";
+const ACCOUNT_ROW_RE: &str = r"\b(\d{1,2}/\d{1,2}/\d{4})\s+([0-9A-Z]{8,})\s+([A-Z]{3})\b";
 const SAVINGS_WORDS: &[&str] = &["epargne", "livret", "pel", "ldds", "lep", "cel", "plan"];
 
 pub struct BoursoBankSavingsPdf;

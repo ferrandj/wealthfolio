@@ -7,6 +7,7 @@
 pub mod account_kind;
 pub mod adapters;
 pub mod analysis;
+pub mod categorize;
 pub mod naming;
 pub mod pdf;
 pub mod py;
@@ -21,6 +22,7 @@ pub use analysis::{
     analyze, sha256_hex, supported_documents, Analysis, StatementPreview, SupportedAdapter,
     SupportedInstitution, TransactionPreview,
 };
+pub use categorize::{suggest as suggest_category, CategoryInput, CategorySuggestion};
 pub use naming::{account_type_label, document_kind_label, standard_file_name};
 
 #[cfg(test)]

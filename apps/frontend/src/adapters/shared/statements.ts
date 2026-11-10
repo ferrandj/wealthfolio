@@ -2,6 +2,9 @@
 import type {
   AccountIdentity,
   AccountIdentityInput,
+  DocumentReview,
+  RevalidationResult,
+  ReviewDecision,
   StatementAnalysis,
   StatementDocument,
   StatementDocumentContent,
@@ -71,4 +74,27 @@ export const saveAccountIdentity = async (
 
 export const listSupportedStatements = async (): Promise<SupportedInstitution[]> => {
   return invoke<SupportedInstitution[]>("list_supported_statements");
+};
+
+export const getStatementReviewQueue = async (): Promise<StatementDocument[]> => {
+  return invoke<StatementDocument[]>("get_statement_review_queue");
+};
+
+export const reviewStatementDocument = async (id: string): Promise<DocumentReview> => {
+  return invoke<DocumentReview>("review_statement_document", { id });
+};
+
+export const validateStatementDocument = async (
+  id: string,
+  decisions: ReviewDecision[] = [],
+): Promise<StatementDocument> => {
+  return invoke<StatementDocument>("validate_statement_document", { id, decisions });
+};
+
+export const revalidateStatementDocument = async (id: string): Promise<StatementDocument> => {
+  return invoke<StatementDocument>("revalidate_statement_document", { id });
+};
+
+export const revalidateAllStatementDocuments = async (): Promise<RevalidationResult> => {
+  return invoke<RevalidationResult>("revalidate_all_statement_documents");
 };

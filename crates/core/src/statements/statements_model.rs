@@ -3,8 +3,12 @@
 use serde::{Deserialize, Serialize};
 use wealthfolio_statement_import::{Analysis, StatementPreview};
 
-pub const DOCUMENT_STATUS_IMPORTED: &str = "IMPORTED";
+/// Kept without operations (a letter, a loan paper, an account that is not a cash account).
 pub const DOCUMENT_STATUS_STORED: &str = "STORED";
+/// Operations imported, waiting for someone to check them.
+pub const DOCUMENT_STATUS_PENDING: &str = "PENDING";
+/// Operations imported and checked: the balance reconciles and the categories are confirmed.
+pub const DOCUMENT_STATUS_VALIDATED: &str = "VALIDATED";
 
 /// Who owns an account and how to reach it, as printed on its documents. One row per account.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -69,6 +73,11 @@ pub struct StatementDocument {
     pub import_run_id: Option<String>,
     pub status: String,
     pub created_at: String,
+    /// Why the document waits for review (balance gap, doubtful categories...). Empty once validated.
+    pub review_reason: Option<String>,
+    /// How many operations are doubtful.
+    pub to_review_count: i32,
+    pub validated_at: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -158,6 +167,10 @@ pub struct StatementImportOutcome {
     pub duplicates: u32,
     pub skipped: u32,
     pub opening_balance_added: bool,
+    /// Operations that received a category.
+    pub categorized: u32,
+    /// Operations whose category is a guess worth a look.
+    pub to_review: u32,
     pub messages: Vec<String>,
 }
 
@@ -167,4 +180,102 @@ pub struct StatementImportResult {
     pub document: Option<StatementDocument>,
     pub already_imported: bool,
     pub outcomes: Vec<StatementImportOutcome>,
+}
+
+/// One category written onto an activity (`source` is "import" for a guess made while reading, "manual" for one
+/// somebody confirmed or chose).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryAssignment {
+    pub activity_id: String,
+    pub taxonomy_id: String,
+    pub category_id: String,
+    pub source: String,
+}
+
+/// An operation of a stored document, as shown in the review: what the file says, the activity it became, the
+/// category it has now and the one that would be guessed from its label.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewedOperation {
+    /// Position among the statement's operations.
+    pub row: usize,
+    pub activity_id: Option<String>,
+    pub date: String,
+    pub label: String,
+    /// Signed: negative for money going out.
+    pub amount: String,
+    pub currency: String,
+    pub kind: Option<String>,
+    pub counterparty: Option<String>,
+    pub taxonomy_id: Option<String>,
+    pub category_id: Option<String>,
+    /// Where the category comes from: "import" (a guess), "manual" or "rule".
+    pub category_source: Option<String>,
+    pub suggested_taxonomy_id: Option<String>,
+    pub suggested_category_id: Option<String>,
+    /// `high`, `medium` or `low`.
+    pub confidence: String,
+    pub reason: Option<String>,
+    /// True while the category is a low-confidence guess that nobody confirmed.
+    pub needs_review: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementReview {
+    pub index: usize,
+    pub account_id: Option<String>,
+    pub account_name: Option<String>,
+    pub currency: String,
+    pub period_start: Option<String>,
+    pub period_end: Option<String>,
+    pub opening_balance: Option<String>,
+    pub closing_balance: Option<String>,
+    /// Opening balance plus the operations, to compare with the closing balance.
+    pub computed_balance: Option<String>,
+    /// Closing balance minus the computed one, when they differ.
+    pub balance_gap: Option<String>,
+    pub operations: Vec<ReviewedOperation>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentReview {
+    pub document: StatementDocument,
+    pub statements: Vec<StatementReview>,
+    /// Documents of the same account that come before this one and are not validated yet.
+    pub earlier_pending: Vec<String>,
+    /// The reader's own warnings.
+    pub warnings: Vec<String>,
+}
+
+/// The category the person chose for one activity during the review.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewDecision {
+    pub activity_id: String,
+    pub taxonomy_id: String,
+    pub category_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevalidationOutcome {
+    pub document_id: String,
+    pub file_name: String,
+    pub status: String,
+    pub to_review_count: i32,
+    pub review_reason: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RevalidationResult {
+    pub total: usize,
+    pub validated: usize,
+    pub pending: usize,
+    pub failed: usize,
+    pub outcomes: Vec<RevalidationOutcome>,
 }

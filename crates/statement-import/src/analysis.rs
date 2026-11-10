@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::adapters::base::{ParsedStatement, SourceDocument, TransactionData};
 use crate::adapters::registry::{self, catalog, get_adapter, identify, parse_with};
+use crate::categorize;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,6 +39,13 @@ pub struct TransactionPreview {
     pub counterparty_iban: Option<String>,
     pub reference: Option<String>,
     pub memo: Option<String>,
+    /// The category proposed for this operation (`cat_<key>`), and the taxonomy it belongs to.
+    pub category_id: Option<String>,
+    pub category_taxonomy_id: Option<String>,
+    /// `high`, `medium` or `low`: how sure the proposal is.
+    pub category_confidence: String,
+    /// Why the proposal is doubtful (empty when it is not).
+    pub category_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -132,7 +140,21 @@ fn non_empty(s: &Option<String>) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-fn transaction(t: &TransactionData) -> TransactionPreview {
+fn transaction(t: &TransactionData, holder: Option<&str>) -> TransactionPreview {
+    let amount = t.amount.to_string().parse::<f64>().unwrap_or(0.0);
+    let (counterparty, memo, kind) = (
+        non_empty(&t.counterparty),
+        non_empty(&t.memo),
+        non_empty(&t.kind),
+    );
+    let suggestion = categorize::suggest(&categorize::CategoryInput {
+        label: &t.label,
+        counterparty: counterparty.as_deref(),
+        memo: memo.as_deref(),
+        kind: kind.as_deref(),
+        amount,
+        holder_name: holder,
+    });
     TransactionPreview {
         date: t.date.format("%Y-%m-%d").to_string(),
         value_date: date(t.value_date),
@@ -144,6 +166,10 @@ fn transaction(t: &TransactionData) -> TransactionPreview {
         counterparty_iban: non_empty(&t.counterparty_iban),
         reference: non_empty(&t.reference),
         memo: non_empty(&t.memo),
+        category_id: Some(suggestion.category_id),
+        category_taxonomy_id: Some(suggestion.taxonomy_id),
+        category_confidence: suggestion.confidence,
+        category_reason: suggestion.reason,
     }
 }
 
@@ -175,7 +201,11 @@ fn statement(index: usize, st: &ParsedStatement) -> StatementPreview {
         opening_date: date(st.opening_date),
         period_start: date(st.period_start),
         period_end: date(st.period_end),
-        transactions: st.transactions.iter().map(transaction).collect(),
+        transactions: st
+            .transactions
+            .iter()
+            .map(|t| transaction(t, non_empty(&st.holder_name).as_deref()))
+            .collect(),
         holdings_count: st.holdings.as_ref().map(|h| h.len()).unwrap_or(0),
         warnings: st.warnings.clone(),
         confidence: st.confidence.clone(),

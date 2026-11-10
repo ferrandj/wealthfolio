@@ -86,6 +86,9 @@ pub struct StatementDocumentRow {
     pub import_run_id: Option<String>,
     pub status: String,
     pub created_at: String,
+    pub review_reason: Option<String>,
+    pub to_review_count: i32,
+    pub validated_at: Option<String>,
 }
 
 impl From<StatementDocumentRow> for StatementDocument {
@@ -113,6 +116,9 @@ impl From<StatementDocumentRow> for StatementDocument {
             import_run_id: row.import_run_id,
             status: row.status,
             created_at: row.created_at,
+            review_reason: row.review_reason,
+            to_review_count: row.to_review_count,
+            validated_at: row.validated_at,
         }
     }
 }
@@ -143,6 +149,9 @@ pub struct NewStatementDocumentRow {
     pub status: String,
     pub created_at: String,
     pub content: Vec<u8>,
+    pub review_reason: Option<String>,
+    pub to_review_count: i32,
+    pub validated_at: Option<String>,
 }
 
 impl NewStatementDocumentRow {
@@ -171,6 +180,9 @@ impl NewStatementDocumentRow {
             status: document.status,
             created_at: document.created_at,
             content,
+            review_reason: document.review_reason,
+            to_review_count: document.to_review_count,
+            validated_at: document.validated_at,
         }
     }
 }

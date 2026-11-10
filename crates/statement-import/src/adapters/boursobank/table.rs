@@ -18,9 +18,9 @@ use crate::adapters::pdftools;
 use crate::adapters::re::{g, py_match, re, sub};
 use crate::py;
 
-pub const DATE_RE: &str = r"^\d{2}/\d{2}/\d{4}$";
+pub const DATE_RE: &str = r"^\d{1,2}/\d{1,2}/\d{4}$";
 pub const AMOUNT_RE: &str = r"^\d{1,3}(?:\.\d{3})*,\d{2}$|^\d+,\d{2}$";
-pub const PERIOD_RE: &str = r"du\s+(\d{2}/\d{2}/\d{4})\s+au\s+(\d{2}/\d{2}/\d{4})";
+pub const PERIOD_RE: &str = r"du\s+(\d{1,2}/\d{1,2}/\d{4})\s+au\s+(\d{1,2}/\d{1,2}/\d{4})";
 const REF_RE: &str = r"^R[^\W\d_]f\s*:?\s*(\S.*)$";
 const RUM_RE: &str = r"^RUM\s+(\S.*)$";
 const CARD_RE: &str = r"^CARTE\s+(\d{2}/\d{2}/\d{2})\s+(.*?)(?:\s+CB\*(\d{4}))?\s*$";
@@ -44,6 +44,12 @@ const STREET_WORDS: &[&str] = &[
 ];
 const DEFAULT_BOUNDARY: f64 = 486.0;
 const HOLDER_CUT: usize = 28;
+
+/// Dates are right-aligned in the value column, so a short date ("9/11/2020") starts further right than a long one
+/// ("23/11/2020"): the middle of the word, not its left edge, tells the label from the value date.
+fn in_label(w: &W, value_x: f64) -> bool {
+    (w.x0 + w.x1) / 2.0 < value_x - 12.0
+}
 
 pub fn is_date(t: &str) -> bool {
     py_match(DATE_RE, t).is_some()
@@ -139,12 +145,12 @@ pub fn parse_table(
                 };
                 let value_date = row[1..]
                     .iter()
-                    .find(|w| is_date(&w.text) && w.x0 >= value_x - 12.0)
+                    .find(|w| is_date(&w.text) && !in_label(w, value_x))
                     .and_then(|w| parse_date_s(&w.text));
                 let label = py::strip(
                     &row[1..]
                         .iter()
-                        .filter(|w| w.x0 < value_x - 12.0)
+                        .filter(|w| in_label(w, value_x))
                         .map(|w| w.text.as_str())
                         .collect::<Vec<_>>()
                         .join(" "),
@@ -161,7 +167,7 @@ pub fn parse_table(
             } else if let Some(c) = current {
                 let text = py::strip(
                     &row.iter()
-                        .filter(|w| w.x0 < value_x - 12.0)
+                        .filter(|w| in_label(w, value_x))
                         .map(|w| w.text.as_str())
                         .collect::<Vec<_>>()
                         .join(" "),
@@ -202,9 +208,21 @@ pub fn read_holder(st: &mut ParsedStatement, rows: &[Vec<W>], texts: &[String]) 
     while end + 1 < banner && rows[end + 1][0].top - rows[end][0].top < 20.0 {
         end += 1;
     }
+    // The address is printed twice side by side (window envelope on the left, copy on the right): read the right
+    // copy, whatever the left one is. The page number sits alone in the same band: it is not a name.
     let block: Vec<String> = (end + 1..banner.max(end + 1))
-        .filter(|&i| rows[i][0].x0 > 250.0 && !py::strip(&texts[i]).is_empty())
-        .map(|i| py::strip(&texts[i]).to_string())
+        .map(|i| {
+            py::strip(
+                &rows[i]
+                    .iter()
+                    .filter(|w| w.x0 > 250.0)
+                    .map(|w| w.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
+            .to_string()
+        })
+        .filter(|t| !t.is_empty() && !t.chars().all(|c| c.is_ascii_digit()))
         .collect();
     if block.is_empty() {
         return;
@@ -500,4 +518,37 @@ fn to_transaction(e: &Entry, currency: &str, holder_key: Option<&str>) -> Transa
         Some(details)
     };
     t
+}
+
+#[cfg(test)]
+mod reader_fix_tests {
+    use super::*;
+
+    fn word(text: &str, x0: f64, x1: f64) -> W {
+        W {
+            text: text.to_string(),
+            x0,
+            x1,
+            top: 0.0,
+            bottom: 8.0,
+        }
+    }
+
+    #[test]
+    fn dates_printed_without_leading_zeros_are_dates() {
+        assert!(is_date("1/12/2020"));
+        assert!(is_date("9/11/2020"));
+        assert!(is_date("23/11/2020"));
+        assert!(!is_date("23/11/20"));
+        assert!(py_match(PERIOD_RE, "du 1/12/2020 au 31/12/2020").is_some());
+    }
+
+    #[test]
+    fn a_short_right_aligned_value_date_is_not_taken_for_part_of_the_label() {
+        // the value column starts at 400: "23/11/2020" begins at 400, "9/11/2020" (right aligned) at 411
+        let value_x = 400.0;
+        assert!(!in_label(&word("23/11/2020", 400.0, 440.0), value_x));
+        assert!(!in_label(&word("9/11/2020", 411.0, 440.0), value_x));
+        assert!(in_label(&word("CARTE", 120.0, 150.0), value_x));
+    }
 }

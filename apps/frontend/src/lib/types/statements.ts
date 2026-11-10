@@ -49,8 +49,21 @@ export interface StatementDocument {
   duplicateCount: number;
   warnings: string[];
   importRunId?: string | null;
-  status: "IMPORTED" | "STORED";
+  /** STORED: kept without operations. PENDING: operations imported, waiting for review. VALIDATED: checked. */
+  status: "STORED" | "PENDING" | "VALIDATED";
   createdAt: string;
+  /** JSON of a {@link StatementReviewReason}: why the document waits for review. */
+  reviewReason?: string | null;
+  toReviewCount: number;
+  validatedAt?: string | null;
+}
+
+export interface StatementReviewReason {
+  /** Operations whose category is a low-confidence guess. */
+  doubts: number;
+  /** Closing balance minus (opening balance + operations), when it is not zero. */
+  balanceGap?: string | null;
+  warnings: number;
 }
 
 export interface StatementDocumentContent {
@@ -79,6 +92,11 @@ export interface StatementTransactionPreview {
   counterpartyIban?: string | null;
   reference?: string | null;
   memo?: string | null;
+  categoryId?: string | null;
+  categoryTaxonomyId?: string | null;
+  /** high | medium | low */
+  categoryConfidence: "high" | "medium" | "low";
+  categoryReason?: string | null;
 }
 
 export interface StatementPreview {
@@ -171,6 +189,8 @@ export interface StatementImportOutcome {
   duplicates: number;
   skipped: number;
   openingBalanceAdded: boolean;
+  categorized: number;
+  toReview: number;
   messages: string[];
 }
 
@@ -192,4 +212,69 @@ export interface SupportedStatementAdapter {
 export interface SupportedInstitution {
   institution: string;
   adapters: SupportedStatementAdapter[];
+}
+
+export interface ReviewedOperation {
+  row: number;
+  activityId?: string | null;
+  date: string;
+  label: string;
+  /** Signed: negative for money going out. */
+  amount: string;
+  currency: string;
+  kind?: string | null;
+  counterparty?: string | null;
+  taxonomyId?: string | null;
+  categoryId?: string | null;
+  /** import (a guess) | manual | rule */
+  categorySource?: string | null;
+  suggestedTaxonomyId?: string | null;
+  suggestedCategoryId?: string | null;
+  confidence: "high" | "medium" | "low";
+  reason?: string | null;
+  needsReview: boolean;
+}
+
+export interface StatementReview {
+  index: number;
+  accountId?: string | null;
+  accountName?: string | null;
+  currency: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  openingBalance?: string | null;
+  closingBalance?: string | null;
+  computedBalance?: string | null;
+  balanceGap?: string | null;
+  operations: ReviewedOperation[];
+}
+
+export interface DocumentReview {
+  document: StatementDocument;
+  statements: StatementReview[];
+  earlierPending: string[];
+  warnings: string[];
+}
+
+export interface ReviewDecision {
+  activityId: string;
+  taxonomyId: string;
+  categoryId: string;
+}
+
+export interface RevalidationOutcome {
+  documentId: string;
+  fileName: string;
+  status: StatementDocument["status"];
+  toReviewCount: number;
+  reviewReason?: string | null;
+  error?: string | null;
+}
+
+export interface RevalidationResult {
+  total: number;
+  validated: number;
+  pending: number;
+  failed: number;
+  outcomes: RevalidationOutcome[];
 }

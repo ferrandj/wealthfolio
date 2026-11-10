@@ -389,6 +389,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolve_account_scope_drops_deleted_accounts_from_a_list() {
+        let svc = make_service_with(MockPortfolioRepo::default(), &["a1", "a2"]);
+        let scope = svc
+            .resolve_account_scope(
+                &AccountScope::Accounts {
+                    account_ids: vec!["a1".to_string(), "gone".to_string(), "a2".to_string()],
+                },
+                "USD",
+            )
+            .unwrap();
+        assert_eq!(scope.account_ids, vec!["a1", "a2"]);
+    }
+
+    #[tokio::test]
     async fn resolve_account_scope_empty_portfolio_is_deterministic() {
         let svc = make_service_with(MockPortfolioRepo::default(), &[]);
         let scope = svc
