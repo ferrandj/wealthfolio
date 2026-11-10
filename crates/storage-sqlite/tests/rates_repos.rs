@@ -105,3 +105,53 @@ async fn an_account_rate_shows_its_net_value_and_follows_the_account() {
     let rates = service.list().await.unwrap();
     assert!(rates.iter().all(|r| r.rate.id != "account.acc1"));
 }
+
+#[tokio::test]
+async fn an_account_follows_the_tax_of_its_investment_type_and_the_review_comes_every_six_months() {
+    let (_dir, pool, service) = setup();
+    account(&pool, "pea");
+    let view = service
+        .save(
+            "account.pea",
+            RateInput {
+                rate: Some(Decimal::from(2)),
+                tax_type: Some("tax.type.pea_after_5y".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(view.net_rate, Decimal::new(1628, 3));
+    // a tax type that is not in the table is refused, an empty one goes back to the flat tax
+    assert!(service
+        .save(
+            "account.pea",
+            RateInput {
+                tax_type: Some("tax.type.nope".into()),
+                ..Default::default()
+            }
+        )
+        .await
+        .is_err());
+    let back = service
+        .save(
+            "account.pea",
+            RateInput {
+                tax_type: Some(String::new()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(back.net_rate, Decimal::new(1372, 3));
+    // the tables created today are confirmed today: nothing to confirm until the next revision
+    let day = |y, m, d| chrono::NaiveDate::from_ymd_opt(y, m, d).unwrap();
+    let today = chrono::Utc::now().date_naive();
+    assert!(!service.review(today).await.unwrap().due);
+    // after the next revision date the person is asked again, and confirming clears it
+    let later = day(2099, 2, 2);
+    let review = service.review(later).await.unwrap();
+    assert!(review.due);
+    assert_eq!(review.last_revision, day(2099, 2, 1));
+    assert!(!service.confirm(today).await.unwrap().due);
+}

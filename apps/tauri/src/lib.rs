@@ -450,6 +450,8 @@ pub fn run() {
             commands::rates::list_rates,
             commands::rates::save_rate,
             commands::rates::delete_rate,
+            commands::rates::get_rates_review,
+            commands::rates::confirm_rates,
             commands::statements::analyze_statement,
             commands::statements::import_statement,
             commands::statements::list_statement_documents,

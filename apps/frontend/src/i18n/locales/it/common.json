@@ -735,5 +735,14 @@
     "providerUnavailable": "Il fornitore non ha potuto completare la richiesta. Controlla le impostazioni del fornitore.",
     "customProviderCodeReserved": "Questo codice fornitore è riservato. Scegli un altro codice.",
     "customProviderInUse": "Cambia il fornitore degli asset interessati o rimuovi le relative associazioni dei simboli prima di eliminarlo."
+  },
+  "rates_review": {
+    "title": "Are the rates still the same?",
+    "description": "The regulated rates are revised on 1 February and 1 August. Check them (revision of {{date}}): change the ones that moved, or confirm they are unchanged.",
+    "next": "Next revision: {{date}}.",
+    "unchanged": "They are unchanged",
+    "save": "Save",
+    "later": "Later",
+    "typed_source": "Typed by hand"
   }
 }

@@ -9,6 +9,7 @@ export const QueryKeys = {
   CONTACTS: "contacts",
   CONTACT: "contact",
   RATES: "rates",
+  RATES_REVIEW: "rates_review",
   BENEFICIARY_SPENDING: "beneficiary_spending",
   UNRESOLVED_COUNTERPARTIES: "unresolved_counterparties",
 

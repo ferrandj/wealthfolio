@@ -759,6 +759,15 @@ describe("rates", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/rates", method: "GET" });
   });
 
+  it("reads and confirms the half-yearly review of the rates", async () => {
+    let mock = stubFetch({ due: false });
+    await invoke("get_rates_review");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/rates-review", method: "GET" });
+    mock = stubFetch({ due: false });
+    await invoke("confirm_rates");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/rates-review", method: "POST" });
+  });
+
   it("saves and deletes a rate by its encoded id", async () => {
     let mock = stubFetch({});
     await invoke("save_rate", { id: "account.a/1", input: { rate: 2 } });

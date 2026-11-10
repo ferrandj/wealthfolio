@@ -7,7 +7,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use wealthfolio_core::rates::{RateInput, RateView};
+use wealthfolio_core::rates::{RateInput, RateView, RatesReview};
 
 use crate::{error::ApiResult, main_lib::AppState};
 
@@ -33,8 +33,31 @@ async fn delete_rate(
     Ok(())
 }
 
+async fn rates_review(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<RatesReview>> {
+    Ok(Json(
+        state
+            .rates_service
+            .review(chrono::Utc::now().date_naive())
+            .await?,
+    ))
+}
+
+async fn confirm_rates(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<RatesReview>> {
+    Ok(Json(
+        state
+            .rates_service
+            .confirm(chrono::Utc::now().date_naive())
+            .await?,
+    ))
+}
+
 pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/rates", get(list_rates))
+        .route("/rates-review", get(rates_review).post(confirm_rates))
         .route("/rates/{id}", put(save_rate).delete(delete_rate))
 }

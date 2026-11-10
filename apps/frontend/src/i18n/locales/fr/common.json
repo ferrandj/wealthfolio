@@ -735,5 +735,14 @@
     "providerUnavailable": "Le fournisseur n’a pas pu traiter la demande. Vérifiez ses paramètres.",
     "customProviderCodeReserved": "Ce code de fournisseur est réservé. Choisissez un autre code.",
     "customProviderInUse": "Changez le fournisseur des actifs concernés ou supprimez leurs correspondances de symboles avant de le supprimer."
+  },
+  "rates_review": {
+    "title": "Les taux sont-ils toujours les mêmes ?",
+    "description": "Les taux réglementés sont révisés le 1er février et le 1er août. Vérifiez-les (révision du {{date}}) : modifiez ceux qui ont changé, ou confirmez qu'ils sont inchangés.",
+    "next": "Prochaine révision : {{date}}.",
+    "unchanged": "Ils sont inchangés",
+    "save": "Enregistrer",
+    "later": "Plus tard",
+    "typed_source": "Saisi à la main"
   }
 }

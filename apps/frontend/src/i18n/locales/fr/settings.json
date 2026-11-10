@@ -2257,7 +2257,11 @@
     "entered_gross": "Saisi brut",
     "tax_exempt": "Exonéré d'impôt",
     "remove": "Retirer le taux",
-    "error": "Enregistrement impossible"
+    "error": "Enregistrement impossible",
+    "tax_types_title": "Fiscalité par type de placement",
+    "tax_types_hint": "Le 31,4 % ne s'applique pas à tous les placements : assurance-vie, PEA après 5 ans, PEL/CEL, SCPI et épargne réglementée ont leur propre taux. Modifiez-les ici ; chaque compte choisit son type.",
+    "tax_type": "Type de placement",
+    "tax_type_default": "Flat tax par défaut"
   },
   "loans": {
     "title": "Prêts",

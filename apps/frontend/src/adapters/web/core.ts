@@ -172,6 +172,8 @@ export const COMMANDS: CommandMap = {
   list_rates: { method: "GET", path: "/rates" },
   save_rate: { method: "PUT", path: "/rates" },
   delete_rate: { method: "DELETE", path: "/rates" },
+  get_rates_review: { method: "GET", path: "/rates-review" },
+  confirm_rates: { method: "POST", path: "/rates-review" },
   get_spending_by_beneficiary: { method: "GET", path: "/contacts/spending" },
 
   // Bank statements & account documents

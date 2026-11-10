@@ -998,6 +998,14 @@ diesel::table! {
         account_id -> Nullable<Text>,
         source -> Nullable<Text>,
         updated_at -> Text,
+        tax_type -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    rates_meta (key) {
+        key -> Text,
+        value -> Text,
     }
 }
 
@@ -1070,6 +1078,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     loan_documents,
     loan_settings,
     rates,
+    rates_meta,
     accounts,
     portfolios,
     portfolio_accounts,

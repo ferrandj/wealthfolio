@@ -6,7 +6,8 @@ mod rates_service;
 mod rates_traits;
 
 pub use rates_model::{
-    Rate, RateInput, RateView, KIND_ACCOUNT, KIND_REGULATED, KIND_TAX, TAX_FLAT_ID,
+    Rate, RateInput, RateView, RatesReview, KIND_ACCOUNT, KIND_REGULATED, KIND_TAX, TAX_FLAT_ID,
+    TAX_TYPE_PREFIX,
 };
 pub use rates_service::RatesService;
 pub use rates_traits::{RatesRepositoryTrait, RatesServiceTrait};

@@ -9,7 +9,7 @@ use wealthfolio_core::Result;
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use crate::schema::{accounts, rates};
+use crate::schema::{accounts, rates, rates_meta};
 
 #[derive(Queryable, Selectable, Insertable, AsChangeset, Debug, Clone)]
 #[diesel(table_name = crate::schema::rates)]
@@ -24,6 +24,7 @@ struct RateDB {
     account_id: Option<String>,
     source: Option<String>,
     updated_at: String,
+    tax_type: Option<String>,
 }
 
 impl From<RateDB> for Rate {
@@ -35,6 +36,7 @@ impl From<RateDB> for Rate {
             rate: db.rate.parse().unwrap_or_default(),
             gross: db.gross,
             tax_exempt: db.tax_exempt,
+            tax_type: db.tax_type,
             account_id: db.account_id,
             source: db.source,
             updated_at: db.updated_at,
@@ -51,6 +53,7 @@ impl From<Rate> for RateDB {
             rate: rate.rate.normalize().to_string(),
             gross: rate.gross,
             tax_exempt: rate.tax_exempt,
+            tax_type: rate.tax_type,
             account_id: rate.account_id,
             source: rate.source,
             updated_at: rate.updated_at,
@@ -124,5 +127,29 @@ impl RatesRepositoryTrait for RatesRepository {
             .get_result(&mut conn)
             .map_err(StorageError::from)?;
         Ok(n > 0)
+    }
+
+    fn get_meta(&self, key: &str) -> Result<Option<String>> {
+        let mut conn = get_connection(&self.pool)?;
+        let value = rates_meta::table
+            .find(key)
+            .select(rates_meta::value)
+            .first::<String>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+        Ok(value)
+    }
+
+    async fn set_meta(&self, key: &str, value: &str) -> Result<()> {
+        let (key, value) = (key.to_string(), value.to_string());
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                diesel::replace_into(rates_meta::table)
+                    .values((rates_meta::key.eq(&key), rates_meta::value.eq(&value)))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
     }
 }

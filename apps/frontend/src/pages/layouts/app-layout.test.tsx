@@ -39,6 +39,7 @@ vi.mock("./navigation/mobile-navbar", () => ({ MobileNavBar: () => null }));
 vi.mock("./mobile-navigation-container", () => ({ MobileNavigationContainer: () => null }));
 vi.mock("@/components/app-launcher", () => ({ default: () => null }));
 vi.mock("@/components/update-dialog", () => ({ UpdateDialog: () => null }));
+vi.mock("@/components/rates-review-dialog", () => ({ RatesReviewDialog: () => null }));
 vi.mock("@/components/mobile-loading-indicator", () => ({ MobileLoadingIndicator: () => null }));
 vi.mock("@/use-global-event-listener", () => ({ default: () => true }));
 vi.mock("@/features/devices-sync/hooks/use-active-app-sync-trigger", () => ({

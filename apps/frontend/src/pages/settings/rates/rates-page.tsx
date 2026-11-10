@@ -3,7 +3,20 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { RateInput, RateView } from "@/lib/types/rates";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, Icons, Input, Separator, Skeleton } from "@wealthfolio/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  Icons,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Separator,
+  Skeleton,
+} from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -65,6 +78,13 @@ export default function RatesPage() {
   const rates = data ?? [];
   const regulated = rates.filter((r) => r.kind === "regulated");
   const tax = rates.filter((r) => r.kind === "tax");
+  const taxBase = tax.filter((r) => !r.id.startsWith("tax.type."));
+  const taxTypes = tax.filter((r) => r.id.startsWith("tax.type."));
+  const FLAT = "__flat__";
+  const taxTypeItems = [
+    { value: FLAT, label: t("settings:rates.tax_type_default") },
+    ...taxTypes.map((r) => ({ value: r.id, label: `${r.label} — ${pct(r.rate)}` })),
+  ];
   const byAccount = new Map(rates.filter((r) => r.accountId).map((r) => [r.accountId!, r]));
 
   const row = (r: RateView) => (
@@ -97,7 +117,15 @@ export default function RatesPage() {
             <h2 className="text-lg font-semibold">{t("settings:rates.tax_title")}</h2>
             <p className="text-muted-foreground text-sm">{t("settings:rates.tax_hint")}</p>
             <Card>
-              <CardContent className="divide-y p-4">{tax.map(row)}</CardContent>
+              <CardContent className="divide-y p-4">{taxBase.map(row)}</CardContent>
+            </Card>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-lg font-semibold">{t("settings:rates.tax_types_title")}</h2>
+            <p className="text-muted-foreground text-sm">{t("settings:rates.tax_types_hint")}</p>
+            <Card>
+              <CardContent className="divide-y p-4">{taxTypes.map(row)}</CardContent>
             </Card>
           </section>
 
@@ -134,6 +162,27 @@ export default function RatesPage() {
                             />
                             {t("settings:rates.entered_gross")}
                           </label>
+                          <Select
+                            items={taxTypeItems}
+                            value={r.taxType ?? FLAT}
+                            onValueChange={(v) =>
+                              v && save.mutate({ id, input: { taxType: v === FLAT ? "" : v } })
+                            }
+                          >
+                            <SelectTrigger
+                              className="w-64"
+                              aria-label={t("settings:rates.tax_type")}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {taxTypeItems.map((i) => (
+                                <SelectItem key={i.value} value={i.value}>
+                                  {i.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <label className="flex items-center gap-1 text-xs">
                             <input
                               type="checkbox"

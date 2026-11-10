@@ -2174,7 +2174,11 @@
     "entered_gross": "Entered gross",
     "tax_exempt": "Tax-exempt",
     "remove": "Remove the rate",
-    "error": "Could not save"
+    "error": "Could not save",
+    "tax_types_title": "Tax by type of investment",
+    "tax_types_hint": "The 31.4 % flat tax does not apply to every investment: life insurance, PEA after 5 years, PEL/CEL, SCPI and regulated savings have their own rate. Edit them here; each account picks its type.",
+    "tax_type": "Type of investment",
+    "tax_type_default": "Flat tax by default"
   },
   "loans": {
     "title": "Loans",
