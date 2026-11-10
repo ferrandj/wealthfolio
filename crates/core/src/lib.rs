@@ -10,6 +10,7 @@ pub mod addons;
 pub mod assets;
 pub mod connect_config;
 pub mod constants;
+pub mod contacts;
 pub mod custom_provider;
 pub mod errors;
 pub mod events;

@@ -752,6 +752,97 @@ describe("contribution limit details and exclusions", () => {
   });
 });
 
+describe("contacts", () => {
+  it("lists contacts and reads one by id", async () => {
+    const mock = stubFetch([]);
+    await invoke("list_contacts");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/contacts", method: "GET" });
+  });
+
+  it("reads and deletes a contact by its encoded id", async () => {
+    let mock = stubFetch({});
+    await invoke("get_contact", { id: "c/1" });
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/contacts/c%2F1", method: "GET" });
+    mock = stubFetch({});
+    await invoke("delete_contact", { id: "c/1" });
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/contacts/c%2F1", method: "DELETE" });
+  });
+
+  it("creates a contact with its identifiers and linked accounts", async () => {
+    const mock = stubFetch({});
+    const contact = {
+      kind: "person",
+      firstName: "Jean",
+      identifiers: [{ kind: "iban", value: "FR76 3000 6000 0112 3456 7890 189" }],
+      linkedAccountIds: ["acc-1"],
+    };
+    await invoke("create_contact", { contact });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/contacts");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual(contact);
+  });
+
+  it("replaces the card of a contact", async () => {
+    const mock = stubFetch({});
+    await invoke("update_contact", { id: "c/1", input: { kind: "company", displayName: "EDF" } });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/contacts/c%2F1");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ kind: "company", displayName: "EDF" });
+  });
+
+  it("merges a contact into another", async () => {
+    const mock = stubFetch({});
+    await invoke("merge_contacts", { id: "c/1", targetId: "c2" });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/contacts/c%2F1/merge");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual({ targetId: "c2" });
+  });
+
+  it("adds and removes an identifier", async () => {
+    let mock = stubFetch({});
+    await invoke("add_contact_identifier", {
+      id: "c/1",
+      identifier: { kind: "name", value: "DUPONT JEAN" },
+    });
+    let call = lastCall(mock);
+    expect(call.url).toBe("/api/v1/contacts/c%2F1/identifiers");
+    expect(call.method).toBe("POST");
+    expect(JSON.parse(call.body as string)).toEqual({ kind: "name", value: "DUPONT JEAN" });
+
+    mock = stubFetch({});
+    await invoke("remove_contact_identifier", { identifierId: "i/1" });
+    call = lastCall(mock);
+    expect(call).toMatchObject({ url: "/api/v1/contact-identifiers/i%2F1", method: "DELETE" });
+  });
+
+  it("links and unlinks an account", async () => {
+    let mock = stubFetch({});
+    await invoke("link_contact_account", { id: "c/1", accountId: "a/1" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/contacts/c%2F1/accounts/a%2F1",
+      method: "PUT",
+    });
+    mock = stubFetch({});
+    await invoke("unlink_contact_account", { id: "c/1", accountId: "a/1" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/contacts/c%2F1/accounts/a%2F1",
+      method: "DELETE",
+    });
+  });
+
+  it("lists the counterparties to identify, shops on request", async () => {
+    let mock = stubFetch([]);
+    await invoke("list_unresolved_counterparties", { includeShops: false });
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/contacts/unresolved", method: "GET" });
+    mock = stubFetch([]);
+    await invoke("list_unresolved_counterparties", { includeShops: true });
+    expect(lastCall(mock).url).toBe("/api/v1/contacts/unresolved?includeShops=true");
+  });
+});
+
 describe("bank statements and account documents", () => {
   it("encodes the document id and the remove-operations flag", async () => {
     const mock = stubFetch({});

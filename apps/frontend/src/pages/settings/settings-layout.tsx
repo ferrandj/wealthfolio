@@ -57,6 +57,12 @@ export default function SettingsLayout() {
             icon: <Icons.FileText className="size-5" />,
           },
           {
+            title: t("settings:nav.items.contacts"),
+            href: "contacts",
+            subtitle: t("settings:nav.subtitles.contacts"),
+            icon: <Icons.Users className="size-5" />,
+          },
+          {
             title: t("settings:nav.items.contribution_limits"),
             href: "contribution-limits",
             subtitle: t("settings:nav.subtitles.contribution_limits"),

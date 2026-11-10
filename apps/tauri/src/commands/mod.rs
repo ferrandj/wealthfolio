@@ -11,6 +11,7 @@ pub mod asset_logo;
 #[cfg(feature = "connect-sync")]
 pub mod brokers_sync;
 pub mod cloud_backups;
+pub mod contacts;
 pub mod custom_provider;
 pub mod database;
 #[cfg(feature = "device-sync")]

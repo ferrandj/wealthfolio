@@ -38,6 +38,7 @@ use crate::activities::{
     ActivityBulkMutationRequest, ActivityImport, ActivityServiceTrait, ACTIVITY_TYPE_DEPOSIT,
     ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_WITHDRAWAL,
 };
+use crate::contacts::{CounterpartyRecorderTrait, OperationCounterparty};
 use crate::errors::{Error, Result, ValidationError};
 
 /// The largest file that is accepted (a statement is a few hundred KB; this leaves room for scans).
@@ -384,6 +385,7 @@ pub struct StatementService {
     account_service: Arc<dyn AccountServiceTrait>,
     activity_service: Arc<dyn ActivityServiceTrait>,
     category_assigner: Arc<dyn CategoryAssignerTrait>,
+    counterparties: Arc<dyn CounterpartyRecorderTrait>,
 }
 
 impl StatementService {
@@ -392,12 +394,14 @@ impl StatementService {
         account_service: Arc<dyn AccountServiceTrait>,
         activity_service: Arc<dyn ActivityServiceTrait>,
         category_assigner: Arc<dyn CategoryAssignerTrait>,
+        counterparties: Arc<dyn CounterpartyRecorderTrait>,
     ) -> Self {
         Self {
             repository,
             account_service,
             activity_service,
             category_assigner,
+            counterparties,
         }
     }
 
@@ -855,6 +859,27 @@ impl StatementService {
                                     source: "import".to_string(),
                                 });
                             }
+                        }
+                        // who the other side of each operation is, so contacts can recognise them
+                        let who: Vec<OperationCounterparty> = result
+                            .persisted_rows
+                            .iter()
+                            .filter_map(|persisted| {
+                                let Some(Some(position)) = source_of.get(persisted.index) else {
+                                    return None;
+                                };
+                                let op = preview.transactions.get(*position)?;
+                                Some(OperationCounterparty {
+                                    activity_id: persisted.activity_id.clone(),
+                                    counterparty_name: op.counterparty.clone(),
+                                    counterparty_iban: op.counterparty_iban.clone(),
+                                    operation_kind: op.kind.clone(),
+                                    contact_id: None,
+                                })
+                            })
+                            .collect();
+                        if let Err(e) = self.counterparties.record(who).await {
+                            warn!("could not record the counterparties of the operations: {e}");
                         }
                         outcome.categorized = items.len() as u32;
                         outcome.to_review = doubts;

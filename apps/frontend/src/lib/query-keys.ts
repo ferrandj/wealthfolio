@@ -5,6 +5,11 @@ export const QueryKeys = {
   // Account related keys
   ACCOUNTS: "accounts",
 
+  // Contacts
+  CONTACTS: "contacts",
+  CONTACT: "contact",
+  UNRESOLVED_COUNTERPARTIES: "unresolved_counterparties",
+
   // Bank statements & account documents
   STATEMENT_DOCUMENTS: "statement_documents",
   STATEMENT_REVIEW_QUEUE: "statement_review_queue",

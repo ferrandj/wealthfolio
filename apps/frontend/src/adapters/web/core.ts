@@ -157,6 +157,19 @@ export const COMMANDS: CommandMap = {
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   get_contribution_limit_details: { method: "GET", path: "/limits" },
   set_contribution_activity_excluded: { method: "PUT", path: "/limits" },
+  // Contacts
+  list_contacts: { method: "GET", path: "/contacts" },
+  get_contact: { method: "GET", path: "/contacts" },
+  create_contact: { method: "POST", path: "/contacts" },
+  update_contact: { method: "PUT", path: "/contacts" },
+  delete_contact: { method: "DELETE", path: "/contacts" },
+  merge_contacts: { method: "POST", path: "/contacts" },
+  add_contact_identifier: { method: "POST", path: "/contacts" },
+  remove_contact_identifier: { method: "DELETE", path: "/contact-identifiers" },
+  link_contact_account: { method: "PUT", path: "/contacts" },
+  unlink_contact_account: { method: "DELETE", path: "/contacts" },
+  list_unresolved_counterparties: { method: "GET", path: "/contacts/unresolved" },
+
   // Bank statements & account documents
   analyze_statement: { method: "POST", path: "/statements/analyze" },
   import_statement: { method: "POST", path: "/statements/import" },
@@ -1034,6 +1047,51 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "test_custom_provider_source": {
       const { payload: tp } = payload as { payload: Record<string, unknown> };
       body = JSON.stringify(tp);
+      break;
+    }
+    case "get_contact":
+    case "delete_contact": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_contact": {
+      const { contact } = payload as { contact: Record<string, unknown> };
+      body = JSON.stringify(contact);
+      break;
+    }
+    case "update_contact": {
+      const { id, input } = payload as { id: string; input: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(input);
+      break;
+    }
+    case "merge_contacts": {
+      const { id, targetId } = payload as { id: string; targetId: string };
+      url += `/${encodeURIComponent(id)}/merge`;
+      body = JSON.stringify({ targetId });
+      break;
+    }
+    case "add_contact_identifier": {
+      const { id, identifier } = payload as { id: string; identifier: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}/identifiers`;
+      body = JSON.stringify(identifier);
+      break;
+    }
+    case "remove_contact_identifier": {
+      const { identifierId } = payload as { identifierId: string };
+      url += `/${encodeURIComponent(identifierId)}`;
+      break;
+    }
+    case "link_contact_account":
+    case "unlink_contact_account": {
+      const { id, accountId } = payload as { id: string; accountId: string };
+      url += `/${encodeURIComponent(id)}/accounts/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "list_unresolved_counterparties": {
+      const { includeShops } = (payload ?? {}) as { includeShops?: boolean };
+      if (includeShops) url += "?includeShops=true";
       break;
     }
     case "analyze_statement": {

@@ -40,6 +40,7 @@ mod assets;
 pub(crate) mod cloud_backups;
 #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod connect;
+mod contacts;
 mod custom_providers;
 mod data_exports;
 mod database_backups;
@@ -218,6 +219,7 @@ fn app_router_with_profiles(
         .merge(health::router())
         .merge(custom_providers::router())
         .merge(spending::router())
+        .merge(contacts::router())
         .merge(statements::router())
         .merge(allocation_targets::router())
         .merge(agent_access::router());

@@ -955,8 +955,67 @@ diesel::table! {
 diesel::joinable!(account_identities -> accounts (account_id));
 diesel::joinable!(statement_documents -> accounts (account_id));
 
+diesel::table! {
+    contacts (id) {
+        id -> Text,
+        kind -> Text,
+        role -> Text,
+        display_name -> Text,
+        civility -> Nullable<Text>,
+        last_name -> Nullable<Text>,
+        first_name -> Nullable<Text>,
+        birth_name -> Nullable<Text>,
+        address -> Nullable<Text>,
+        phone -> Nullable<Text>,
+        email -> Nullable<Text>,
+        notes -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    contact_identifiers (id) {
+        id -> Text,
+        contact_id -> Text,
+        kind -> Text,
+        value -> Text,
+        label -> Nullable<Text>,
+        bic -> Nullable<Text>,
+        institution -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    contact_linked_accounts (contact_id, account_id) {
+        contact_id -> Text,
+        account_id -> Text,
+    }
+}
+
+diesel::table! {
+    activity_counterparties (activity_id) {
+        activity_id -> Text,
+        counterparty_name -> Nullable<Text>,
+        counterparty_iban -> Nullable<Text>,
+        operation_kind -> Nullable<Text>,
+        contact_id -> Nullable<Text>,
+    }
+}
+
+diesel::joinable!(contact_identifiers -> contacts (contact_id));
+diesel::joinable!(contact_linked_accounts -> contacts (contact_id));
+diesel::joinable!(contact_linked_accounts -> accounts (account_id));
+diesel::joinable!(activity_counterparties -> activities (activity_id));
+diesel::joinable!(activity_counterparties -> contacts (contact_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
     import_account_templates,
+    contacts,
+    contact_identifiers,
+    contact_linked_accounts,
+    activity_counterparties,
     account_identities,
     statement_documents,
     accounts,

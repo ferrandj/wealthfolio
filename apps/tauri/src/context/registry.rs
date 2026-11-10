@@ -57,6 +57,7 @@ pub struct ServiceContext {
     pub quote_service: Arc<dyn quotes::QuoteServiceTrait>,
     pub limits_service: Arc<dyn limits::ContributionLimitServiceTrait>,
     pub statement_service: Arc<dyn statements::StatementServiceTrait>,
+    pub contacts_service: Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>,
     pub fx_service: Arc<dyn fx::FxServiceTrait>,
     pub performance_service: Arc<dyn portfolio::performance::PerformanceServiceTrait>,
     pub income_service: Arc<dyn portfolio::income::IncomeServiceTrait>,
@@ -196,6 +197,10 @@ impl ServiceContext {
 
     pub fn statement_service(&self) -> Arc<dyn statements::StatementServiceTrait> {
         Arc::clone(&self.statement_service)
+    }
+
+    pub fn contacts_service(&self) -> Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait> {
+        Arc::clone(&self.contacts_service)
     }
 
     pub fn fx_service(&self) -> Arc<dyn fx::FxServiceTrait> {

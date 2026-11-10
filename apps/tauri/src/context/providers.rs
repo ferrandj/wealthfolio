@@ -462,6 +462,9 @@ async fn build_context(
         .with_valuation_repository(valuation_repository.clone())
         .with_event_sink(domain_event_sink.clone()),
     );
+    let contacts_service = Arc::new(wealthfolio_core::contacts::ContactsService::new(Arc::new(
+        wealthfolio_storage_sqlite::contacts::ContactsRepository::new(pool.clone(), writer.clone()),
+    )));
     let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
         Arc::new(wealthfolio_core::statements::StatementService::new(
             Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
@@ -473,6 +476,7 @@ async fn build_context(
                     activity_assignments_repo.clone(),
                 ),
             ),
+            contacts_service.clone(),
         ));
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),
@@ -850,6 +854,7 @@ async fn build_context(
             quote_service,
             limits_service,
             statement_service,
+            contacts_service,
             fx_service,
             performance_service,
             income_service,

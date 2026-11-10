@@ -257,6 +257,21 @@ export {
   setContributionActivityExcluded,
 } from "../shared/contribution-limits";
 
+// Contacts
+export {
+  addContactIdentifier,
+  createContact,
+  deleteContact,
+  getContact,
+  linkContactAccount,
+  listContacts,
+  listUnresolvedCounterparties,
+  mergeContacts,
+  removeContactIdentifier,
+  unlinkContactAccount,
+  updateContact,
+} from "../shared/contacts";
+
 // Bank statements & account documents
 export {
   analyzeStatement,
