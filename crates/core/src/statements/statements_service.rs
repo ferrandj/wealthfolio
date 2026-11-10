@@ -70,6 +70,14 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Validation(ValidationError::InvalidInput(message.into()))
 }
 
+/// Card payments and direct debits are purchases and bills, never a move between own accounts.
+fn looks_like_card_or_debit(note: &str) -> bool {
+    let n = note.trim_start().to_uppercase();
+    ["CARTE ", "CB ", "PRLV", "PAIEMENT CB", "PAIEMENT PAR CARTE"]
+        .iter()
+        .any(|p| n.starts_with(p))
+}
+
 fn clean(value: &Option<String>) -> Option<String> {
     value
         .as_ref()
@@ -971,7 +979,11 @@ impl StatementService {
         if has_operations {
             apply_reason(&mut document, &reason);
         }
-        let _ = tracked_any;
+        if tracked_any {
+            if let Err(e) = self.link_own_transfers().await {
+                warn!("could not look for transfers between own accounts: {e}");
+            }
+        }
         if let Some(previous) = &run.reimport_of {
             // the stored file stays as it is; what changes is what was read from it
             let mut updated = previous.clone();
@@ -1032,6 +1044,95 @@ impl StatementService {
         self.enrich(reading)
     }
 
+    /// Money moved between the user's own accounts is not spent or earned: a withdrawal on one account and a deposit
+    /// of the same amount, on the same day, in the same currency, on another account of the statements are linked
+    /// as one internal transfer. Only an unambiguous pair is linked (one withdrawal and one deposit for that day and
+    /// amount); card payments and direct debits are never taken for transfers. Returns the number of pairs linked.
+    async fn link_own_transfers(&self) -> Result<u32> {
+        use crate::activities::{
+            ConvertToTransferRequest, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+        };
+        let known: HashSet<String> = self
+            .repository
+            .list_identities()?
+            .into_iter()
+            .map(|i| i.account_id)
+            .collect();
+        if known.len() < 2 {
+            return Ok(0);
+        }
+        type Leg = (String, String, String, bool); // activity id, account id, type, is a transfer already
+        let mut groups: HashMap<(String, Decimal, String), (Vec<Leg>, Vec<Leg>)> = HashMap::new();
+        for a in self.activity_service.get_activities()? {
+            if !known.contains(&a.account_id) || a.source_group_id.is_some() {
+                continue;
+            }
+            let kind = a.effective_type().to_string();
+            let outgoing = kind == ACTIVITY_TYPE_WITHDRAWAL || kind == ACTIVITY_TYPE_TRANSFER_OUT;
+            let incoming = kind == ACTIVITY_TYPE_DEPOSIT || kind == ACTIVITY_TYPE_TRANSFER_IN;
+            if !outgoing && !incoming {
+                continue;
+            }
+            let note = a.notes.clone().unwrap_or_default();
+            if note == OPENING_BALANCE_NOTE || looks_like_card_or_debit(&note) {
+                continue;
+            }
+            let Some(amount) = a.amount.map(|v| v.abs()).filter(|v| !v.is_zero()) else {
+                continue;
+            };
+            let day = a.activity_date.format("%Y-%m-%d").to_string();
+            let leg: Leg = (
+                a.id.clone(),
+                a.account_id.clone(),
+                kind.clone(),
+                kind.starts_with("TRANSFER"),
+            );
+            let entry = groups.entry((day, amount, a.currency.clone())).or_default();
+            if outgoing {
+                entry.0.push(leg);
+            } else {
+                entry.1.push(leg);
+            }
+        }
+        let mut linked = 0;
+        for (_, (outs, ins)) in groups {
+            let ([out], [inc]) = (outs.as_slice(), ins.as_slice()) else {
+                continue;
+            };
+            if out.1 == inc.1 {
+                continue;
+            }
+            let result = if out.3 && inc.3 {
+                self.activity_service
+                    .link_transfer_activities(out.0.clone(), inc.0.clone())
+                    .await
+                    .map(|_| ())
+            } else {
+                // the leg that is still a plain deposit or withdrawal becomes the transfer
+                let (source, other) = if out.3 {
+                    (&inc.0, &out.0)
+                } else {
+                    (&out.0, &inc.0)
+                };
+                self.activity_service
+                    .convert_to_internal_transfer(ConvertToTransferRequest {
+                        activity_id: source.clone(),
+                        counterpart_activity_id: Some(other.clone()),
+                        counterpart_account_id: None,
+                        counterpart_amount: None,
+                        split_review: None,
+                    })
+                    .await
+                    .map(|_| ())
+            };
+            match result {
+                Ok(()) => linked += 1,
+                Err(e) => warn!("could not link a transfer between own accounts: {e}"),
+            }
+        }
+        Ok(linked)
+    }
+
     /// Remove the operations a document brought in, and return the categories chosen by hand on them.
     async fn undo_document(
         &self,
@@ -1051,6 +1152,32 @@ impl StatementService {
             return Ok(carry);
         }
         let ids: Vec<String> = activities.iter().map(|a| a.id.clone()).collect();
+        // a transfer between own accounts has its other leg in another document: unlink it first, so removing
+        // this document's leg does not take the other one away
+        for a in &activities {
+            if a.source_group_id.is_none() || !a.effective_type().starts_with("TRANSFER") {
+                continue;
+            }
+            if let Ok(Some(pair)) = self
+                .activity_service
+                .get_transfer_pair_for_activity(a.id.clone())
+            {
+                let other = if pair.transfer_in.id == a.id {
+                    &pair.transfer_out
+                } else {
+                    &pair.transfer_in
+                };
+                if !ids.contains(&other.id) {
+                    if let Err(e) = self
+                        .activity_service
+                        .unlink_transfer_activities(a.id.clone(), other.id.clone())
+                        .await
+                    {
+                        warn!("could not unlink a transfer before removing its document: {e}");
+                    }
+                }
+            }
+        }
         let assignments = self
             .category_assigner
             .current(&ids)
@@ -1599,6 +1726,13 @@ mod tests {
             confidence: "high".into(),
             extra: serde_json::Value::Null,
         }
+    }
+
+    #[test]
+    fn card_payments_and_debits_are_never_taken_for_transfers() {
+        assert!(looks_like_card_or_debit("CARTE 12/09 CARREFOUR"));
+        assert!(looks_like_card_or_debit("PRLV SEPA EDF"));
+        assert!(!looks_like_card_or_debit("VIR M DUPONT JEAN"));
     }
 
     #[test]
