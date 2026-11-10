@@ -57,7 +57,10 @@ export function DocumentsLibrary() {
   });
 
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
+    ]);
 
   const refreshOperations = async () => {
     await refresh();

@@ -2105,7 +2105,12 @@
     "review_skip": "Passer",
     "review_close": "Fermer",
     "review_validated_toast": "Relevé validé",
-    "review_no_operations": "Aucune opération dans ce document"
+    "review_no_operations": "Aucune opération dans ce document",
+    "coverage_title": "Relevés manquants et continuité",
+    "coverage_missing": "Mois sans relevé :",
+    "coverage_normal": "C'est normal",
+    "coverage_undo_normal": "Annuler",
+    "coverage_break": "Le solde d'ouverture ({{found}}) ne reprend pas le solde de clôture du relevé précédent ({{expected}})."
   },
   "identity": {
     "title": "Coordonnées du compte",

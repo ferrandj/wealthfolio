@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 
+use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview,
     NewStatementDocument, RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
@@ -32,6 +33,10 @@ pub trait StatementRepositoryTrait: Send + Sync {
     /// Replace what changes over a document's life (account, reading, counts, import run, status, review).
     async fn update_document(&self, document: StatementDocument) -> Result<StatementDocument>;
     async fn delete_document(&self, id: &str) -> Result<()>;
+
+    /// Months (account, "YYYY-MM") without a statement that the person called normal.
+    fn list_gap_marks(&self) -> Result<Vec<(String, String)>>;
+    async fn set_gap_mark(&self, account_id: &str, month: &str, normal: bool) -> Result<()>;
 }
 
 /// What the statements feature needs from the spending module, which sits next to core and cannot be depended
@@ -95,4 +100,9 @@ pub trait StatementServiceTrait: Send + Sync {
         account_id: &str,
         input: AccountIdentityInput,
     ) -> Result<AccountIdentity>;
+
+    /// Per account: months without a statement and statements whose balances do not follow each other.
+    fn coverage(&self) -> Result<Vec<AccountCoverage>>;
+    /// Mark a month without a statement as normal (or not).
+    async fn set_month_normal(&self, account_id: &str, month: &str, normal: bool) -> Result<()>;
 }

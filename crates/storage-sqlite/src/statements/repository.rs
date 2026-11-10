@@ -12,7 +12,7 @@ use wealthfolio_core::Result;
 use super::model::{AccountIdentityDB, NewStatementDocumentRow, StatementDocumentRow};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use crate::schema::{account_identities, statement_documents};
+use crate::schema::{account_identities, statement_documents, statement_gap_marks};
 
 pub struct StatementRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -174,6 +174,8 @@ impl StatementRepositoryTrait for StatementRepository {
                         statement_documents::review_reason.eq(&document.review_reason),
                         statement_documents::to_review_count.eq(document.to_review_count),
                         statement_documents::validated_at.eq(&document.validated_at),
+                        statement_documents::opening_balance.eq(&document.opening_balance),
+                        statement_documents::closing_balance.eq(&document.closing_balance),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -197,6 +199,43 @@ impl StatementRepositoryTrait for StatementRepository {
                 diesel::delete(statement_documents::table.find(&id))
                     .execute(conn)
                     .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn list_gap_marks(&self) -> Result<Vec<(String, String)>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rows = statement_gap_marks::table
+            .select((statement_gap_marks::account_id, statement_gap_marks::month))
+            .load::<(String, String)>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows)
+    }
+
+    async fn set_gap_mark(&self, account_id: &str, month: &str, normal: bool) -> Result<()> {
+        let account_id = account_id.to_string();
+        let month = month.to_string();
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                if normal {
+                    diesel::insert_or_ignore_into(statement_gap_marks::table)
+                        .values((
+                            statement_gap_marks::account_id.eq(&account_id),
+                            statement_gap_marks::month.eq(&month),
+                            statement_gap_marks::created_at.eq(chrono::Utc::now().to_rfc3339()),
+                        ))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                } else {
+                    diesel::delete(
+                        statement_gap_marks::table
+                            .filter(statement_gap_marks::account_id.eq(&account_id))
+                            .filter(statement_gap_marks::month.eq(&month)),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                }
                 Ok(())
             })
             .await

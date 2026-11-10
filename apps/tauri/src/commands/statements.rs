@@ -220,3 +220,30 @@ pub async fn save_account_identity(
 pub async fn list_supported_statements() -> Result<Vec<SupportedInstitution>, String> {
     Ok(supported_documents())
 }
+
+#[tauri::command]
+pub async fn get_statement_coverage(
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::AccountCoverage>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .coverage()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_statement_month_normal(
+    account_id: String,
+    month: String,
+    normal: bool,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::AccountCoverage>, String> {
+    let context = state.context()?;
+    let service = context.statement_service();
+    service
+        .set_month_normal(&account_id, &month, normal)
+        .await
+        .map_err(|e| e.to_string())?;
+    service.coverage().map_err(|e| e.to_string())
+}

@@ -949,8 +949,20 @@ diesel::table! {
         review_reason -> Nullable<Text>,
         to_review_count -> Integer,
         validated_at -> Nullable<Text>,
+        opening_balance -> Nullable<Text>,
+        closing_balance -> Nullable<Text>,
     }
 }
+
+diesel::table! {
+    statement_gap_marks (account_id, month) {
+        account_id -> Text,
+        month -> Text,
+        created_at -> Text,
+    }
+}
+
+diesel::joinable!(statement_gap_marks -> accounts (account_id));
 
 diesel::joinable!(account_identities -> accounts (account_id));
 diesel::joinable!(statement_documents -> accounts (account_id));
@@ -1018,6 +1030,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     activity_counterparties,
     account_identities,
     statement_documents,
+    statement_gap_marks,
     accounts,
     portfolios,
     portfolio_accounts,

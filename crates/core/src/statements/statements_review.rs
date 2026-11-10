@@ -218,6 +218,8 @@ mod tests {
             review_reason: None,
             to_review_count: 0,
             validated_at: None,
+            opening_balance: None,
+            closing_balance: None,
         };
         let mut docs = [
             doc("dec", Some("a"), "2020-12-01"),
@@ -258,6 +260,8 @@ mod tests {
             review_reason: None,
             to_review_count: 0,
             validated_at: None,
+            opening_balance: None,
+            closing_balance: None,
         };
         let p = preview("0", "10", &["10"]);
         let mut clear = doc("clear");

@@ -13,6 +13,7 @@ export const QueryKeys = {
   // Bank statements & account documents
   STATEMENT_DOCUMENTS: "statement_documents",
   STATEMENT_REVIEW_QUEUE: "statement_review_queue",
+  STATEMENT_COVERAGE: "statement_coverage",
   STATEMENT_REVIEW: "statement_review",
   ACCOUNT_IDENTITIES: "account_identities",
   SUPPORTED_STATEMENTS: "supported_statements",

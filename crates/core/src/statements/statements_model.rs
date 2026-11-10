@@ -78,6 +78,9 @@ pub struct StatementDocument {
     /// How many operations are doubtful.
     pub to_review_count: i32,
     pub validated_at: Option<String>,
+    /// Balances the statement states, to check that consecutive statements follow each other.
+    pub opening_balance: Option<String>,
+    pub closing_balance: Option<String>,
 }
 
 #[derive(Debug, Clone)]

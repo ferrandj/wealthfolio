@@ -898,6 +898,25 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
   });
 
+  it("reads the statement coverage", async () => {
+    const mock = stubFetch([]);
+    await invoke("get_statement_coverage");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/coverage", method: "GET" });
+  });
+
+  it("marks a month without statement as normal", async () => {
+    const mock = stubFetch([]);
+    await invoke("set_statement_month_normal", {
+      accountId: "acc/1",
+      month: "2026-02",
+      normal: true,
+    });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/statements/coverage/acc%2F1/2026-02");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ normal: true });
+  });
+
   it("lists the documents waiting for review", async () => {
     const mock = stubFetch([]);
     await invoke("get_statement_review_queue");

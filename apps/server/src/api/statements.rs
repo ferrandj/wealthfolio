@@ -11,9 +11,9 @@ use axum::{
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use wealthfolio_core::statements::{
-    supported_documents, AccountIdentity, AccountIdentityInput, DocumentReview, RevalidationResult,
-    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
-    StatementImportResult, SupportedInstitution, MAX_DOCUMENT_BYTES,
+    supported_documents, AccountCoverage, AccountIdentity, AccountIdentityInput, DocumentReview,
+    RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
+    StatementImportRequest, StatementImportResult, SupportedInstitution, MAX_DOCUMENT_BYTES,
 };
 
 use crate::{
@@ -200,6 +200,29 @@ async fn save_identity(
     ))
 }
 
+async fn coverage(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<AccountCoverage>>> {
+    Ok(Json(state.statement_service.coverage()?))
+}
+
+#[derive(Deserialize)]
+struct NormalBody {
+    normal: bool,
+}
+
+async fn set_month_normal(
+    Path((account_id, month)): Path<(String, String)>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<NormalBody>,
+) -> ApiResult<Json<Vec<AccountCoverage>>> {
+    state
+        .statement_service
+        .set_month_normal(&account_id, &month, body.normal)
+        .await?;
+    Ok(Json(state.statement_service.coverage()?))
+}
+
 async fn supported() -> Json<Vec<SupportedInstitution>> {
     Json(supported_documents())
 }
@@ -215,6 +238,11 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
             post(import_statement).layer(DefaultBodyLimit::max(STATEMENT_BODY_LIMIT)),
         )
         .route("/statements/supported", get(supported))
+        .route("/statements/coverage", get(coverage))
+        .route(
+            "/statements/coverage/{account_id}/{month}",
+            put(set_month_normal),
+        )
         .route("/statements/documents", get(list_documents))
         .route(
             "/statements/documents/{id}/content",

@@ -289,6 +289,8 @@ export {
   getAccountIdentity,
   saveAccountIdentity,
   listSupportedStatements,
+  getStatementCoverage,
+  setStatementMonthNormal,
 } from "../shared/statements";
 
 // Exchange Rates Commands

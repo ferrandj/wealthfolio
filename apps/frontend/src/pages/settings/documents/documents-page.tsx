@@ -8,6 +8,7 @@ import { Button, Icons, Separator } from "@wealthfolio/ui";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
+import { CoverageCard } from "./components/coverage-card";
 import { DocumentsLibrary } from "./components/documents-library";
 import { PendingFileCard, type PendingFile } from "./components/pending-file-card";
 import { SupportedDocuments } from "./components/supported-documents";
@@ -94,6 +95,7 @@ export default function DocumentsPage() {
         patchFile(file.id, { status: "done", result });
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
+          queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNT_IDENTITIES] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] }),
@@ -218,6 +220,8 @@ export default function DocumentsPage() {
           ))}
         </div>
       )}
+
+      <CoverageCard />
 
       <SupportedDocuments />
 

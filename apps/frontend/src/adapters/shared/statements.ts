@@ -1,5 +1,6 @@
 // Bank statements & account documents
 import type {
+  AccountCoverage,
   AccountIdentity,
   AccountIdentityInput,
   DocumentReview,
@@ -97,4 +98,16 @@ export const revalidateStatementDocument = async (id: string): Promise<Statement
 
 export const revalidateAllStatementDocuments = async (): Promise<RevalidationResult> => {
   return invoke<RevalidationResult>("revalidate_all_statement_documents");
+};
+
+export const getStatementCoverage = async (): Promise<AccountCoverage[]> => {
+  return invoke<AccountCoverage[]>("get_statement_coverage");
+};
+
+export const setStatementMonthNormal = async (
+  accountId: string,
+  month: string,
+  normal: boolean,
+): Promise<AccountCoverage[]> => {
+  return invoke<AccountCoverage[]>("set_statement_month_normal", { accountId, month, normal });
 };

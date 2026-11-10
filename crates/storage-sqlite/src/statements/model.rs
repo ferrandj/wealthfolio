@@ -89,6 +89,8 @@ pub struct StatementDocumentRow {
     pub review_reason: Option<String>,
     pub to_review_count: i32,
     pub validated_at: Option<String>,
+    pub opening_balance: Option<String>,
+    pub closing_balance: Option<String>,
 }
 
 impl From<StatementDocumentRow> for StatementDocument {
@@ -119,6 +121,8 @@ impl From<StatementDocumentRow> for StatementDocument {
             review_reason: row.review_reason,
             to_review_count: row.to_review_count,
             validated_at: row.validated_at,
+            opening_balance: row.opening_balance,
+            closing_balance: row.closing_balance,
         }
     }
 }
@@ -152,6 +156,8 @@ pub struct NewStatementDocumentRow {
     pub review_reason: Option<String>,
     pub to_review_count: i32,
     pub validated_at: Option<String>,
+    pub opening_balance: Option<String>,
+    pub closing_balance: Option<String>,
 }
 
 impl NewStatementDocumentRow {
@@ -183,6 +189,8 @@ impl NewStatementDocumentRow {
             review_reason: document.review_reason,
             to_review_count: document.to_review_count,
             validated_at: document.validated_at,
+            opening_balance: document.opening_balance,
+            closing_balance: document.closing_balance,
         }
     }
 }

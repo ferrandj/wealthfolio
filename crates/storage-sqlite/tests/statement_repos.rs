@@ -59,6 +59,8 @@ fn document(id: &str, account_id: Option<&str>, sha: &str) -> StatementDocument 
         review_reason: None,
         to_review_count: 0,
         validated_at: None,
+        opening_balance: Some("1000.00".into()),
+        closing_balance: Some("1500.00".into()),
         created_at: "2026-10-01T10:00:00Z".into(),
     }
 }

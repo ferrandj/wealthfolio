@@ -186,6 +186,8 @@ export const COMMANDS: CommandMap = {
   get_account_identity: { method: "GET", path: "/statements/identities" },
   save_account_identity: { method: "PUT", path: "/statements/identities" },
   list_supported_statements: { method: "GET", path: "/statements/supported" },
+  get_statement_coverage: { method: "GET", path: "/statements/coverage" },
+  set_statement_month_normal: { method: "PUT", path: "/statements/coverage" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
   create_asset: { method: "POST", path: "/assets" },
@@ -1139,6 +1141,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "get_account_identity": {
       const { accountId } = payload as { accountId: string };
       url += `/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "set_statement_month_normal": {
+      const { accountId, month, normal } = payload as {
+        accountId: string;
+        month: string;
+        normal: boolean;
+      };
+      url += `/${encodeURIComponent(accountId)}/${encodeURIComponent(month)}`;
+      body = JSON.stringify({ normal });
       break;
     }
     case "save_account_identity": {

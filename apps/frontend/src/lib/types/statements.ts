@@ -278,3 +278,23 @@ export interface RevalidationResult {
   failed: number;
   outcomes: RevalidationOutcome[];
 }
+
+export interface MissingMonth {
+  month: string;
+  normal: boolean;
+}
+
+export interface BalanceBreak {
+  previousDocumentId: string;
+  nextDocumentId: string;
+  expected: string;
+  found: string;
+}
+
+export interface AccountCoverage {
+  accountId: string;
+  firstMonth: string | null;
+  lastMonth: string | null;
+  missingMonths: MissingMonth[];
+  balanceBreaks: BalanceBreak[];
+}

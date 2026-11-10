@@ -969,6 +969,8 @@ impl StatementService {
             review_reason: None,
             to_review_count: 0,
             validated_at: None,
+            opening_balance: head.and_then(|p| p.opening_balance.clone()),
+            closing_balance: head.and_then(|p| p.balance.clone()),
             created_at: Utc::now().to_rfc3339(),
         };
         let mut document = document;
@@ -998,6 +1000,8 @@ impl StatementService {
             updated.review_reason = document.review_reason.clone();
             updated.to_review_count = document.to_review_count;
             updated.validated_at = document.validated_at.clone();
+            updated.opening_balance = document.opening_balance.clone();
+            updated.closing_balance = document.closing_balance.clone();
             let stored = self.repository.update_document(updated).await?;
             return Ok(StatementImportResult {
                 document: Some(stored),
@@ -1061,8 +1065,11 @@ impl StatementService {
         if known.len() < 2 {
             return Ok(0);
         }
-        type Leg = (String, String, String, bool); // activity id, account id, type, is a transfer already
-        let mut groups: HashMap<(String, Decimal, String), (Vec<Leg>, Vec<Leg>)> = HashMap::new();
+        // activity id, account id, type, is a transfer already
+        type Leg = (String, String, String, bool);
+        // day, amount, currency
+        type Slot = (String, Decimal, String);
+        let mut groups: HashMap<Slot, (Vec<Leg>, Vec<Leg>)> = HashMap::new();
         for a in self.activity_service.get_activities()? {
             if !known.contains(&a.account_id) || a.source_group_id.is_some() {
                 continue;
@@ -1626,6 +1633,27 @@ impl StatementServiceTrait for StatementService {
             }
         }
         Ok(result)
+    }
+
+    fn coverage(&self) -> Result<Vec<super::AccountCoverage>> {
+        let marked: HashSet<(String, String)> =
+            self.repository.list_gap_marks()?.into_iter().collect();
+        Ok(super::compute_coverage(
+            &self.repository.list_documents()?,
+            &marked,
+        ))
+    }
+
+    async fn set_month_normal(&self, account_id: &str, month: &str, normal: bool) -> Result<()> {
+        self.account_service.get_account(account_id)?;
+        if chrono::NaiveDate::parse_from_str(&format!("{month}-01"), "%Y-%m-%d").is_err() {
+            return Err(crate::errors::Error::Validation(
+                crate::errors::ValidationError::InvalidInput("A month looks like 2026-03".into()),
+            ));
+        }
+        self.repository
+            .set_gap_mark(account_id, month, normal)
+            .await
     }
 
     fn list_identities(&self) -> Result<Vec<AccountIdentity>> {

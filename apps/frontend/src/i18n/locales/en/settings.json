@@ -2049,7 +2049,12 @@
     "review_skip": "Skip",
     "review_close": "Close",
     "review_validated_toast": "Statement validated",
-    "review_no_operations": "No transactions in this document"
+    "review_no_operations": "No transactions in this document",
+    "coverage_title": "Missing statements and continuity",
+    "coverage_missing": "Months without a statement:",
+    "coverage_normal": "This is normal",
+    "coverage_undo_normal": "Undo",
+    "coverage_break": "The opening balance ({{found}}) does not pick up the previous statement's closing balance ({{expected}})."
   },
   "identity": {
     "title": "Account details",

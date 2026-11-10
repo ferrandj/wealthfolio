@@ -2,11 +2,13 @@
 //! operations become cash activities, their originals are kept, and the account holder's identity (name,
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
+mod statements_coverage;
 mod statements_model;
 mod statements_review;
 mod statements_service;
 mod statements_traits;
 
+pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
     ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
