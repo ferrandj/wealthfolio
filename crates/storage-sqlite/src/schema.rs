@@ -946,6 +946,9 @@ diesel::table! {
         status -> Text,
         created_at -> Text,
         content -> Binary,
+        review_reason -> Nullable<Text>,
+        to_review_count -> Integer,
+        validated_at -> Nullable<Text>,
     }
 }
 

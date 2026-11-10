@@ -771,6 +771,51 @@ describe("bank statements and account documents", () => {
     expect(JSON.parse(body as string)).toEqual({ accountId: "acc/1" });
   });
 
+  it("reads the review of a document", async () => {
+    const mock = stubFetch({});
+    await invoke("review_statement_document", { id: "doc/1" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/documents/doc%2F1/review",
+      method: "GET",
+    });
+  });
+
+  it("validates a document with the chosen categories", async () => {
+    const mock = stubFetch({});
+    const decisions = [
+      { activityId: "a", taxonomyId: "spending_categories", categoryId: "cat_food" },
+    ];
+    await invoke("validate_statement_document", { id: "doc/1", decisions });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/statements/documents/doc%2F1/validate");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual({ decisions });
+  });
+
+  it("reads one document again", async () => {
+    const mock = stubFetch({});
+    await invoke("revalidate_statement_document", { id: "doc/1" });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/documents/doc%2F1/revalidate",
+      method: "POST",
+    });
+  });
+
+  it("reads every document again", async () => {
+    const mock = stubFetch({});
+    await invoke("revalidate_all_statement_documents");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
+  });
+
+  it("lists the documents waiting for review", async () => {
+    const mock = stubFetch([]);
+    await invoke("get_statement_review_queue");
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/review-queue",
+      method: "GET",
+    });
+  });
+
   it("saves an account identity", async () => {
     const mock = stubFetch({});
     await invoke("save_account_identity", { accountId: "acc/1", input: { iban: "FR76" } });

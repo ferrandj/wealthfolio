@@ -20,11 +20,19 @@ import {
 import { useIsMobileViewport } from "@/hooks";
 import { AccountTypeIconTile, IconTile } from "@/components/account-type-icon";
 import { cn } from "@/lib/utils";
-import { forwardRef, useRef, useState, type ComponentPropsWithoutRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useAccounts } from "@/hooks/use-accounts";
 import { usePortfolios } from "@/hooks/use-portfolios";
+import { dropStaleScope } from "@/lib/stale-account-scope";
 import type { AccountScope } from "@/lib/types";
 
 interface AccountScopeSelectorProps {
@@ -275,6 +283,24 @@ export function AccountScopeSelector({
   const sheetTitleRef = useRef<HTMLHeadingElement>(null);
   const { accounts } = useAccounts({ filterActive: false, includeArchived: false });
   const { data: portfolios = [], isSuccess } = usePortfolios();
+  const { accounts: everyAccount, isLoading: allAccountsLoading } = useAccounts({
+    filterActive: false,
+    includeArchived: true,
+  });
+
+  // The selection outlives account deletions: step back to "all accounts" instead of failing every page.
+  const cleaned = useMemo(
+    () =>
+      dropStaleScope(
+        value,
+        new Set(everyAccount.map((a) => a.id)),
+        new Set(portfolios.map((p) => p.id)),
+      ),
+    [value, everyAccount, portfolios],
+  );
+  useEffect(() => {
+    if (!allAccountsLoading && isSuccess && cleaned !== value) onChange(cleaned);
+  }, [allAccountsLoading, isSuccess, cleaned, value, onChange]);
 
   const label = filterLabel(value, accounts, portfolios, t);
 

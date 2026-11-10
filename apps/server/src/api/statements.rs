@@ -11,9 +11,9 @@ use axum::{
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use wealthfolio_core::statements::{
-    supported_documents, AccountIdentity, AccountIdentityInput, StatementAnalysis,
-    StatementDocument, StatementImportRequest, StatementImportResult, SupportedInstitution,
-    MAX_DOCUMENT_BYTES,
+    supported_documents, AccountIdentity, AccountIdentityInput, DocumentReview, RevalidationResult,
+    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
+    StatementImportResult, SupportedInstitution, MAX_DOCUMENT_BYTES,
 };
 
 use crate::{
@@ -124,6 +124,56 @@ async fn link_document(
     ))
 }
 
+async fn review_queue(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<StatementDocument>>> {
+    Ok(Json(state.statement_service.review_queue()?))
+}
+
+async fn review_document(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<DocumentReview>> {
+    Ok(Json(state.statement_service.review_document(&id).await?))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ValidateBody {
+    #[serde(default)]
+    decisions: Vec<ReviewDecision>,
+}
+
+async fn validate_document(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<ValidateBody>,
+) -> ApiResult<Json<StatementDocument>> {
+    Ok(Json(
+        state
+            .statement_service
+            .validate_document(&id, body.decisions)
+            .await?,
+    ))
+}
+
+async fn revalidate_document(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<StatementDocument>> {
+    let document = state.statement_service.revalidate_document(&id).await?;
+    state.health_service.clear_cache().await;
+    Ok(Json(document))
+}
+
+async fn revalidate_all(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<RevalidationResult>> {
+    let result = state.statement_service.revalidate_all().await?;
+    state.health_service.clear_cache().await;
+    Ok(Json(result))
+}
+
 async fn list_identities(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AccountIdentity>>> {
@@ -169,6 +219,17 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route(
             "/statements/documents/{id}/content",
             get(get_document_content),
+        )
+        .route("/statements/review-queue", get(review_queue))
+        .route("/statements/revalidate", post(revalidate_all))
+        .route("/statements/documents/{id}/review", get(review_document))
+        .route(
+            "/statements/documents/{id}/validate",
+            post(validate_document),
+        )
+        .route(
+            "/statements/documents/{id}/revalidate",
+            post(revalidate_document),
         )
         .route("/statements/documents/{id}", delete(delete_document))
         .route("/statements/documents/{id}/account", put(link_document))

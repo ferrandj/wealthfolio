@@ -3,17 +3,22 @@
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
 mod statements_model;
+mod statements_review;
 mod statements_service;
 mod statements_traits;
 
 pub use statements_model::{
-    AccountIdentity, AccountIdentityInput, AnalyzedStatement, ImportMode, MatchedAccount,
-    NewStatementDocument, StatementAnalysis, StatementDocument, StatementImportOutcome,
-    StatementImportRequest, StatementImportResult, StatementOverride, DOCUMENT_STATUS_IMPORTED,
-    DOCUMENT_STATUS_STORED,
+    AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
+    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
+    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
+    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };
+pub use statements_review::{balance_gap, logical_order, ReviewReason};
 pub use statements_service::{StatementService, MAX_DOCUMENT_BYTES, OPENING_BALANCE_NOTE};
-pub use statements_traits::{StatementRepositoryTrait, StatementServiceTrait};
+pub use statements_traits::{
+    CategoryAssignerTrait, StatementRepositoryTrait, StatementServiceTrait,
+};
 
 pub use wealthfolio_statement_import::{SupportedAdapter, SupportedInstitution};
 

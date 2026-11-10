@@ -69,6 +69,18 @@ impl PortfolioService {
         Ok(())
     }
 
+    fn retain_existing_account_ids(&self, ids: &mut Vec<String>) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let existing = self
+            .account_repository
+            .list(None, None, Some(ids.as_slice()))?;
+        let found: HashSet<&str> = existing.iter().map(|a| a.id.as_str()).collect();
+        ids.retain(|id| found.contains(id.as_str()));
+        Ok(())
+    }
+
     fn retain_portfolio_scope_accounts(&self, ids: &mut Vec<String>) -> Result<()> {
         if ids.is_empty() {
             return Ok(());
@@ -140,7 +152,13 @@ impl PortfolioServiceTrait for PortfolioService {
         };
         ids.sort();
         ids.dedup();
-        self.validate_resolved_account_ids_exist(&ids)?;
+        if matches!(filter, AccountScope::Account { .. }) {
+            self.validate_resolved_account_ids_exist(&ids)?;
+        } else {
+            // A portfolio or a saved list can still name an account that was deleted since: it is left out
+            // rather than failing every report that reads the scope.
+            self.retain_existing_account_ids(&mut ids)?;
+        }
         self.retain_portfolio_scope_accounts(&mut ids)?;
 
         let scope_id = match filter {

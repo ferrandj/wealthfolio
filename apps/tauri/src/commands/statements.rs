@@ -4,8 +4,9 @@ use base64::Engine;
 use serde::Serialize;
 use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::statements::{
-    supported_documents, AccountIdentity, AccountIdentityInput, StatementAnalysis,
-    StatementDocument, StatementImportRequest, StatementImportResult, SupportedInstitution,
+    supported_documents, AccountIdentity, AccountIdentityInput, DocumentReview, RevalidationResult,
+    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
+    StatementImportResult, SupportedInstitution,
 };
 
 use crate::profiles::ProfileAccess;
@@ -111,6 +112,73 @@ pub async fn link_statement_document(
         .link_document(&id, account_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_statement_review_queue(
+    state: ProfileAccess,
+) -> Result<Vec<StatementDocument>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .review_queue()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn review_statement_document(
+    id: String,
+    state: ProfileAccess,
+) -> Result<DocumentReview, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .review_document(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn validate_statement_document(
+    id: String,
+    decisions: Option<Vec<ReviewDecision>>,
+    state: ProfileAccess,
+) -> Result<StatementDocument, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .validate_document(&id, decisions.unwrap_or_default())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn revalidate_statement_document(
+    id: String,
+    state: ProfileAccess,
+) -> Result<StatementDocument, String> {
+    let context = state.context()?;
+    let document = context
+        .statement_service()
+        .revalidate_document(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+    context.health_service().clear_cache().await;
+    Ok(document)
+}
+
+#[tauri::command]
+pub async fn revalidate_all_statement_documents(
+    state: ProfileAccess,
+) -> Result<RevalidationResult, String> {
+    let context = state.context()?;
+    let result = context
+        .statement_service()
+        .revalidate_all()
+        .await
+        .map_err(|e| e.to_string())?;
+    context.health_service().clear_cache().await;
+    Ok(result)
 }
 
 #[tauri::command]

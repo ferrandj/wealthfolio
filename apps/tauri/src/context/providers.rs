@@ -458,6 +458,12 @@ async fn build_context(
             Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
             account_service.clone(),
             activity_service.clone(),
+            Arc::new(
+                wealthfolio_spending::statement_categories::StatementCategoryAssigner::new(
+                    spending_settings_service.clone(),
+                    activity_assignments_repo.clone(),
+                ),
+            ),
         ));
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),

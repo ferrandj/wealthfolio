@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use wealthfolio_core::statements::{
     AccountIdentity, NewStatementDocument, StatementDocument, StatementRepositoryTrait,
-    DOCUMENT_STATUS_IMPORTED,
+    DOCUMENT_STATUS_PENDING,
 };
 use wealthfolio_storage_sqlite::db;
 use wealthfolio_storage_sqlite::statements::StatementRepository;
@@ -55,7 +55,10 @@ fn document(id: &str, account_id: Option<&str>, sha: &str) -> StatementDocument 
         duplicate_count: 1,
         warnings: vec!["un avertissement".into()],
         import_run_id: Some("run-1".into()),
-        status: DOCUMENT_STATUS_IMPORTED.into(),
+        status: DOCUMENT_STATUS_PENDING.into(),
+        review_reason: None,
+        to_review_count: 0,
+        validated_at: None,
         created_at: "2026-10-01T10:00:00Z".into(),
     }
 }
@@ -202,4 +205,37 @@ async fn deleting_an_account_removes_its_identity_and_keeps_its_documents_unlink
     assert!(repo.get_identity("acc-1").unwrap().is_none());
     let kept = repo.get_document("doc-1").unwrap().unwrap();
     assert_eq!(kept.account_id, None);
+}
+
+#[tokio::test]
+async fn a_document_is_updated_after_a_review_without_touching_its_bytes() {
+    let (_dir, pool, writer) = setup();
+    insert_account(&pool, "acc-1");
+    let repo = StatementRepository::new(pool, writer);
+    repo.insert_document(NewStatementDocument {
+        document: document("doc-1", Some("acc-1"), "sha-1"),
+        content: b"%PDF-".to_vec(),
+    })
+    .await
+    .unwrap();
+
+    let mut validated = document("doc-1", Some("acc-1"), "sha-1");
+    validated.status = "VALIDATED".into();
+    validated.validated_at = Some("2026-11-10T12:00:00Z".into());
+    validated.imported_count = 20;
+    validated.import_run_id = Some("run-2".into());
+    validated.review_reason = Some(r#"{"doubts":0}"#.into());
+    validated.to_review_count = 3;
+    let saved = repo.update_document(validated).await.unwrap();
+    assert_eq!(saved.status, "VALIDATED");
+    assert_eq!(saved.import_run_id.as_deref(), Some("run-2"));
+    assert_eq!(saved.to_review_count, 3);
+    assert_eq!(saved.validated_at.as_deref(), Some("2026-11-10T12:00:00Z"));
+
+    let (read, bytes) = repo.get_document_content("doc-1").unwrap().unwrap();
+    assert_eq!(bytes, b"%PDF-".to_vec());
+    assert_eq!(read.imported_count, 20);
+
+    let missing = document("nope", None, "sha-x");
+    assert!(repo.update_document(missing).await.is_err());
 }

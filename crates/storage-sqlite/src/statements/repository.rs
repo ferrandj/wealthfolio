@@ -156,6 +156,40 @@ impl StatementRepositoryTrait for StatementRepository {
             .await
     }
 
+    async fn update_document(&self, document: StatementDocument) -> Result<StatementDocument> {
+        self.writer
+            .exec(move |conn| -> Result<StatementDocument> {
+                let warnings =
+                    serde_json::to_string(&document.warnings).unwrap_or_else(|_| "[]".into());
+                let updated = diesel::update(statement_documents::table.find(&document.id))
+                    .set((
+                        statement_documents::account_id.eq(&document.account_id),
+                        statement_documents::adapter_id.eq(&document.adapter_id),
+                        statement_documents::reader_version.eq(&document.reader_version),
+                        statement_documents::imported_count.eq(document.imported_count),
+                        statement_documents::duplicate_count.eq(document.duplicate_count),
+                        statement_documents::warnings.eq(warnings),
+                        statement_documents::import_run_id.eq(&document.import_run_id),
+                        statement_documents::status.eq(&document.status),
+                        statement_documents::review_reason.eq(&document.review_reason),
+                        statement_documents::to_review_count.eq(document.to_review_count),
+                        statement_documents::validated_at.eq(&document.validated_at),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                if updated == 0 {
+                    return Err(StorageError::from(diesel::result::Error::NotFound).into());
+                }
+                let row = statement_documents::table
+                    .find(&document.id)
+                    .select(StatementDocumentRow::as_select())
+                    .first::<StatementDocumentRow>(conn)
+                    .map_err(StorageError::from)?;
+                Ok(StatementDocument::from(row))
+            })
+            .await
+    }
+
     async fn delete_document(&self, id: &str) -> Result<()> {
         let id = id.to_string();
         self.writer
