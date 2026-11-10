@@ -465,6 +465,9 @@ async fn build_context(
     let contacts_service = Arc::new(wealthfolio_core::contacts::ContactsService::new(Arc::new(
         wealthfolio_storage_sqlite::contacts::ContactsRepository::new(pool.clone(), writer.clone()),
     )));
+    let rates_service = Arc::new(wealthfolio_core::rates::RatesService::new(Arc::new(
+        wealthfolio_storage_sqlite::rates::RatesRepository::new(pool.clone(), writer.clone()),
+    )));
     let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
         Arc::new(wealthfolio_core::statements::StatementService::new(
             Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
@@ -855,6 +858,7 @@ async fn build_context(
             limits_service,
             statement_service,
             contacts_service,
+            rates_service,
             fx_service,
             performance_service,
             income_service,

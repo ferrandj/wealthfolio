@@ -477,7 +477,8 @@
       "addons": "Extensions",
       "about": "À propos",
       "documents": "Documents",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "rates": "Taux et fiscalité"
     },
     "subtitles": {
       "general": "Devise, taux de change et mises à jour",
@@ -496,7 +497,8 @@
       "addons": "Étendez Wealthfolio avec des fonctionnalités",
       "about": "Informations sur l'application",
       "documents": "Importer des relevés, garder les originaux",
-      "contacts": "Bénéficiaires, débiteurs et personnes"
+      "contacts": "Bénéficiaires, débiteurs et personnes",
+      "rates": "Taux réglementés, barème, taux des comptes"
     }
   },
   "timezone_title": "Fuseau horaire",
@@ -2232,5 +2234,20 @@
     "spending_empty": "Aucune opération sur la période.",
     "spending_count": "{{count}} opération(s)",
     "spending_identify": "Identifier"
+  },
+  "rates": {
+    "title": "Taux et fiscalité",
+    "subtitle": "Taux réglementés, barème fiscal et taux de chacun de vos comptes.",
+    "regulated_title": "Taux réglementés",
+    "regulated_hint": "Valeurs préremplies, à vérifier sur service-public.gouv.fr ; modifiez-les quand les taux changent.",
+    "tax_title": "Barème fiscal",
+    "tax_hint": "Prélevé sur les intérêts des comptes imposables pour calculer le taux net.",
+    "accounts_title": "Taux par compte",
+    "accounts_hint": "Saisissez le taux de chaque compte, brut ou net.",
+    "gross_net": "Brut {{gross}} · Net {{net}}",
+    "entered_gross": "Saisi brut",
+    "tax_exempt": "Exonéré d'impôt",
+    "remove": "Retirer le taux",
+    "error": "Enregistrement impossible"
   }
 }

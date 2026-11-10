@@ -119,6 +119,7 @@ export * from "../shared/asset-logos";
 // Contribution Limits Commands
 export * from "../shared/contribution-limits";
 export * from "../shared/contacts";
+export * from "../shared/rates";
 export * from "../shared/statements";
 
 // Exchange Rates Commands

@@ -472,7 +472,8 @@
       "addons": "アドオン",
       "about": "このアプリについて",
       "documents": "Documents",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "rates": "Rates and taxes"
     },
     "subtitles": {
       "general": "通貨、為替レート、アップデート",
@@ -491,7 +492,8 @@
       "addons": "Wealthfolioの機能を拡張",
       "about": "アプリケーション情報",
       "documents": "Import statements, keep the originals",
-      "contacts": "Beneficiaries, debtors and people"
+      "contacts": "Beneficiaries, debtors and people",
+      "rates": "Regulated rates, tax table, account rates"
     }
   },
   "timezone_title": "タイムゾーン",
@@ -2149,5 +2151,20 @@
     "spending_empty": "No operations in this period.",
     "spending_count": "{{count}} operation(s)",
     "spending_identify": "Identify"
+  },
+  "rates": {
+    "title": "Rates and taxes",
+    "subtitle": "Regulated rates, the tax table and the rate of each of your accounts.",
+    "regulated_title": "Regulated rates",
+    "regulated_hint": "Prefilled values, to be checked on service-public.gouv.fr; edit them when the rates change.",
+    "tax_title": "Tax table",
+    "tax_hint": "Taken off the interest of taxable accounts to compute the net rate.",
+    "accounts_title": "Rate per account",
+    "accounts_hint": "Enter the rate of each account, gross or net.",
+    "gross_net": "Gross {{gross}} · Net {{net}}",
+    "entered_gross": "Entered gross",
+    "tax_exempt": "Tax-exempt",
+    "remove": "Remove the rate",
+    "error": "Could not save"
   }
 }

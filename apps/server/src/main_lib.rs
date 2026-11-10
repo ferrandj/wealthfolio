@@ -119,6 +119,7 @@ pub struct AppState {
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub statement_service: Arc<dyn StatementServiceTrait + Send + Sync>,
     pub contacts_service: Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait + Send + Sync>,
+    pub rates_service: Arc<dyn wealthfolio_core::rates::RatesServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
@@ -822,6 +823,9 @@ async fn initialize_profile_state(
     let contacts_service = Arc::new(wealthfolio_core::contacts::ContactsService::new(Arc::new(
         wealthfolio_storage_sqlite::contacts::ContactsRepository::new(pool.clone(), writer.clone()),
     )));
+    let rates_service = Arc::new(wealthfolio_core::rates::RatesService::new(Arc::new(
+        wealthfolio_storage_sqlite::rates::RatesRepository::new(pool.clone(), writer.clone()),
+    )));
     let statement_service: Arc<dyn StatementServiceTrait + Send + Sync> =
         Arc::new(StatementService::new(
             Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
@@ -1228,6 +1232,7 @@ async fn initialize_profile_state(
         activity_service,
         statement_service,
         contacts_service,
+        rates_service,
         asset_service,
         taxonomy_service,
         net_worth_service,

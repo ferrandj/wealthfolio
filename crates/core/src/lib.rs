@@ -25,6 +25,7 @@ pub mod portfolio;
 pub mod portfolios;
 pub mod profiles;
 pub mod quotes;
+pub mod rates;
 pub mod secrets;
 pub mod settings;
 pub mod statements;

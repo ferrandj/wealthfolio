@@ -8,6 +8,7 @@ export const QueryKeys = {
   // Contacts
   CONTACTS: "contacts",
   CONTACT: "contact",
+  RATES: "rates",
   BENEFICIARY_SPENDING: "beneficiary_spending",
   UNRESOLVED_COUNTERPARTIES: "unresolved_counterparties",
 

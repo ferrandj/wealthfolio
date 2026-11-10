@@ -169,6 +169,9 @@ export const COMMANDS: CommandMap = {
   link_contact_account: { method: "PUT", path: "/contacts" },
   unlink_contact_account: { method: "DELETE", path: "/contacts" },
   list_unresolved_counterparties: { method: "GET", path: "/contacts/unresolved" },
+  list_rates: { method: "GET", path: "/rates" },
+  save_rate: { method: "PUT", path: "/rates" },
+  delete_rate: { method: "DELETE", path: "/rates" },
   get_spending_by_beneficiary: { method: "GET", path: "/contacts/spending" },
 
   // Bank statements & account documents
@@ -1091,6 +1094,17 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "unlink_contact_account": {
       const { id, accountId } = payload as { id: string; accountId: string };
       url += `/${encodeURIComponent(id)}/accounts/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "save_rate": {
+      const { id, input } = payload as { id: string; input: Record<string, unknown> };
+      url += `/${encodeURIComponent(id)}`;
+      body = JSON.stringify(input);
+      break;
+    }
+    case "delete_rate": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
       break;
     }
     case "get_spending_by_beneficiary": {

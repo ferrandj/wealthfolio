@@ -63,6 +63,12 @@ export default function SettingsLayout() {
             icon: <Icons.Users className="size-5" />,
           },
           {
+            title: t("settings:nav.items.rates"),
+            href: "rates",
+            subtitle: t("settings:nav.subtitles.rates"),
+            icon: <Icons.Percent className="size-5" />,
+          },
+          {
             title: t("settings:nav.items.contribution_limits"),
             href: "contribution-limits",
             subtitle: t("settings:nav.subtitles.contribution_limits"),

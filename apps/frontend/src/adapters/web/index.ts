@@ -273,6 +273,9 @@ export {
   updateContact,
 } from "../shared/contacts";
 
+// Regulated rates, tax table, account rates
+export { listRates, saveRate, deleteRate } from "../shared/rates";
+
 // Bank statements & account documents
 export {
   analyzeStatement,

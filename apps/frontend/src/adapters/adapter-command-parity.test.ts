@@ -752,6 +752,26 @@ describe("contribution limit details and exclusions", () => {
   });
 });
 
+describe("rates", () => {
+  it("lists the rates", async () => {
+    const mock = stubFetch([]);
+    await invoke("list_rates");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/rates", method: "GET" });
+  });
+
+  it("saves and deletes a rate by its encoded id", async () => {
+    let mock = stubFetch({});
+    await invoke("save_rate", { id: "account.a/1", input: { rate: 2 } });
+    let call = lastCall(mock);
+    expect(call).toMatchObject({ url: "/api/v1/rates/account.a%2F1", method: "PUT" });
+    expect(JSON.parse(call.body as string)).toEqual({ rate: 2 });
+    mock = stubFetch({});
+    await invoke("delete_rate", { id: "account.a/1" });
+    call = lastCall(mock);
+    expect(call).toMatchObject({ url: "/api/v1/rates/account.a%2F1", method: "DELETE" });
+  });
+});
+
 describe("contacts", () => {
   it("reads the spending by beneficiary over a period", async () => {
     const mock = stubFetch([]);

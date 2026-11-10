@@ -968,6 +968,22 @@ diesel::joinable!(account_identities -> accounts (account_id));
 diesel::joinable!(statement_documents -> accounts (account_id));
 
 diesel::table! {
+    rates (id) {
+        id -> Text,
+        kind -> Text,
+        label -> Text,
+        rate -> Text,
+        gross -> Bool,
+        tax_exempt -> Bool,
+        account_id -> Nullable<Text>,
+        source -> Nullable<Text>,
+        updated_at -> Text,
+    }
+}
+
+diesel::joinable!(rates -> accounts (account_id));
+
+diesel::table! {
     contacts (id) {
         id -> Text,
         kind -> Text,
@@ -1031,6 +1047,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     account_identities,
     statement_documents,
     statement_gap_marks,
+    rates,
     accounts,
     portfolios,
     portfolio_accounts,

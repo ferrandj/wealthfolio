@@ -29,6 +29,7 @@ pub mod platform;
 pub mod portfolio;
 pub mod portfolios;
 pub mod providers_settings;
+pub mod rates;
 pub mod secrets;
 pub mod settings;
 pub mod spending;
