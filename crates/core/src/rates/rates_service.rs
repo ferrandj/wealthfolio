@@ -114,7 +114,7 @@ impl RatesService {
             KIND_TAX => 1,
             _ => 2,
         };
-        rates.sort_by(|a, b| (order(&a.kind), a.id.clone()).cmp(&(order(&b.kind), b.id.clone())));
+        rates.sort_by_key(|r| (order(&r.kind), r.id.clone()));
         rates
     }
 }
