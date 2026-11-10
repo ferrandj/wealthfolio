@@ -50,6 +50,7 @@ use wealthfolio_core::{
     quotes::{QuoteService, QuoteServiceTrait},
     secrets::SecretStore,
     settings::{SettingsRepositoryTrait, SettingsService, SettingsServiceTrait},
+    statements::{StatementService, StatementServiceTrait},
     taxonomies::{TaxonomyService, TaxonomyServiceTrait},
 };
 use wealthfolio_device_sync::{engine::DeviceSyncRuntimeState, DeviceEnrollService};
@@ -69,6 +70,7 @@ use wealthfolio_storage_sqlite::{
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     portfolios::PortfolioRepository,
     settings::SettingsRepository,
+    statements::StatementRepository,
     sync::{AppSyncRepository, BrokerSyncStateRepository, ImportRunRepository, PlatformRepository},
     taxonomies::TaxonomyRepository,
 };
@@ -115,6 +117,7 @@ pub struct AppState {
     pub limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync>,
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
+    pub statement_service: Arc<dyn StatementServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
@@ -813,6 +816,12 @@ async fn initialize_profile_state(
         .with_valuation_repository(valuation_repository.clone())
         .with_event_sink(domain_event_sink.clone()),
     );
+    let statement_service: Arc<dyn StatementServiceTrait + Send + Sync> =
+        Arc::new(StatementService::new(
+            Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
+            account_service.clone(),
+            activity_service.clone(),
+        ));
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),
         activity_repository.as_ref(),
@@ -1156,6 +1165,7 @@ async fn initialize_profile_state(
         limits_service,
         fx_service: fx_service.clone(),
         activity_service,
+        statement_service,
         asset_service,
         taxonomy_service,
         net_worth_service,

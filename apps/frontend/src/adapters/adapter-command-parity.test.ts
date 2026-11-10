@@ -751,3 +751,32 @@ describe("contribution limit details and exclusions", () => {
     expect(JSON.parse(body as string)).toEqual({ excluded });
   });
 });
+
+describe("bank statements and account documents", () => {
+  it("encodes the document id and the remove-operations flag", async () => {
+    const mock = stubFetch({});
+    await invoke("delete_statement_document", { id: "doc/1", removeOperations: true });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/documents/doc%2F1?removeOperations=true",
+      method: "DELETE",
+    });
+  });
+
+  it("links a document to an account", async () => {
+    const mock = stubFetch({});
+    await invoke("link_statement_document", { id: "doc/1", accountId: "acc/1" });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/statements/documents/doc%2F1/account");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ accountId: "acc/1" });
+  });
+
+  it("saves an account identity", async () => {
+    const mock = stubFetch({});
+    await invoke("save_account_identity", { accountId: "acc/1", input: { iban: "FR76" } });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/statements/identities/acc%2F1");
+    expect(method).toBe("PUT");
+    expect(JSON.parse(body as string)).toEqual({ iban: "FR76" });
+  });
+});

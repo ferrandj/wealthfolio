@@ -60,6 +60,7 @@ use wealthfolio_storage_sqlite::{
     },
     portfolios::PortfolioRepository,
     settings::SettingsRepository,
+    statements::StatementRepository,
     sync::{AppSyncRepository, BrokerSyncStateRepository, ImportRunRepository, PlatformRepository},
     taxonomies::TaxonomyRepository,
 };
@@ -452,6 +453,12 @@ async fn build_context(
         .with_valuation_repository(valuation_repository.clone())
         .with_event_sink(domain_event_sink.clone()),
     );
+    let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
+        Arc::new(wealthfolio_core::statements::StatementService::new(
+            Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
+            account_service.clone(),
+            activity_service.clone(),
+        ));
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),
         activity_repository.as_ref(),
@@ -784,6 +791,7 @@ async fn build_context(
             goal_service,
             quote_service,
             limits_service,
+            statement_service,
             fx_service,
             performance_service,
             income_service,

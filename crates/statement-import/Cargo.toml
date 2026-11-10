@@ -1,0 +1,40 @@
+[package]
+name = "wealthfolio-statement-import"
+version.workspace = true
+edition.workspace = true
+build = "build.rs"
+description = "Readers (adapters) that turn bank statements and account documents (PDF, CSV, OFX, QIF) into parsed statements"
+license = "AGPL-3.0"
+
+[dependencies]
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order", "float_roundtrip"] }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+indexmap = { version = "2", features = ["serde"] }
+regex = "1"
+fancy-regex = "0.14"
+aes = "0.8"
+md-5 = "0.10"
+sha2 = "0.10"
+hex = "0.4"
+flate2 = "1"
+num-bigint = "0.4"
+num-traits = "0.2"
+unicode-normalization = "0.1"
+unicode-general-category = "1"
+
+# Ported as-is from the myMoney adapters (line-for-line Python parity): the style rules of the
+# rest of the workspace are not applied to this vendored reading code.
+[lints.rust]
+dead_code = "allow"
+unused = "allow"
+
+[lints.clippy]
+all = "allow"
+unwrap_used = "allow"
+panic = "allow"
+
+[build-dependencies]
+sha2 = "0.10"

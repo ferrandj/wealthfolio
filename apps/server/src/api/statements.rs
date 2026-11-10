@@ -1,0 +1,180 @@
+//! Bank statements and account documents: analyze a dropped file, import it, keep and download the original, and read
+//! or edit the identity (holder, address, IBAN, BIC, RIB) stored with an account.
+
+use std::sync::Arc;
+
+use axum::{
+    extract::{DefaultBodyLimit, Path, Query},
+    routing::{delete, get, post, put},
+    Json, Router,
+};
+use base64::Engine;
+use serde::{Deserialize, Serialize};
+use wealthfolio_core::statements::{
+    supported_documents, AccountIdentity, AccountIdentityInput, StatementAnalysis,
+    StatementDocument, StatementImportRequest, StatementImportResult, SupportedInstitution,
+    MAX_DOCUMENT_BYTES,
+};
+
+use crate::{
+    error::{ApiError, ApiResult},
+    main_lib::AppState,
+};
+
+/// A file travels as base64 in JSON: a third larger than its bytes, plus the request's other fields.
+const STATEMENT_BODY_LIMIT: usize = MAX_DOCUMENT_BYTES / 3 * 4 + 1024 * 1024;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnalyzeBody {
+    file_name: String,
+    content_base64: String,
+    adapter_id: Option<String>,
+}
+
+async fn analyze_statement(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<AnalyzeBody>,
+) -> ApiResult<Json<StatementAnalysis>> {
+    let content = base64::engine::general_purpose::STANDARD
+        .decode(body.content_base64.trim())
+        .map_err(|_| ApiError::BadRequest("The file content is not valid base64".to_string()))?;
+    let service = state.statement_service.clone();
+    // reading a PDF is CPU work: keep it off the async workers
+    let analysis = tokio::task::spawn_blocking(move || {
+        service.analyze(&body.file_name, &content, body.adapter_id.as_deref())
+    })
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))??;
+    Ok(Json(analysis))
+}
+
+async fn import_statement(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(request): Json<StatementImportRequest>,
+) -> ApiResult<Json<StatementImportResult>> {
+    let result = state.statement_service.import(request).await?;
+    state.health_service.clear_cache().await;
+    // Domain events handle the portfolio recalculation, as for any activity import.
+    Ok(Json(result))
+}
+
+async fn list_documents(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<StatementDocument>>> {
+    Ok(Json(state.statement_service.list_documents()?))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentContent {
+    document: StatementDocument,
+    content_base64: String,
+}
+
+async fn get_document_content(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<DocumentContent>> {
+    let (document, content) = state.statement_service.get_document_content(&id)?;
+    Ok(Json(DocumentContent {
+        document,
+        content_base64: base64::engine::general_purpose::STANDARD.encode(content),
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteQuery {
+    #[serde(default)]
+    remove_operations: bool,
+}
+
+async fn delete_document(
+    Path(id): Path<String>,
+    Query(query): Query<DeleteQuery>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<()> {
+    state
+        .statement_service
+        .delete_document(&id, query.remove_operations)
+        .await?;
+    if query.remove_operations {
+        state.health_service.clear_cache().await;
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LinkBody {
+    account_id: Option<String>,
+}
+
+async fn link_document(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<LinkBody>,
+) -> ApiResult<Json<StatementDocument>> {
+    Ok(Json(
+        state
+            .statement_service
+            .link_document(&id, body.account_id)
+            .await?,
+    ))
+}
+
+async fn list_identities(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<AccountIdentity>>> {
+    Ok(Json(state.statement_service.list_identities()?))
+}
+
+async fn get_identity(
+    Path(account_id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Option<AccountIdentity>>> {
+    Ok(Json(state.statement_service.get_identity(&account_id)?))
+}
+
+async fn save_identity(
+    Path(account_id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(input): Json<AccountIdentityInput>,
+) -> ApiResult<Json<AccountIdentity>> {
+    Ok(Json(
+        state
+            .statement_service
+            .save_identity(&account_id, input)
+            .await?,
+    ))
+}
+
+async fn supported() -> Json<Vec<SupportedInstitution>> {
+    Json(supported_documents())
+}
+
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
+    Router::new()
+        .route(
+            "/statements/analyze",
+            post(analyze_statement).layer(DefaultBodyLimit::max(STATEMENT_BODY_LIMIT)),
+        )
+        .route(
+            "/statements/import",
+            post(import_statement).layer(DefaultBodyLimit::max(STATEMENT_BODY_LIMIT)),
+        )
+        .route("/statements/supported", get(supported))
+        .route("/statements/documents", get(list_documents))
+        .route(
+            "/statements/documents/{id}/content",
+            get(get_document_content),
+        )
+        .route("/statements/documents/{id}", delete(delete_document))
+        .route("/statements/documents/{id}/account", put(link_document))
+        .route("/statements/identities", get(list_identities))
+        .route(
+            "/statements/identities/{account_id}",
+            get(get_identity).put(save_identity),
+        )
+}

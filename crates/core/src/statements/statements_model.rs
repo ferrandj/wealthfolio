@@ -1,0 +1,170 @@
+//! Domain models of the statements feature.
+
+use serde::{Deserialize, Serialize};
+use wealthfolio_statement_import::{Analysis, StatementPreview};
+
+pub const DOCUMENT_STATUS_IMPORTED: &str = "IMPORTED";
+pub const DOCUMENT_STATUS_STORED: &str = "STORED";
+
+/// Who owns an account and how to reach it, as printed on its documents. One row per account.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountIdentity {
+    pub account_id: String,
+    pub institution: Option<String>,
+    pub holder_name: Option<String>,
+    pub holder_address: Option<String>,
+    pub iban: Option<String>,
+    pub bic: Option<String>,
+    pub bank_code: Option<String>,
+    pub branch_code: Option<String>,
+    pub account_number: Option<String>,
+    pub rib_key: Option<String>,
+    /// True once the user has typed a value: documents then only fill what is still empty.
+    pub edited_by_user: bool,
+    pub updated_at: String,
+}
+
+/// The identity fields a caller can set. A missing field is left as it is; an empty string clears it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountIdentityInput {
+    pub institution: Option<String>,
+    pub holder_name: Option<String>,
+    pub holder_address: Option<String>,
+    pub iban: Option<String>,
+    pub bic: Option<String>,
+    pub bank_code: Option<String>,
+    pub branch_code: Option<String>,
+    pub account_number: Option<String>,
+    pub rib_key: Option<String>,
+}
+
+/// A stored original (its bytes stay in the repository; this is what lists show).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementDocument {
+    pub id: String,
+    pub account_id: Option<String>,
+    /// The name the file was dropped with.
+    pub file_name: String,
+    /// The standard name it is stored and downloaded under.
+    pub stored_name: String,
+    pub content_type: String,
+    pub size_bytes: i64,
+    pub sha256: String,
+    pub institution: Option<String>,
+    pub adapter_id: Option<String>,
+    pub document_kind: Option<String>,
+    pub account_type: Option<String>,
+    pub period_start: Option<String>,
+    pub period_end: Option<String>,
+    pub holder_name: Option<String>,
+    pub iban: Option<String>,
+    pub reader_version: Option<String>,
+    pub imported_count: i32,
+    pub duplicate_count: i32,
+    pub warnings: Vec<String>,
+    /// The id of the activity import that brought in this document's operations.
+    pub import_run_id: Option<String>,
+    pub status: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewStatementDocument {
+    pub document: StatementDocument,
+    pub content: Vec<u8>,
+}
+
+/// An existing Wealthfolio account that a statement belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchedAccount {
+    pub id: String,
+    pub name: String,
+    pub currency: String,
+    /// Why it was picked: "iban" or "accountNumber".
+    pub matched_on: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportMode {
+    /// The statement's operations become cash activities of a cash account.
+    Transactions,
+    /// The document is kept (and linked to its account when one matches) but brings no operations.
+    DocumentOnly,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzedStatement {
+    pub preview: StatementPreview,
+    pub mode: ImportMode,
+    pub matched_account: Option<MatchedAccount>,
+    /// The name a new account would get.
+    pub suggested_account_name: String,
+    pub suggested_account_type: String,
+    /// Operations already in the matched account (same date, amount and label).
+    pub known_duplicates: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementAnalysis {
+    pub analysis: Analysis,
+    pub statements: Vec<AnalyzedStatement>,
+    /// The document of the same bytes, when this exact file was already imported.
+    pub existing_document: Option<StatementDocument>,
+}
+
+/// What the user decided for one statement of the file.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementOverride {
+    pub index: usize,
+    /// Put the operations in this account instead of the one found (or created).
+    pub account_id: Option<String>,
+    /// The name of the account to create when none matches.
+    pub new_account_name: Option<String>,
+    /// Leave this statement out.
+    #[serde(default)]
+    pub skip: bool,
+    pub identity: Option<AccountIdentityInput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementImportRequest {
+    pub file_name: String,
+    pub content_base64: String,
+    pub adapter_id: Option<String>,
+    #[serde(default)]
+    pub overrides: Vec<StatementOverride>,
+    /// Import again a file whose exact bytes are already stored.
+    #[serde(default)]
+    pub allow_duplicate_document: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementImportOutcome {
+    pub index: usize,
+    pub account_id: Option<String>,
+    pub account_name: Option<String>,
+    pub created_account: bool,
+    pub imported: u32,
+    pub duplicates: u32,
+    pub skipped: u32,
+    pub opening_balance_added: bool,
+    pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatementImportResult {
+    pub document: Option<StatementDocument>,
+    pub already_imported: bool,
+    pub outcomes: Vec<StatementImportOutcome>,
+}

@@ -26,6 +26,7 @@ pub mod profiles;
 pub mod quotes;
 pub mod secrets;
 pub mod settings;
+pub mod statements;
 pub mod sync;
 pub mod taxonomies;
 pub mod utils;

@@ -152,6 +152,17 @@ export const COMMANDS: CommandMap = {
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   get_contribution_limit_details: { method: "GET", path: "/limits" },
   set_contribution_activity_excluded: { method: "PUT", path: "/limits" },
+  // Bank statements & account documents
+  analyze_statement: { method: "POST", path: "/statements/analyze" },
+  import_statement: { method: "POST", path: "/statements/import" },
+  list_statement_documents: { method: "GET", path: "/statements/documents" },
+  get_statement_document_content: { method: "GET", path: "/statements/documents" },
+  delete_statement_document: { method: "DELETE", path: "/statements/documents" },
+  link_statement_document: { method: "PUT", path: "/statements/documents" },
+  list_account_identities: { method: "GET", path: "/statements/identities" },
+  get_account_identity: { method: "GET", path: "/statements/identities" },
+  save_account_identity: { method: "PUT", path: "/statements/identities" },
+  list_supported_statements: { method: "GET", path: "/statements/supported" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
   create_asset: { method: "POST", path: "/assets" },
@@ -1005,6 +1016,46 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "test_custom_provider_source": {
       const { payload: tp } = payload as { payload: Record<string, unknown> };
       body = JSON.stringify(tp);
+      break;
+    }
+    case "analyze_statement": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "import_statement": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
+      break;
+    }
+    case "get_statement_document_content": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}/content`;
+      break;
+    }
+    case "delete_statement_document": {
+      const { id, removeOperations } = payload as { id: string; removeOperations?: boolean };
+      url += `/${encodeURIComponent(id)}`;
+      if (removeOperations) url += "?removeOperations=true";
+      break;
+    }
+    case "link_statement_document": {
+      const { id, accountId } = payload as { id: string; accountId: string | null };
+      url += `/${encodeURIComponent(id)}/account`;
+      body = JSON.stringify({ accountId });
+      break;
+    }
+    case "get_account_identity": {
+      const { accountId } = payload as { accountId: string };
+      url += `/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "save_account_identity": {
+      const { accountId, input } = payload as {
+        accountId: string;
+        input: Record<string, unknown>;
+      };
+      url += `/${encodeURIComponent(accountId)}`;
+      body = JSON.stringify(input);
       break;
     }
     case "create_contribution_limit": {
