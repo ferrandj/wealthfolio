@@ -70,13 +70,24 @@ describe("resolving the doubts of a review", () => {
     });
   });
 
-  it("prefers the category already on the activity to the suggestion", () => {
+  it("prefers the reader's suggestion to the stored category, and falls back to the stored one", () => {
     expect(suggestedChoice(op({}))).toEqual({
       taxonomyId: "income_sources",
       categoryId: "cat_income_transfers_own",
     });
+    // an old catch-all on the activity must not win over the precise suggestion
     expect(
-      suggestedChoice(op({ taxonomyId: "income_sources", categoryId: "cat_income_prime" })),
+      suggestedChoice(op({ taxonomyId: "income_sources", categoryId: "cat_income_other" })),
+    ).toEqual({ taxonomyId: "income_sources", categoryId: "cat_income_transfers_own" });
+    expect(
+      suggestedChoice(
+        op({
+          suggestedTaxonomyId: null,
+          suggestedCategoryId: null,
+          taxonomyId: "income_sources",
+          categoryId: "cat_income_prime",
+        }),
+      ),
     ).toEqual({ taxonomyId: "income_sources", categoryId: "cat_income_prime" });
     expect(
       suggestedChoice(op({ suggestedTaxonomyId: null, suggestedCategoryId: null })),

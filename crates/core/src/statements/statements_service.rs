@@ -1625,6 +1625,17 @@ impl StatementService {
                 self.category_assigner.current(&ids).await?
             };
 
+            // the accounts Wealthfolio knows by IBAN: a transfer to an own account outside this list is flagged
+            let known_ibans: HashSet<String> = self
+                .repository
+                .list_identities()
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|i| i.iban)
+                .map(|i| i.split_whitespace().collect::<String>().to_uppercase())
+                .filter(|i| !i.is_empty())
+                .collect();
+
             let operations = tagged
                 .iter()
                 .zip(matched)
@@ -1634,6 +1645,28 @@ impl StatementService {
                         .as_ref()
                         .and_then(|id| current.iter().find(|c| &c.activity_id == id));
                     let guessed = assignment.map(|a| a.source == "import").unwrap_or(true);
+                    let outdated = assignment.is_some_and(|a| {
+                        suggestion_replaces_kept(
+                            &a.category_id,
+                            t.category_id.as_deref(),
+                            &t.category_confidence,
+                        )
+                    });
+                    let own_transfer = match (assignment, &t.category_taxonomy_id, &t.category_id) {
+                        (Some(a), _, _)
+                            if is_own_transfer_category(&a.taxonomy_id, &a.category_id) =>
+                        {
+                            true
+                        }
+                        (_, Some(tax), Some(cat)) => is_own_transfer_category(tax, cat),
+                        _ => false,
+                    };
+                    let other_account_unknown = own_transfer
+                        && !t
+                            .counterparty_iban
+                            .as_deref()
+                            .map(|i| i.split_whitespace().collect::<String>().to_uppercase())
+                            .is_some_and(|i| known_ibans.contains(&i));
                     ReviewedOperation {
                         row: *position,
                         activity_id,
@@ -1650,7 +1683,9 @@ impl StatementService {
                         suggested_category_id: t.category_id.clone(),
                         confidence: t.category_confidence.clone(),
                         reason: t.category_reason.clone(),
-                        needs_review: guessed && t.category_confidence == "low",
+                        needs_review: (guessed && t.category_confidence == "low") || outdated,
+                        outdated,
+                        other_account_unknown,
                     }
                 })
                 .collect();

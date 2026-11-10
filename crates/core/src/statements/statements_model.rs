@@ -239,8 +239,15 @@ pub struct ReviewedOperation {
     /// `high`, `medium` or `low`.
     pub confidence: String,
     pub reason: Option<String>,
-    /// True while the category is a low-confidence guess that nobody confirmed.
+    /// True while the category is a low-confidence guess that nobody confirmed, or an old catch-all category that
+    /// the reader now replaces by a precise one.
     pub needs_review: bool,
+    /// The stored category is only the catch-all and the reader now suggests a precise one.
+    #[serde(default)]
+    pub outdated: bool,
+    /// The operation is money moved between own accounts, but the other account is not one Wealthfolio knows.
+    #[serde(default)]
+    pub other_account_unknown: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -2102,6 +2102,8 @@
     "review_to_check": "{{count}} à vérifier",
     "review_nothing_doubtful": "Rien de douteux",
     "review_doubt": "À vérifier",
+    "review_outdated": "Une catégorie plus précise est proposée : « {{category}} »",
+    "review_unknown_account": "L'autre compte n'est pas suivi dans Wealthfolio (compte inconnu). Le virement reste neutre pour tes dépenses et tes revenus.",
     "review_estimated": "Estimé",
     "review_confirmed": "Confirmé",
     "review_category": "Catégorie",

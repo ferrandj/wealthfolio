@@ -246,6 +246,10 @@ export interface ReviewedOperation {
   confidence: "high" | "medium" | "low";
   reason?: string | null;
   needsReview: boolean;
+  /** The stored category is only the catch-all and the reader now suggests a precise one. */
+  outdated?: boolean;
+  /** Money moved between own accounts, but the other account is not one Wealthfolio knows. */
+  otherAccountUnknown?: boolean;
 }
 
 export interface StatementReview {

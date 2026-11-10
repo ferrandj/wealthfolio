@@ -54,10 +54,10 @@ export function ownTransferChoice(amount: string): ReviewChoice {
     : { taxonomyId: "income_sources", categoryId: "cat_income_transfers_own" };
 }
 
-/** The category the reader suggests for an operation, when it has one. */
+/** The category the reader suggests for an operation, when it has one (else the stored one). */
 export function suggestedChoice(op: ReviewedOperation): ReviewChoice | null {
-  const taxonomyId = op.taxonomyId ?? op.suggestedTaxonomyId;
-  const categoryId = op.categoryId ?? op.suggestedCategoryId;
+  const taxonomyId = op.suggestedTaxonomyId ?? op.taxonomyId;
+  const categoryId = op.suggestedCategoryId ?? op.categoryId;
   return taxonomyId && categoryId ? { taxonomyId, categoryId } : null;
 }
 

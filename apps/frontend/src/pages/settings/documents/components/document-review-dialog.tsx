@@ -421,6 +421,18 @@ function OperationRow({
             {op.reason}
           </div>
         )}
+        {op.outdated && !choice && suggestion && (
+          <div className="text-xs text-amber-700">
+            {t("settings:documents.review_outdated", {
+              category: label(suggestion.taxonomyId, suggestion.categoryId),
+            })}
+          </div>
+        )}
+        {op.otherAccountUnknown && (
+          <div className="text-xs text-amber-700">
+            {t("settings:documents.review_unknown_account")}
+          </div>
+        )}
       </div>
       <div
         className={cn(

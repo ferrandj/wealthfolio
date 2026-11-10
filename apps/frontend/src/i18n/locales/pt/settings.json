@@ -2102,6 +2102,8 @@
     "review_to_check": "{{count}} to check",
     "review_nothing_doubtful": "Nothing doubtful",
     "review_doubt": "To check",
+    "review_outdated": "A more precise category is suggested: \"{{category}}\"",
+    "review_unknown_account": "The other account is not tracked in Wealthfolio (unknown account). The transfer is still neutral for your spending and income.",
     "review_estimated": "Guess",
     "review_confirmed": "Confirmed",
     "review_category": "Category",
