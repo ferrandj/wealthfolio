@@ -2119,7 +2119,10 @@
     "holder_filter": "Titulaires",
     "holder_all": "Tous les comptes",
     "holder_joint": "Comptes joints",
-    "holder_individual": "Comptes individuels"
+    "holder_individual": "Comptes individuels",
+    "view_tree": "Arborescence",
+    "view_list": "Liste",
+    "revalidate_protected": "Document validé : encore {{left}} clic(s) pour le relire"
   },
   "identity": {
     "title": "Coordonnées du compte",

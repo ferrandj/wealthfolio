@@ -2287,7 +2287,10 @@
     "holder_filter": "Holders",
     "holder_all": "All accounts",
     "holder_joint": "Joint accounts",
-    "holder_individual": "Individual accounts"
+    "holder_individual": "Individual accounts",
+    "view_tree": "Tree view",
+    "view_list": "List view",
+    "revalidate_protected": "Validated document: {{left}} more click(s) to read it again"
   },
   "identity": {
     "title": "Account details",
