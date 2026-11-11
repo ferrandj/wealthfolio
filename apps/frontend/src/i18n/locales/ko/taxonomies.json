@@ -697,6 +697,7 @@
       "cat_personal": "개인 관리",
       "cat_gifts": "선물 및 기부",
       "cat_fees": "수수료 및 요금",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "기타 비용",
       "cat_housing_rent": "임대료/모기지",
       "cat_housing_insurance": "주택 보험",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

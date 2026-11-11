@@ -7,6 +7,10 @@ export interface AccountIdentity {
   /** The people the account belongs to, read from the documents (several for a joint account). */
   holders?: string[];
   holderAddress?: string | null;
+  /** The address cut into parts (read-only view of `holderAddress`). */
+  holderStreet?: string | null;
+  holderPostalCode?: string | null;
+  holderCity?: string | null;
   iban?: string | null;
   bic?: string | null;
   bankCode?: string | null;
@@ -22,6 +26,10 @@ export interface AccountIdentityInput {
   institution?: string | null;
   holderName?: string | null;
   holderAddress?: string | null;
+  /** The address in parts: a part given replaces the same part, the others stay. */
+  holderStreet?: string | null;
+  holderPostalCode?: string | null;
+  holderCity?: string | null;
   iban?: string | null;
   bic?: string | null;
   bankCode?: string | null;

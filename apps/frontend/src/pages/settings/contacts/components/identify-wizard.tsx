@@ -199,7 +199,9 @@ function IdentifyItem({
         civility: parsed.civility,
         lastName: parsed.lastName,
         firstName: parsed.firstName,
-        address: kind === "self" ? (own?.holderAddress ?? "") : "",
+        street: kind === "self" ? (own?.holderStreet ?? "") : "",
+        postalCode: kind === "self" ? (own?.holderPostalCode ?? "") : "",
+        city: kind === "self" ? (own?.holderCity ?? "") : "",
       };
     }
     return { ...base, displayName: printed };

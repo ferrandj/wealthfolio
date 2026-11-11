@@ -22,7 +22,7 @@ pub const IDENTIFIER_IBAN: &str = "iban";
 pub const IDENTIFIER_NAME: &str = "name";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", into = "ContactRepr")]
 pub struct Contact {
     pub id: String,
     pub kind: String,
@@ -38,6 +38,58 @@ pub struct Contact {
     pub notes: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// A contact as it is sent out: the card plus its address cut into street, postal code and city.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContactRepr {
+    id: String,
+    kind: String,
+    role: String,
+    display_name: String,
+    civility: Option<String>,
+    last_name: Option<String>,
+    first_name: Option<String>,
+    birth_name: Option<String>,
+    address: Option<String>,
+    street: Option<String>,
+    postal_code: Option<String>,
+    city: Option<String>,
+    phone: Option<String>,
+    email: Option<String>,
+    notes: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+impl From<Contact> for ContactRepr {
+    fn from(c: Contact) -> Self {
+        let parts = c
+            .address
+            .as_deref()
+            .map(crate::address::split_address)
+            .unwrap_or_default();
+        Self {
+            id: c.id,
+            kind: c.kind,
+            role: c.role,
+            display_name: c.display_name,
+            civility: c.civility,
+            last_name: c.last_name,
+            first_name: c.first_name,
+            birth_name: c.birth_name,
+            address: c.address,
+            street: parts.street,
+            postal_code: parts.postal_code,
+            city: parts.city,
+            phone: c.phone,
+            email: c.email,
+            notes: c.notes,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        }
+    }
 }
 
 /// One bank account (IBAN) or printed name that identifies a contact on the other side of an operation.
@@ -69,7 +121,11 @@ pub struct ContactInput {
     pub last_name: Option<String>,
     pub first_name: Option<String>,
     pub birth_name: Option<String>,
+    /// The whole address, or give `street`, `postal_code` and `city` instead (they win when any is given).
     pub address: Option<String>,
+    pub street: Option<String>,
+    pub postal_code: Option<String>,
+    pub city: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
     pub notes: Option<String>,

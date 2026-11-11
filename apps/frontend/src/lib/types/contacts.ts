@@ -14,6 +14,10 @@ export interface Contact {
   firstName: string | null;
   birthName: string | null;
   address: string | null;
+  /** The address cut into parts. */
+  street: string | null;
+  postalCode: string | null;
+  city: string | null;
   phone: string | null;
   email: string | null;
   notes: string | null;
@@ -45,6 +49,9 @@ export interface ContactInput {
   firstName?: string | null;
   birthName?: string | null;
   address?: string | null;
+  street?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
   phone?: string | null;
   email?: string | null;
   notes?: string | null;

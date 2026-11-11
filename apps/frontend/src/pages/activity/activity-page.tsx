@@ -40,6 +40,7 @@ import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-fo
 import { TransferMatchDialog } from "./components/transfer-match-dialog";
 import { useActivityActionDialogs } from "./hooks/use-activity-action-dialogs";
 import { isConversionActivity } from "./utils/conversion-counterpart";
+import { useActivityCategoryLabels } from "./hooks/use-activity-category-labels";
 import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
 import {
   clearActivityUrlFilters,
@@ -480,6 +481,7 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
   const showsCashBalances = isDateOrder && effectiveInvestmentAccountIds?.length === 1;
 
   // Infinite scroll search for table view
+  const categoryLabels = useActivityCategoryLabels();
   const infiniteSearch = useActivitySearch({
     mode: "infinite",
     filters: {
@@ -826,6 +828,7 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
           isFetching={infiniteSearch.isFetching}
           isFetchingNextPage={infiniteSearch.isFetchingNextPage}
           hasLoadMoreError={infiniteSearch.isFetchNextPageError}
+          categoryLabels={categoryLabels}
         />
       ) : shouldUseDatagridView ? (
         <ActivityDataGrid
@@ -864,6 +867,7 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
           isFetching={infiniteSearch.isFetching}
           isFetchingNextPage={infiniteSearch.isFetchingNextPage}
           hasLoadMoreError={infiniteSearch.isFetchNextPageError}
+          categoryLabels={categoryLabels}
         />
       )}
 

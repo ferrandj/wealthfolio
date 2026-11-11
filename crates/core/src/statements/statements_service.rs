@@ -444,7 +444,16 @@ fn apply_input(identity: &mut AccountIdentity, input: &AccountIdentityInput) {
     let mut changed = false;
     changed |= set(&mut identity.institution, &input.institution, false);
     changed |= set(&mut identity.holder_name, &input.holder_name, false);
-    changed |= set(&mut identity.holder_address, &input.holder_address, false);
+    let address = crate::address::resolve_address(
+        identity.holder_address.as_deref(),
+        &input.holder_address,
+        &input.holder_street,
+        &input.holder_postal_code,
+        &input.holder_city,
+    )
+    // an empty string clears the address in `set`
+    .map(|a| a.unwrap_or_default());
+    changed |= set(&mut identity.holder_address, &address, false);
     changed |= set(&mut identity.iban, &input.iban, true);
     changed |= set(&mut identity.bic, &input.bic, true);
     changed |= set(&mut identity.bank_code, &input.bank_code, false);
@@ -933,6 +942,13 @@ impl StatementService {
                         // a category for every operation that was added, and a flag on the doubtful ones
                         let mut items = Vec::new();
                         let mut doubts = 0u32;
+                        let remembered = match self.remembered_categories().await {
+                            Ok(found) => found,
+                            Err(e) => {
+                                warn!("could not read the categories chosen before: {e}");
+                                HashMap::new()
+                            }
+                        };
                         // guesses nobody has looked at yet: not taken for transfers between own accounts until confirmed
                         let mut unsure: HashSet<String> = HashSet::new();
                         for persisted in &result.persisted_rows {
@@ -960,6 +976,25 @@ impl StatementService {
                                     taxonomy_id: taxonomy.clone(),
                                     category_id: category.clone(),
                                     source: "manual".to_string(),
+                                });
+                            } else if let Some((taxonomy, category)) = rows[persisted.index]
+                                .comment
+                                .as_deref()
+                                .and_then(equivalence_key)
+                                .and_then(|key| remembered.get(&key))
+                                // same direction only: a refund is not filed as the purchase it cancels
+                                .filter(|(taxonomy, _)| {
+                                    op.category_taxonomy_id
+                                        .as_deref()
+                                        .is_none_or(|guess| guess == taxonomy)
+                                })
+                            {
+                                // the same payee was filed before by a person: no new review is needed
+                                items.push(CategoryAssignment {
+                                    activity_id: persisted.activity_id.clone(),
+                                    taxonomy_id: taxonomy.clone(),
+                                    category_id: category.clone(),
+                                    source: "rule".to_string(),
                                 });
                             } else if let (Some(category), Some(taxonomy)) =
                                 (&op.category_id, &op.category_taxonomy_id)
@@ -1246,6 +1281,45 @@ impl StatementService {
                 .await
                 .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?;
         self.enrich(reading)
+    }
+
+    /// What was decided before for each payee: the category most often given by a person or a rule to the
+    /// operations whose label is equivalent. A guess from the import never counts.
+    async fn remembered_categories(&self) -> Result<HashMap<String, (String, String)>> {
+        let activities = self.activity_service.get_activities()?;
+        let key_of: HashMap<&str, String> = activities
+            .iter()
+            .filter(|a| a.notes.as_deref() != Some(OPENING_BALANCE_NOTE))
+            .filter_map(|a| {
+                a.notes
+                    .as_deref()
+                    .and_then(equivalence_key)
+                    .map(|k| (a.id.as_str(), k))
+            })
+            .collect();
+        let ids: Vec<String> = key_of.keys().map(|id| id.to_string()).collect();
+        let mut counts: HashMap<String, HashMap<(String, String), u32>> = HashMap::new();
+        for c in self.category_assigner.current(&ids).await? {
+            if c.source != "manual" && c.source != "rule" {
+                continue;
+            }
+            if let Some(key) = key_of.get(c.activity_id.as_str()) {
+                *counts
+                    .entry(key.clone())
+                    .or_default()
+                    .entry((c.taxonomy_id, c.category_id))
+                    .or_default() += 1;
+            }
+        }
+        Ok(counts
+            .into_iter()
+            .filter_map(|(key, choices)| {
+                choices
+                    .into_iter()
+                    .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
+                    .map(|(choice, _)| (key, choice))
+            })
+            .collect())
     }
 
     /// The category a person chose, carried to the other operations with an equivalent label. A category chosen by
@@ -1870,6 +1944,26 @@ impl StatementServiceTrait for StatementService {
             .collect();
         let mut items = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
+        // what was chosen for a payee in this document applies to its other operations without a new choice
+        let note_of: HashMap<String, Option<String>> = if decisions.iter().any(|d| d.remember) {
+            self.activity_service
+                .get_activities()?
+                .into_iter()
+                .map(|a| (a.id, a.notes))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+        let mut same_payee: HashMap<String, &ReviewDecision> = HashMap::new();
+        for d in decisions.iter().filter(|d| d.remember) {
+            if let Some(key) = note_of
+                .get(&d.activity_id)
+                .and_then(|n| n.as_deref())
+                .and_then(equivalence_key)
+            {
+                same_payee.insert(key, d);
+            }
+        }
         for statement in &review.statements {
             for op in &statement.operations {
                 let Some(activity_id) = &op.activity_id else {
@@ -1878,16 +1972,22 @@ impl StatementServiceTrait for StatementService {
                 if !seen.insert(activity_id.clone()) {
                     continue;
                 }
-                let (taxonomy, category) = match chosen.get(activity_id.as_str()) {
-                    Some(d) => (d.taxonomy_id.clone(), d.category_id.clone()),
-                    None => match (
-                        op.taxonomy_id.clone().or(op.suggested_taxonomy_id.clone()),
-                        op.category_id.clone().or(op.suggested_category_id.clone()),
-                    ) {
-                        (Some(t), Some(c)) => (t, c),
-                        _ => continue,
-                    },
-                };
+                let equivalent = note_of
+                    .get(activity_id)
+                    .and_then(|n| n.as_deref())
+                    .and_then(equivalence_key)
+                    .and_then(|key| same_payee.get(&key).copied());
+                let (taxonomy, category) =
+                    match chosen.get(activity_id.as_str()).copied().or(equivalent) {
+                        Some(d) => (d.taxonomy_id.clone(), d.category_id.clone()),
+                        None => match (
+                            op.taxonomy_id.clone().or(op.suggested_taxonomy_id.clone()),
+                            op.category_id.clone().or(op.suggested_category_id.clone()),
+                        ) {
+                            (Some(t), Some(c)) => (t, c),
+                            _ => continue,
+                        },
+                    };
                 items.push(CategoryAssignment {
                     activity_id: activity_id.clone(),
                     taxonomy_id: taxonomy,

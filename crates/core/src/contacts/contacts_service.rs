@@ -231,7 +231,17 @@ impl ContactsService {
             last_name,
             first_name,
             birth_name: clean(&input.birth_name, MAX_FIELD, "Birth name")?,
-            address: clean(&input.address, MAX_NOTES, "Address")?,
+            address: {
+                let composed = crate::address::resolve_address(
+                    None,
+                    &input.address,
+                    &input.street,
+                    &input.postal_code,
+                    &input.city,
+                )
+                .flatten();
+                clean(&composed, MAX_NOTES, "Address")?
+            },
             phone: clean(&input.phone, 60, "Phone")?,
             email: clean(&input.email, MAX_FIELD, "E-mail")?,
             notes: clean(&input.notes, MAX_NOTES, "Notes")?,

@@ -95,6 +95,8 @@ interface ActivityTableMobileProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
+  /** Category label per cash activity id, shared with the spending screens and the document import. */
+  categoryLabels?: ReadonlyMap<string, string>;
 }
 
 export const ActivityTableMobile = ({
@@ -116,6 +118,7 @@ export const ActivityTableMobile = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
+  categoryLabels,
 }: ActivityTableMobileProps) => {
   const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
@@ -248,7 +251,8 @@ export const ActivityTableMobile = ({
     const isOptionActivity = activity.instrumentType === "OPTION";
     const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
     const displaySymbol = isCash
-      ? t("activity:table.cash")
+      ? (categoryLabels?.get(activity.id) ?? (activity.comment ?? "").trim()) ||
+        t("activity:table.cash")
       : parsedOption
         ? parsedOption.underlying
         : symbol;

@@ -159,7 +159,7 @@ service_tool!(
             "accountId": {"type": ["string", "null"], "description": "Put the operations in this account."},
             "newAccountName": {"type": ["string", "null"], "description": "Name of the account to create when none matches."},
             "skip": {"type": "boolean"},
-            "identity": {"type": ["object", "null"], "description": "Identity of the account: institution, holderName, holderAddress, iban, bic, bankCode, branchCode, accountNumber, ribKey."}
+            "identity": {"type": ["object", "null"], "description": "Identity of the account: institution, holderName, holderAddress (or holderStreet, holderPostalCode, holderCity), iban, bic, bankCode, branchCode, accountNumber, ribKey."}
         }), &["index"])},
         "allowDuplicateDocument": {"type": "boolean"},
         "replaceDocumentIds": {"type": "array", "items": {"type": "string"}}
@@ -177,14 +177,14 @@ service_tool!(
 service_tool!(
     ValidateStatementDocument, "validate_statement_document", Write, additive = false,
     scopes = [DocumentsWrite],
-    description = "Validate a reviewed document. `decisions` gives the category chosen for each activity to change (activityId, taxonomyId, categoryId, remember = give the same category to the other operations with the same payee unless one was chosen by hand); activities without a decision keep their guessed category, which the validation confirms.",
+    description = "Validate a reviewed document. `decisions` gives the category chosen for each activity to change (activityId, taxonomyId, categoryId, remember (default true) = give the same category to the other operations with the same payee unless one was chosen by hand); activities without a decision keep their guessed category, which the validation confirms.",
     schema = object(json!({
         "documentId": {"type": "string"},
         "decisions": {"type": "array", "items": object(json!({
             "activityId": {"type": "string"},
             "taxonomyId": {"type": "string", "description": "spending_categories or income_sources."},
             "categoryId": {"type": "string"},
-            "remember": {"type": "boolean"}
+            "remember": {"type": "boolean", "description": "Default true"}
         }), &["activityId", "taxonomyId", "categoryId"])}
     }), &["documentId"]),
     |env, args| {
@@ -338,7 +338,10 @@ service_tool!(
         "accountId": {"type": "string"},
         "institution": {"type": "string"},
         "holderName": {"type": "string"},
-        "holderAddress": {"type": "string"},
+        "holderAddress": {"type": "string", "description": "The whole address (\"street\\npostal code city\"), or use the three parts below."},
+        "holderStreet": {"type": "string", "description": "Number and street. A part given replaces the same part; the others stay."},
+        "holderPostalCode": {"type": "string"},
+        "holderCity": {"type": "string"},
         "iban": {"type": "string"},
         "bic": {"type": "string"},
         "bankCode": {"type": "string"},

@@ -717,6 +717,7 @@
       "cat_personal": "パーソナルケア",
       "cat_gifts": "ギフトと寄付",
       "cat_fees": "料金と料金",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "その他の費用",
       "cat_housing_rent": "家賃・住宅ローン",
       "cat_housing_insurance": "住宅保険",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

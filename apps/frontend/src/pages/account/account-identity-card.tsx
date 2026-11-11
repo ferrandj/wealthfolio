@@ -12,7 +12,9 @@ import { useTranslation } from "react-i18next";
 
 export const IDENTITY_FIELDS = [
   "holderName",
-  "holderAddress",
+  "holderStreet",
+  "holderPostalCode",
+  "holderCity",
   "iban",
   "bic",
   "institution",
@@ -38,7 +40,8 @@ export function AccountIdentityCard({ accountId }: { accountId: string }) {
   const shown = (field: IdentityField, text: string) => {
     if (!isBalanceHidden) return displayValue(field, text);
     if (field === "iban") return maskIban(text);
-    if (field === "holderAddress") return maskAddress(text);
+    if (field === "holderStreet" || field === "holderPostalCode" || field === "holderCity")
+      return maskAddress(text);
     if (field === "holderName") return maskText(text);
     return displayValue(field, text);
   };

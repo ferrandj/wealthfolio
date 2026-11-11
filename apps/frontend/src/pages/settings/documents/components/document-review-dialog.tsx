@@ -31,6 +31,7 @@ import {
   suggestedChoice,
   type ReviewChoice,
 } from "../statement-review";
+import { useDownloadDocument } from "../use-download-document";
 
 const SPENDING = "spending_categories";
 const INCOME = "income_sources";
@@ -123,6 +124,7 @@ function ReviewBody({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const downloadDocument = useDownloadDocument();
   const queryClient = useQueryClient();
   const names = useCategoryNames();
   const [choices, setChoices] = useState<Record<string, Choice>>({});
@@ -224,6 +226,17 @@ function ReviewBody({
             {t("settings:documents.review_remaining", { count: remaining })}
           </DialogDescription>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          onClick={() => void downloadDocument(document.id)}
+          aria-label={t("settings:documents.download")}
+          title={t("settings:documents.download")}
+        >
+          <Icons.Download className="size-4" />
+        </Button>
         <Badge variant={doubtCount > 0 ? "outline" : "secondary"} className="shrink-0">
           {doubtCount > 0
             ? t("settings:documents.review_to_check", { count: doubtCount })

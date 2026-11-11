@@ -18,7 +18,9 @@ export interface ContactForm {
   lastName: string;
   firstName: string;
   birthName: string;
-  address: string;
+  street: string;
+  postalCode: string;
+  city: string;
   phone: string;
   email: string;
   notes: string;
@@ -33,7 +35,9 @@ export function emptyForm(kind: ContactKind = "person"): ContactForm {
     lastName: "",
     firstName: "",
     birthName: "",
-    address: "",
+    street: "",
+    postalCode: "",
+    city: "",
     phone: "",
     email: "",
     notes: "",
@@ -49,7 +53,9 @@ export function contactToForm(contact: Contact): ContactForm {
     lastName: contact.lastName ?? "",
     firstName: contact.firstName ?? "",
     birthName: contact.birthName ?? "",
-    address: contact.address ?? "",
+    street: contact.street ?? "",
+    postalCode: contact.postalCode ?? "",
+    city: contact.city ?? "",
     phone: contact.phone ?? "",
     email: contact.email ?? "",
     notes: contact.notes ?? "",
@@ -97,7 +103,9 @@ export function formToInput(form: ContactForm): ContactInput {
     lastName: named ? text(form.lastName) : null,
     firstName: named ? text(form.firstName) : null,
     birthName: named ? text(form.birthName) : null,
-    address: text(form.address),
+    street: text(form.street),
+    postalCode: text(form.postalCode),
+    city: text(form.city),
     phone: text(form.phone),
     email: text(form.email),
     notes: text(form.notes),

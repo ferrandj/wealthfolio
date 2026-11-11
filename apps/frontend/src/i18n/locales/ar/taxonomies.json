@@ -697,6 +697,7 @@
       "cat_personal": "العناية الشخصية",
       "cat_gifts": "الهدايا والتبرعات",
       "cat_fees": "الرسوم والمصاريف",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "مصاريف أخرى",
       "cat_housing_rent": "الإيجار/الرهن العقاري",
       "cat_housing_insurance": "التأمين على المنزل",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

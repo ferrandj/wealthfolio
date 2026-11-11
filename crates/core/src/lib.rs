@@ -7,6 +7,7 @@
 pub mod accounts;
 pub mod activities;
 pub mod addons;
+pub mod address;
 pub mod assets;
 pub mod connect_config;
 pub mod constants;

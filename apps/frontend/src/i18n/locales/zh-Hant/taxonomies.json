@@ -697,6 +697,7 @@
       "cat_personal": "個人護理",
       "cat_gifts": "禮品與捐贈",
       "cat_fees": "手續費及費用",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "其他費用",
       "cat_housing_rent": "房租 / 房貸",
       "cat_housing_insurance": "房屋保險",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

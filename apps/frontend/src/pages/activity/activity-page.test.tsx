@@ -26,6 +26,9 @@ vi.mock("@/hooks/use-platform", () => ({
   useIsMobileViewport: () => false,
   useIsCompactTableViewport: () => false,
 }));
+vi.mock("./hooks/use-activity-category-labels", () => ({
+  useActivityCategoryLabels: () => new Map(),
+}));
 vi.mock("@/pages/asset/alternative-assets", () => ({ AlternativeAssetQuickAddModal: () => null }));
 vi.mock("./components/activity-data-grid/activity-data-grid", () => ({
   ActivityDataGrid: () => null,

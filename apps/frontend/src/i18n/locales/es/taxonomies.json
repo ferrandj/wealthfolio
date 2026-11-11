@@ -697,6 +697,7 @@
       "cat_personal": "cuidado personal",
       "cat_gifts": "Regalos y donaciones",
       "cat_fees": "Tarifas y cargos",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "Otros gastos",
       "cat_housing_rent": "Alquiler/hipoteca",
       "cat_housing_insurance": "Seguro de hogar",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

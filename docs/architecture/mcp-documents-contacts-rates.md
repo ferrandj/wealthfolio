@@ -45,6 +45,22 @@ Typical import by an agent: `analyze_statement_document` → `import_statement_d
 `get_statement_review_queue` → `review_statement_document` → `validate_statement_document` (with `decisions`) →
 `list_account_identities` / `link_contact_account` to set the owner of each new account.
 
+## Rule: every feature is reachable through MCP
+
+Anything the app can do is exposed as a tool (or as a field of an existing tool). Recent additions:
+
+- **Categories remembered**: `validate_statement_document` decisions default to `remember: true`; the category chosen for a
+  payee is applied to the other operations of the same document and to later imports (source `rule`), never over a
+  category chosen by hand.
+- **"To categorize later"** (`cat_to_categorize` in `spending_categories`, `cat_income_to_categorize` in
+  `income_sources`): a normal category, so the operation is counted in totals, charts and analyses; assign it with the
+  usual categorization tools.
+- **Addresses in parts**: `create_contact` / `update_contact` accept `street`, `postalCode`, `city` (or the whole
+  `address`); `save_account_identity` accepts `holderStreet`, `holderPostalCode`, `holderCity`. Contacts and identities
+  are read back with both the whole address and its parts. The stored text stays `"street\npostal code city"`: no
+  migration.
+- **Downloading a document**: `get_statement_document_content` returns the original file (base64) and its stored name.
+
 ## Audit
 
 These tools log only opaque ids and flags (`documentId`, `accountId`, `removeOperations`…), never names, IBANs,

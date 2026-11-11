@@ -1,11 +1,9 @@
 import {
   deleteStatementDocument,
-  getStatementDocumentContent,
   getStatementOutdated,
   invalidateAllStatementDocuments,
   linkStatementDocument,
   listStatementDocuments,
-  openFileSaveDialog,
   revalidateAllStatementDocuments,
   revalidateStatementDocument,
 } from "@/adapters";
@@ -39,7 +37,8 @@ import {
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { base64ToBytes, formatBytes } from "../statement-files";
+import { formatBytes } from "../statement-files";
+import { useDownloadDocument } from "../use-download-document";
 import { logicalOrder, parseReviewReason } from "../statement-review";
 import { DocumentReviewDialog } from "./document-review-dialog";
 import { matchesHolderFilter, type HolderFilter } from "../holders";
@@ -183,18 +182,8 @@ export function DocumentsLibrary() {
       }),
   });
 
-  const download = async (doc: StatementDocument) => {
-    try {
-      const { contentBase64, document } = await getStatementDocumentContent(doc.id);
-      await openFileSaveDialog(base64ToBytes(contentBase64), document.storedName);
-    } catch (e) {
-      toast({
-        title: t("settings:documents.error"),
-        description: String(e),
-        variant: "destructive",
-      });
-    }
-  };
+  const downloadDocument = useDownloadDocument();
+  const download = (doc: StatementDocument) => downloadDocument(doc.id);
 
   // A validated document was checked by a person: reading it again takes three clicks in a row.
   const [armed, setArmed] = useState<{ id: string; count: number } | null>(null);

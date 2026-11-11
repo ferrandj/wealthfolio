@@ -693,6 +693,7 @@
       "cat_travel": "Travel",
       "cat_gifts": "Gifts & Donations",
       "cat_fees": "Fees & Charges",
+      "cat_to_categorize": "To Categorize Later",
       "cat_other_expense": "Other Expenses",
       "cat_housing_rent": "Rent/Mortgage",
       "cat_housing_utilities": "Utilities",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "From a Savings Account",
       "cat_income_prime": "Bonuses & Sign-up Offers",
       "cat_income_benefits": "Benefits & Allowances",
+      "cat_income_to_categorize": "To Categorize Later",
       "cat_income_pension": "Pension"
     }
   },

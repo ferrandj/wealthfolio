@@ -144,6 +144,8 @@ interface ActivityTableProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
+  /** Category label per cash activity id, shared with the spending screens and the document import. */
+  categoryLabels?: ReadonlyMap<string, string>;
 }
 
 export const ActivityTable = ({
@@ -165,6 +167,7 @@ export const ActivityTable = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
+  categoryLabels,
 }: ActivityTableProps) => {
   const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
@@ -250,8 +253,9 @@ export const ActivityTable = ({
           // For cash activities, surface the payee/merchant from notes when available
           // (e.g., "AMAZON*MARKETPLACE" instead of just "Cash").
           const cashPayee = isCash ? (row.original.comment ?? "").trim() : "";
+          const cashCategory = isCash ? categoryLabels?.get(row.original.id) : undefined;
           const displaySymbol = isCash
-            ? cashPayee || t("activity:table.cash")
+            ? cashCategory || cashPayee || t("activity:table.cash")
             : parsedOption
               ? parsedOption.underlying
               : symbol;
@@ -298,8 +302,8 @@ export const ActivityTable = ({
                   className="text-muted-foreground truncate text-xs font-light rtl:text-right"
                 >
                   {isCash
-                    ? cashPayee
-                      ? `${t("activity:table.cash")} · ${String(currency)}`
+                    ? cashPayee || cashCategory
+                      ? `${cashCategory && cashPayee ? cashPayee : t("activity:table.cash")} · ${String(currency)}`
                       : String(currency)
                     : (optionSubtitle ?? String(assetName ?? currency))}
                 </span>
@@ -790,6 +794,7 @@ export const ActivityTable = ({
       showsCashBalance,
       symbolExchangeCountMap,
       reviewExplanation,
+      categoryLabels,
       t,
     ],
   );

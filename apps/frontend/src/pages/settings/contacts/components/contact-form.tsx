@@ -179,13 +179,33 @@ export function ContactForm({ value, onChange, hideKind = false }: Props) {
         </div>
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="contact-address">{t("settings:contacts.field_address")}</Label>
-        <Textarea
-          id="contact-address"
-          rows={2}
-          value={value.address}
-          onChange={(e) => set("address", e.target.value)}
+        <Label htmlFor="contact-street">{t("settings:contacts.field_street")}</Label>
+        <Input
+          id="contact-street"
+          autoComplete="street-address"
+          value={value.street}
+          onChange={(e) => set("street", e.target.value)}
         />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+        <div className="grid gap-1.5">
+          <Label htmlFor="contact-postal-code">{t("settings:contacts.field_postal_code")}</Label>
+          <Input
+            id="contact-postal-code"
+            autoComplete="postal-code"
+            value={value.postalCode}
+            onChange={(e) => set("postalCode", e.target.value)}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="contact-city">{t("settings:contacts.field_city")}</Label>
+          <Input
+            id="contact-city"
+            autoComplete="address-level2"
+            value={value.city}
+            onChange={(e) => set("city", e.target.value)}
+          />
+        </div>
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="contact-notes">{t("settings:contacts.field_notes")}</Label>

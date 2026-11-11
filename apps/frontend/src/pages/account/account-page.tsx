@@ -1,4 +1,5 @@
 import { parseLocalDate } from "@/lib/utils";
+import { useActivityCategoryLabels } from "@/pages/activity/hooks/use-activity-category-labels";
 import { formatZonedDateKey } from "@/features/spending/lib/timezone";
 import { getContributionLimit, getSnapshots, searchActivities } from "@/adapters";
 import { HistoryChart } from "@/components/history-chart";
@@ -104,6 +105,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useBackNavigation } from "@/pages/layouts/mobile-stack/use-mobile-stack";
 import { isContributionLimitCurrent } from "@/pages/settings/contribution-limits/contribution-limit-dates";
 import { AccountContributionLimit } from "./account-contribution-limit";
+import { AccountDocumentsCard } from "./account-documents-card";
 import { AccountIdentityCard } from "./account-identity-card";
 import { AccountHeaderDetails } from "./account-header-details";
 import AccountHoldings from "./account-holdings";
@@ -355,6 +357,10 @@ const AccountPage = () => {
     () => (isAccountActivitiesTabActive && account ? [id] : EMPTY_ACCOUNT_IDS),
     [account, id, isAccountActivitiesTabActive],
   );
+  const categoryLabels = useActivityCategoryLabels({
+    accountId: id,
+    enabled: isAccountActivitiesTabActive,
+  });
   const accountActivitiesSearch = useActivitySearch({
     mode: "infinite",
     filters: {
@@ -723,6 +729,7 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
+        categoryLabels={categoryLabels}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}
@@ -746,6 +753,7 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
+        categoryLabels={categoryLabels}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}
@@ -1223,6 +1231,7 @@ const AccountPage = () => {
                 />
                 {showContributionLimitCard && <AccountContributionLimit accountId={id} />}
                 <AccountIdentityCard accountId={id} />
+                <AccountDocumentsCard accountId={id} />
               </div>
             </div>
 

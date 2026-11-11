@@ -12,7 +12,7 @@ pub const DOCUMENT_STATUS_VALIDATED: &str = "VALIDATED";
 
 /// Who owns an account and how to reach it, as printed on its documents. One row per account.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", into = "AccountIdentityRepr")]
 pub struct AccountIdentity {
     pub account_id: String,
     pub institution: Option<String>,
@@ -33,6 +33,56 @@ pub struct AccountIdentity {
     pub updated_at: String,
 }
 
+/// An identity as it is sent out: the stored fields plus the holder address cut into street, postal code and city.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AccountIdentityRepr {
+    account_id: String,
+    institution: Option<String>,
+    holder_name: Option<String>,
+    holders: Vec<String>,
+    holder_address: Option<String>,
+    holder_street: Option<String>,
+    holder_postal_code: Option<String>,
+    holder_city: Option<String>,
+    iban: Option<String>,
+    bic: Option<String>,
+    bank_code: Option<String>,
+    branch_code: Option<String>,
+    account_number: Option<String>,
+    rib_key: Option<String>,
+    edited_by_user: bool,
+    updated_at: String,
+}
+
+impl From<AccountIdentity> for AccountIdentityRepr {
+    fn from(i: AccountIdentity) -> Self {
+        let parts = i
+            .holder_address
+            .as_deref()
+            .map(crate::address::split_address)
+            .unwrap_or_default();
+        Self {
+            account_id: i.account_id,
+            institution: i.institution,
+            holder_name: i.holder_name,
+            holders: i.holders,
+            holder_address: i.holder_address,
+            holder_street: parts.street,
+            holder_postal_code: parts.postal_code,
+            holder_city: parts.city,
+            iban: i.iban,
+            bic: i.bic,
+            bank_code: i.bank_code,
+            branch_code: i.branch_code,
+            account_number: i.account_number,
+            rib_key: i.rib_key,
+            edited_by_user: i.edited_by_user,
+            updated_at: i.updated_at,
+        }
+    }
+}
+
 /// The identity fields a caller can set. A missing field is left as it is; an empty string clears it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -40,6 +90,10 @@ pub struct AccountIdentityInput {
     pub institution: Option<String>,
     pub holder_name: Option<String>,
     pub holder_address: Option<String>,
+    /// Or the address in parts: a part given replaces the same part, the others stay (empty clears).
+    pub holder_street: Option<String>,
+    pub holder_postal_code: Option<String>,
+    pub holder_city: Option<String>,
     pub iban: Option<String>,
     pub bic: Option<String>,
     pub bank_code: Option<String>,
@@ -283,6 +337,10 @@ pub struct DocumentReview {
     pub warnings: Vec<String>,
 }
 
+fn default_remember() -> bool {
+    true
+}
+
 /// The category the person chose for one activity during the review.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -291,8 +349,8 @@ pub struct ReviewDecision {
     pub taxonomy_id: String,
     pub category_id: String,
     /// Give the same category to the other operations with an equivalent label (same payee), unless a person
-    /// chose theirs by hand.
-    #[serde(default)]
+    /// chose theirs by hand. On unless said otherwise: a choice made once is not asked again.
+    #[serde(default = "default_remember")]
     pub remember: bool,
 }
 
@@ -323,4 +381,26 @@ pub struct RevalidationResult {
 pub struct OutdatedDocuments {
     pub current_version: String,
     pub document_ids: Vec<String>,
+}
+
+#[cfg(test)]
+mod remember_tests {
+    use super::ReviewDecision;
+
+    #[test]
+    fn a_decision_is_remembered_unless_said_otherwise() {
+        let json =
+            r#"{"activityId":"a","taxonomyId":"spending_categories","categoryId":"cat_food"}"#;
+        assert!(
+            serde_json::from_str::<ReviewDecision>(json)
+                .unwrap()
+                .remember
+        );
+        let off = r#"{"activityId":"a","taxonomyId":"t","categoryId":"c","remember":false}"#;
+        assert!(
+            !serde_json::from_str::<ReviewDecision>(off)
+                .unwrap()
+                .remember
+        );
+    }
 }

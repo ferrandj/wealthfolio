@@ -3055,6 +3055,25 @@ async fn mcp_manages_contacts_rates_and_documents_with_their_own_scopes() {
     let contact_id = created["contact"]["id"].as_str().unwrap().to_string();
     assert_eq!(created["contact"]["displayName"], "Jean Dupont");
 
+    // an address given in parts is stored as the printed text and read back in parts
+    let updated = mcp_call_tool(
+        &server,
+        &pat,
+        &session,
+        "update_contact",
+        serde_json::json!({
+            "contactId": contact_id, "kind": "self", "firstName": "Jean", "lastName": "Dupont",
+            "street": "45 RUE ALEXANDRE BICKART", "postalCode": "77500", "city": "CHELLES"
+        }),
+    )
+    .await;
+    assert_eq!(
+        updated["contact"]["address"], "45 RUE ALEXANDRE BICKART\n77500 CHELLES",
+        "{updated}"
+    );
+    assert_eq!(updated["contact"]["postalCode"], "77500", "{updated}");
+    assert_eq!(updated["contact"]["city"], "CHELLES", "{updated}");
+
     let linked = mcp_call_tool(
         &server,
         &pat,

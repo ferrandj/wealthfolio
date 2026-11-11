@@ -697,6 +697,7 @@
       "cat_personal": "Soins personnels",
       "cat_gifts": "Cadeaux et dons",
       "cat_fees": "Frais et charges",
+      "cat_to_categorize": "À catégoriser plus tard",
       "cat_other_expense": "Autres dépenses",
       "cat_housing_rent": "Loyer/hypothèque",
       "cat_housing_insurance": "Assurance habitation",
@@ -781,6 +782,7 @@
       "cat_income_transfers_savings": "Depuis un compte d'épargne",
       "cat_income_prime": "Primes et offres",
       "cat_income_benefits": "Aides et allocations",
+      "cat_income_to_categorize": "À catégoriser plus tard",
       "cat_income_pension": "Pension et retraite"
     }
   },
