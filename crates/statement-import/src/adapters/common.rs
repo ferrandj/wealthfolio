@@ -374,6 +374,43 @@ const NAME_NOISE: &[&str] = &[
     "eurl",
 ];
 
+/// The holders an account statement prints on one line: "M DUPONT JEAN OU MME MARTIN CLAIRE" is two people.
+/// "M OU MME DUPONT JEAN" shares one family name between both civilities. A lone name is one holder.
+pub fn split_holders(name: &str) -> Vec<String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return vec![];
+    }
+    // statements print capitals: a lower-case "et" belongs to a name
+    let parts: Vec<&str> = re(r"\s+(?:ET|OU|&)\s+")
+        .split(name)
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.len() < 2 {
+        return vec![name.to_string()];
+    }
+    let is_civility = |w: &str| {
+        matches!(
+            w.trim_end_matches('.'),
+            "M" | "MR" | "MME" | "MLE" | "MLLE" | "MONSIEUR" | "MADAME" | "MADEMOISELLE"
+        )
+    };
+    if parts.len() == 2 && is_civility(parts[0]) {
+        let mut words = parts[1].split_whitespace();
+        if let Some(second) = words.next().filter(|w| is_civility(w)) {
+            let shared = words.collect::<Vec<_>>().join(" ");
+            if !shared.is_empty() {
+                return vec![
+                    format!("{} {shared}", parts[0]),
+                    format!("{second} {shared}"),
+                ];
+            }
+        }
+    }
+    parts.into_iter().map(str::to_string).collect()
+}
+
 /// Order- and civility-insensitive key: "M DUPONT Jean" and "Jean Dupont" are the same person.
 pub fn name_key(name: &str) -> String {
     static T: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -452,5 +489,44 @@ mod num_big {
         pub fn rem97(&self) -> u64 {
             self.0.iter().fold(0u64, |r, d| (r * 10 + *d as u64) % 97)
         }
+    }
+}
+
+#[cfg(test)]
+mod holders_tests {
+    use super::split_holders;
+
+    #[test]
+    fn a_lone_holder_stays_one() {
+        assert_eq!(
+            split_holders("M FERRAND JEREMIE"),
+            vec!["M FERRAND JEREMIE"]
+        );
+        assert!(split_holders("  ").is_empty());
+    }
+
+    #[test]
+    fn a_joint_account_lists_each_holder() {
+        assert_eq!(
+            split_holders("M DUPONT JEAN OU MME MARTIN CLAIRE"),
+            vec!["M DUPONT JEAN", "MME MARTIN CLAIRE"]
+        );
+        assert_eq!(
+            split_holders("MR DUPONT JEAN ET MME DUPONT MARIE"),
+            vec!["MR DUPONT JEAN", "MME DUPONT MARIE"]
+        );
+    }
+
+    #[test]
+    fn two_civilities_share_the_family_name() {
+        assert_eq!(
+            split_holders("M OU MME DUPONT JEAN"),
+            vec!["M DUPONT JEAN", "MME DUPONT JEAN"]
+        );
+    }
+
+    #[test]
+    fn a_name_with_a_lower_case_et_is_not_split() {
+        assert_eq!(split_holders("Dupont et Fils"), vec!["Dupont et Fils"]);
     }
 }

@@ -8,6 +8,7 @@ import { Button, Icons, Separator } from "@wealthfolio/ui";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
+import { AccountOwnerPrompt, OwnerlessAccountsBanner } from "../contacts/components/account-owners";
 import { CoverageCard } from "./components/coverage-card";
 import { DocumentsLibrary } from "./components/documents-library";
 import { PendingFileCard, type PendingFile } from "./components/pending-file-card";
@@ -33,6 +34,8 @@ export default function DocumentsPage() {
   const { accounts } = useAccounts({ filterActive: false });
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [dragging, setDragging] = useState(false);
+  // accounts this session's imports created: their owner is asked once the imports are done
+  const [newAccounts, setNewAccounts] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const patchFile = useCallback((id: string, patch: Partial<PendingFile>) => {
@@ -100,6 +103,10 @@ export default function DocumentsPage() {
           replaceDocumentIds: replacedDocumentIds(file.analysis?.statements ?? [], file.choices),
         });
         patchFile(file.id, { status: "done", result });
+        const created = result.outcomes.flatMap((o) =>
+          o.createdAccount && o.accountId ? [o.accountId] : [],
+        );
+        if (created.length > 0) setNewAccounts((list) => [...new Set([...list, ...created])]);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
@@ -229,6 +236,8 @@ export default function DocumentsPage() {
         </div>
       )}
 
+      <OwnerlessAccountsBanner />
+
       <CoverageCard />
 
       <SupportedDocuments />
@@ -238,6 +247,9 @@ export default function DocumentsPage() {
         <h2 className="text-lg font-semibold">{t("settings:documents.library_title")}</h2>
         <DocumentsLibrary />
       </div>
+      {newAccounts.length > 0 && !files.some((f) => f.status === "importing") ? (
+        <AccountOwnerPrompt accountIds={newAccounts} onClose={() => setNewAccounts([])} />
+      ) : null}
     </div>
   );
 }

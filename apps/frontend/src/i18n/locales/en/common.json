@@ -450,6 +450,8 @@
     "delete": "Delete profile",
     "deleteHelp": "Permanently remove this profile and its local data.",
     "resetDataTitle": "Reset all data",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "Erase every account, activity and setting of this profile and start again from the welcome screen. This cannot be undone.",
     "resetDataButton": "Reset all data",
     "resetDataProgress": "Press again to confirm ({{pressed}}/{{total}})",

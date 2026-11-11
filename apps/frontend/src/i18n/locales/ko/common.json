@@ -441,6 +441,8 @@
     "delete": "프로필 삭제",
     "deleteHelp": "이 프로필과 로컬 데이터를 영구적으로 삭제합니다.",
     "resetDataTitle": "모든 데이터 초기화",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "이 프로필의 모든 계좌, 활동, 설정을 지우고 시작 화면부터 다시 시작합니다. 이 작업은 되돌릴 수 없습니다.",
     "resetDataButton": "모든 데이터 초기화",
     "resetDataProgress": "확인하려면 다시 누르세요 ({{pressed}}/{{total}})",

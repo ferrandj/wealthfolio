@@ -28,6 +28,7 @@ import { Link } from "react-router-dom";
 import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { SettingsList } from "@/components/settings-list";
+import { AccountOwners } from "../contacts/components/account-owners";
 import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 import { badgeVariants } from "@wealthfolio/ui";
@@ -161,6 +162,7 @@ const SettingsAccountsPage = () => {
         onDelete={handleDeleteAccount}
         onArchive={handleArchiveAccount}
         onHide={handleHideAccount}
+        owners={<AccountOwners accountId={account.id} />}
       />
     </li>
   );

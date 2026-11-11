@@ -12,6 +12,7 @@ use log::warn;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 use uuid::Uuid;
+use wealthfolio_statement_import::adapters::common::split_holders;
 use wealthfolio_statement_import::{
     account_type_label, analyze, sha256_hex, standard_file_name, Analysis, StatementPreview,
     TransactionPreview,
@@ -339,6 +340,16 @@ fn overlapping(
         .collect()
 }
 
+/// The people an identity belongs to, read from its holder line.
+fn with_holders(mut identity: AccountIdentity) -> AccountIdentity {
+    identity.holders = identity
+        .holder_name
+        .as_deref()
+        .map(split_holders)
+        .unwrap_or_default();
+    identity
+}
+
 /// Merge what a document says (and what the user typed) into an account's identity.
 fn merge_identity(
     existing: Option<AccountIdentity>,
@@ -369,6 +380,17 @@ fn merge_identity(
         clean(&preview.holder_name),
         locked,
     );
+    // a joint account the reader names holder by holder: kept as one line the holders can be read back from
+    if !locked
+        && preview.holders.len() > 1
+        && identity
+            .holder_name
+            .as_deref()
+            .map(|n| split_holders(n).len())
+            != Some(preview.holders.len())
+    {
+        identity.holder_name = Some(preview.holders.join(" ET "));
+    }
     fill(
         &mut identity.holder_address,
         clean(&preview.holder_address),
@@ -2067,11 +2089,16 @@ impl StatementServiceTrait for StatementService {
     }
 
     fn list_identities(&self) -> Result<Vec<AccountIdentity>> {
-        self.repository.list_identities()
+        Ok(self
+            .repository
+            .list_identities()?
+            .into_iter()
+            .map(with_holders)
+            .collect())
     }
 
     fn get_identity(&self, account_id: &str) -> Result<Option<AccountIdentity>> {
-        self.repository.get_identity(account_id)
+        Ok(self.repository.get_identity(account_id)?.map(with_holders))
     }
 
     async fn save_identity(
@@ -2089,7 +2116,7 @@ impl StatementServiceTrait for StatementService {
             });
         apply_input(&mut identity, &input);
         identity.updated_at = Utc::now().to_rfc3339();
-        self.repository.save_identity(identity).await
+        Ok(with_holders(self.repository.save_identity(identity).await?))
     }
 }
 
@@ -2135,6 +2162,27 @@ mod tests {
         p
     }
 
+    #[test]
+    fn a_joint_account_keeps_every_holder() {
+        let mut p = empty_preview();
+        p.holder_name = Some("M DUPONT JEAN OU MME MARTIN CLAIRE".into());
+        let identity = with_holders(merge_identity(None, "a", &p, None));
+        assert_eq!(identity.holders, vec!["M DUPONT JEAN", "MME MARTIN CLAIRE"]);
+
+        // a reader that names the holders itself is kept, even when the holder line only shows one
+        p.holder_name = Some("M DUPONT JEAN".into());
+        p.holders = vec!["M DUPONT JEAN".into(), "MME MARTIN CLAIRE".into()];
+        let identity = with_holders(merge_identity(None, "a", &p, None));
+        assert_eq!(identity.holders, vec!["M DUPONT JEAN", "MME MARTIN CLAIRE"]);
+
+        p.holder_name = Some("M DUPONT JEAN".into());
+        p.holders = vec![];
+        assert_eq!(
+            with_holders(merge_identity(None, "a", &p, None)).holders,
+            vec!["M DUPONT JEAN"]
+        );
+    }
+
     fn empty_preview() -> StatementPreview {
         StatementPreview {
             index: 0,
@@ -2144,6 +2192,7 @@ mod tests {
             account_label: None,
             account_type: Some("checking".into()),
             currency: "EUR".into(),
+            holders: vec![],
             holder_name: Some("M DUPONT JEAN".into()),
             holder_address: Some("1 RUE DU TEST 60200 COMPIEGNE".into()),
             iban: Some("FR7612345123450000000000185".into()),

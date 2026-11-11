@@ -1,5 +1,6 @@
 import { Icons } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
+import { MobilePeopleMenu } from "./people-menu";
 import { ProfileAvatar } from "./profile-avatar";
 import { useProfile } from "./profile-context";
 
@@ -42,6 +43,7 @@ export function MobileProfileMenu({ onAction }: MobileProfileMenuProps) {
           </button>
         ))}
       </div>
+      <MobilePeopleMenu rowClassName={rowClassName} onAction={runAction} />
       <div className="py-3">
         <button type="button" className={rowClassName} onClick={() => runAction(manageProfile)}>
           <Icons.User className="size-6 shrink-0" />

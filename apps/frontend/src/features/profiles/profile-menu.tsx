@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
   Icons,
 } from "@wealthfolio/ui";
+import { PeopleMenuItems } from "./people-menu";
 import { ProfileAvatar } from "./profile-avatar";
 import { useProfile } from "./profile-context";
 
@@ -59,6 +60,7 @@ export function ProfileMenu({ collapsed = false }: { collapsed?: boolean }) {
             <span className="min-w-0 truncate">{profile.name}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <PeopleMenuItems />
           <DropdownMenuItem className="h-11 gap-3" onClick={manageProfile}>
             <Icons.User className="size-4" />
             {t("profiles.settings")}

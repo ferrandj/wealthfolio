@@ -162,6 +162,7 @@ mod tests {
             account_label: None,
             account_type: Some("checking".into()),
             currency: "EUR".into(),
+            holders: vec![],
             holder_name: None,
             holder_address: None,
             iban: None,

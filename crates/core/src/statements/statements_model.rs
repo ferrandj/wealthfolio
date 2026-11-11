@@ -17,6 +17,10 @@ pub struct AccountIdentity {
     pub account_id: String,
     pub institution: Option<String>,
     pub holder_name: Option<String>,
+    /// The people the account belongs to, read from the holder line (several for a joint account). Computed when an
+    /// identity is read, never stored.
+    #[serde(default)]
+    pub holders: Vec<String>,
     pub holder_address: Option<String>,
     pub iban: Option<String>,
     pub bic: Option<String>,

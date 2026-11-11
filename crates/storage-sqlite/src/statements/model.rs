@@ -28,6 +28,7 @@ impl From<AccountIdentityDB> for AccountIdentity {
             account_id: db.account_id,
             institution: db.institution,
             holder_name: db.holder_name,
+            holders: Vec::new(),
             holder_address: db.holder_address,
             iban: db.iban,
             bic: db.bic,

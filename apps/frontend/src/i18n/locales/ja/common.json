@@ -441,6 +441,8 @@
     "delete": "プロフィールを削除",
     "deleteHelp": "このプロフィールとローカルデータを完全に削除します。",
     "resetDataTitle": "すべてのデータをリセット",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "このプロフィールのすべての口座、取引、設定を消去し、ウェルカム画面からやり直します。この操作は元に戻せません。",
     "resetDataButton": "すべてのデータをリセット",
     "resetDataProgress": "もう一度押して確定（{{pressed}}/{{total}}）",

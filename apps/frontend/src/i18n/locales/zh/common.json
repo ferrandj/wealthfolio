@@ -441,6 +441,8 @@
     "delete": "删除个人资料",
     "deleteHelp": "永久删除此个人资料及其本地数据。",
     "resetDataTitle": "重置所有数据",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "清除此个人资料的所有账户、活动和设置，并从欢迎界面重新开始。此操作无法撤销。",
     "resetDataButton": "重置所有数据",
     "resetDataProgress": "再次点击以确认（{{pressed}}/{{total}}）",

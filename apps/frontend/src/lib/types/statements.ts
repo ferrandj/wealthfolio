@@ -4,6 +4,8 @@ export interface AccountIdentity {
   accountId: string;
   institution?: string | null;
   holderName?: string | null;
+  /** The people the account belongs to, read from the documents (several for a joint account). */
+  holders?: string[];
   holderAddress?: string | null;
   iban?: string | null;
   bic?: string | null;
@@ -107,6 +109,8 @@ export interface StatementPreview {
   accountLabel?: string | null;
   accountType?: string | null;
   currency: string;
+  /** The people the account belongs to (several for a joint account). */
+  holders?: string[];
   holderName?: string | null;
   holderAddress?: string | null;
   iban?: string | null;

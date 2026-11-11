@@ -21,6 +21,7 @@ vi.mock("@/adapters", () => ({
     return mocks.isWeb;
   },
   listenPortfolioUpdateStart: mocks.listen,
+  listContacts: async () => [],
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async (_event: string, callback: () => void) => {

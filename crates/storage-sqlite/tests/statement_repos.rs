@@ -70,6 +70,7 @@ fn identity(account_id: &str) -> AccountIdentity {
         account_id: account_id.into(),
         institution: Some("BoursoBank".into()),
         holder_name: Some("M DUPONT JEAN".into()),
+        holders: vec![],
         holder_address: Some("1 RUE DU TEST\n60200 COMPIEGNE".into()),
         iban: Some("FR7612345123450000000000185".into()),
         bic: Some("BOUSFRPPXXX".into()),

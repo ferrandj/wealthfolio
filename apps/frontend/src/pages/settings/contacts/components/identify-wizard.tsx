@@ -6,6 +6,8 @@ import {
   listAccountIdentities,
   listContacts,
   saveAccountIdentity,
+  setContactAccountShare,
+  updateContact,
 } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -39,6 +41,7 @@ import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  contactToForm,
   emptyForm,
   formatIban,
   formToInput,
@@ -69,9 +72,15 @@ interface AccountFields {
   label: string;
 }
 
+/** What is identified: a counterparty, or an account of Wealthfolio that one of its holders is asked for. */
+export type IdentifyItemData = UnresolvedCounterparty & {
+  /** Holders of the account when it is joint: each one gets an equal share. */
+  holderCount?: number;
+};
+
 interface WizardProps {
   /** The accounts to identify, one after the other. */
-  items: UnresolvedCounterparty[];
+  items: IdentifyItemData[];
   onClose: () => void;
 }
 
@@ -121,7 +130,7 @@ function IdentifyItem({
   onIdentified,
   onSkip,
 }: {
-  item: UnresolvedCounterparty;
+  item: IdentifyItemData;
   onIdentified: () => void;
   onSkip: () => void;
 }) {
@@ -208,7 +217,11 @@ function IdentifyItem({
       bic: f.bic || own?.bic || "",
       institution: f.institution || own?.institution || "",
     }));
-    if (owner.mode === "existing" || owner.kind === "other") {
+    if (owner.mode === "existing") {
+      // the card of a contact that exists is shown filled in: validated as it is, or modified
+      if (existing) setForm(contactToForm(existing.contact));
+      setStep("contact");
+    } else if (owner.kind === "other") {
       enterAccount();
     } else {
       setForm(prefill(owner.kind));
@@ -232,10 +245,12 @@ function IdentifyItem({
     });
   };
 
-  const done = useRef<{ contactId: string | null; accountId: string | null }>({
-    contactId: null,
-    accountId: null,
-  });
+  const done = useRef<{
+    contactId: string | null;
+    accountId: string | null;
+    linked: boolean;
+    shared: boolean;
+  }>({ contactId: null, accountId: null, linked: false, shared: false });
   const validate = useMutation({
     mutationFn: async () => {
       const identifiers: NewContactIdentifier[] = [];
@@ -257,6 +272,11 @@ function IdentifyItem({
       if (!contactId) {
         if (owner.mode === "existing") {
           contactId = owner.contactId;
+          const changed =
+            !!existing &&
+            JSON.stringify(formToInput(form)) !==
+              JSON.stringify(formToInput(contactToForm(existing.contact)));
+          if (changed) await updateContact(contactId, formToInput(form));
           for (const identifier of identifiers) await addContactIdentifier(contactId, identifier);
         } else {
           const input =
@@ -265,6 +285,20 @@ function IdentifyItem({
           contactId = created.contact.id;
         }
         done.current.contactId = contactId;
+      }
+      // an account that is already in Wealthfolio is attached to its owner
+      if (item.ownAccountId && !done.current.linked) {
+        await linkContactAccount(contactId, item.ownAccountId);
+        done.current.linked = true;
+      }
+      // a joint account: each holder gets an equal part (it can be changed on the contact's card)
+      if (item.ownAccountId && item.holderCount && item.holderCount > 1 && !done.current.shared) {
+        await setContactAccountShare(
+          contactId,
+          item.ownAccountId,
+          Math.round(10000 / item.holderCount) / 100,
+        );
+        done.current.shared = true;
       }
       if (canCreate && createInWealthfolio && !done.current.accountId) {
         const account = await createAccount({
@@ -308,10 +342,10 @@ function IdentifyItem({
     <div className="grid gap-5">
       <div className="grid gap-1 rounded-md border p-3">
         <span className="font-medium break-words">
-          {printed
+          {printed || ownAccount?.name
             ? hidden
-              ? maskText(printed)
-              : printed
+              ? maskText(printed || ownAccount?.name || "")
+              : printed || ownAccount?.name
             : hidden
               ? maskIban(item.iban ?? "")
               : formatIban(item.iban ?? "")}
@@ -322,9 +356,11 @@ function IdentifyItem({
           </code>
         ) : null}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="secondary">
-            {t("settings:contacts.operations_label", { count: item.count })}
-          </Badge>
+          {item.count > 0 && (
+            <Badge variant="secondary">
+              {t("settings:contacts.operations_label", { count: item.count })}
+            </Badge>
+          )}
           {toNumber(item.totalOut) > 0 && (
             <span className="text-muted-foreground">
               {t("settings:contacts.total_out")} {toNumber(item.totalOut).toFixed(2)}
@@ -415,11 +451,11 @@ function IdentifyItem({
         </section>
       )}
 
-      {step === "contact" && owner.mode === "new" && (
+      {step === "contact" && ownerKind && (
         <section className="grid gap-4">
           <div>
             <h3 className="text-sm font-semibold">
-              {t("settings:contacts.wizard_step_contact", { kind: kindLabel(owner.kind) })}
+              {t("settings:contacts.wizard_step_contact", { kind: kindLabel(ownerKind) })}
             </h3>
             <p className="text-muted-foreground text-xs">
               {t("settings:contacts.wizard_step_contact_hint")}
@@ -512,7 +548,7 @@ function IdentifyItem({
                 </div>
               )}
             </div>
-          ) : ownerKind !== "self" ? (
+          ) : !item.ownAccountId && ownerKind !== "self" ? (
             <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
               {t("settings:contacts.wizard_not_tracked", { name: ownerName || printed })}
             </p>
@@ -523,7 +559,7 @@ function IdentifyItem({
               type="button"
               variant="ghost"
               onClick={() =>
-                setStep(owner.mode === "new" && owner.kind !== "other" ? "contact" : "owner")
+                setStep(owner.mode === "new" && owner.kind === "other" ? "owner" : "contact")
               }
             >
               <Icons.ChevronLeft className="me-1 size-4 rtl:rotate-180" />

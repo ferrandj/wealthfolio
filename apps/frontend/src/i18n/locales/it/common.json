@@ -464,6 +464,8 @@
     "delete": "Elimina profilo",
     "deleteHelp": "Rimuovi definitivamente questo profilo e i suoi dati locali.",
     "resetDataTitle": "Reimposta tutti i dati",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "Cancella tutti i conti, le attività e le impostazioni di questo profilo e ricomincia dalla schermata di benvenuto. L'operazione non può essere annullata.",
     "resetDataButton": "Reimposta tutti i dati",
     "resetDataProgress": "Premi di nuovo per confermare ({{pressed}}/{{total}})",

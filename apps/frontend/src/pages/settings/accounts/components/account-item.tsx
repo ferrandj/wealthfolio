@@ -5,6 +5,7 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
 import { maskAccountNumber } from "@/lib/account-number";
 import type { Account, Platform } from "@/lib/types";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { SettingsListMedia, SettingsListRow } from "@/components/settings-list";
@@ -18,6 +19,8 @@ export interface AccountItemProps {
   onDelete: (account: Account) => void;
   onArchive: (account: Account, archive: boolean) => void;
   onHide: (account: Account, hide: boolean) => void;
+  /** Who owns the account, with the means to change it. */
+  owners?: ReactNode;
 }
 
 export function AccountItem({
@@ -27,6 +30,7 @@ export function AccountItem({
   onDelete,
   onArchive,
   onHide,
+  owners,
 }: AccountItemProps) {
   const { t } = useTranslation();
   // Check if account is synced from broker (has provider_account_id set)
@@ -132,6 +136,12 @@ export function AccountItem({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {owners && (
+            <>
+              <span>·</span>
+              {owners}
+            </>
+          )}
         </span>
       }
       actions={

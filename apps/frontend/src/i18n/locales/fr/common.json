@@ -464,6 +464,8 @@
     "delete": "Supprimer le profil",
     "deleteHelp": "Supprimer définitivement ce profil et ses données locales.",
     "resetDataTitle": "Réinitialiser toutes les données",
+    "holdingsOf": "Avoirs de…",
+    "holdingsAll": "Tous les contacts",
     "resetDataHelp": "Effacer tous les comptes, activités et réglages de ce profil et repartir de l'écran d'accueil. Cette action est irréversible.",
     "resetDataButton": "Réinitialiser toutes les données",
     "resetDataProgress": "Appuyer à nouveau pour confirmer ({{pressed}}/{{total}})",

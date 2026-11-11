@@ -450,6 +450,8 @@
     "delete": "Profil löschen",
     "deleteHelp": "Dieses Profil und seine lokalen Daten dauerhaft löschen.",
     "resetDataTitle": "Alle Daten zurücksetzen",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "Alle Konten, Aktivitäten und Einstellungen dieses Profils löschen und wieder beim Startbildschirm beginnen. Dies kann nicht rückgängig gemacht werden.",
     "resetDataButton": "Alle Daten zurücksetzen",
     "resetDataProgress": "Erneut drücken zum Bestätigen ({{pressed}}/{{total}})",

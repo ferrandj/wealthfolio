@@ -59,6 +59,9 @@ pub struct StatementPreview {
     /// The reader's own taxonomy (checking, savings, livret_a, pel, life_insurance, mortgage...).
     pub account_type: Option<String>,
     pub currency: String,
+    /// The people the account belongs to: more than one for a joint account. An adapter can say them itself
+    /// (`extra["holders"]`), otherwise they are read from the printed holder line.
+    pub holders: Vec<String>,
     pub holder_name: Option<String>,
     pub holder_address: Option<String>,
     pub iban: Option<String>,
@@ -173,6 +176,29 @@ fn transaction(t: &TransactionData, holder: Option<&str>) -> TransactionPreview 
     }
 }
 
+/// The holders of the account: what the adapter said, or what the printed holder line says.
+pub fn holders_of(st: &ParsedStatement) -> Vec<String> {
+    let said: Vec<String> = st
+        .extra
+        .get("holders")
+        .and_then(|v| v.as_array())
+        .map(|list| {
+            list.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+    if !said.is_empty() {
+        return said;
+    }
+    st.holder_name
+        .as_deref()
+        .map(crate::adapters::common::split_holders)
+        .unwrap_or_default()
+}
+
 fn statement(index: usize, st: &ParsedStatement) -> StatementPreview {
     let extra: Map<String, Value> = st.extra.clone();
     StatementPreview {
@@ -187,6 +213,7 @@ fn statement(index: usize, st: &ParsedStatement) -> StatementPreview {
         } else {
             st.currency.clone()
         },
+        holders: holders_of(st),
         holder_name: non_empty(&st.holder_name),
         holder_address: non_empty(&st.holder_address),
         iban: non_empty(&st.iban).map(|i| i.replace(' ', "")),

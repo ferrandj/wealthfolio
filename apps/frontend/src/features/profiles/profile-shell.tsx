@@ -689,6 +689,9 @@ export function ProfileShell({ children }: { children: ReactNode }) {
             setMode("manage");
           },
           lockProfile: () => void lock(),
+          resetProfile: () => {
+            if (current) void resetProfile(current);
+          },
           switchProfile: () => void lock(false, "switch"),
           selectProfile: (profileId) => {
             const target = state.profiles.find((profile) => profile.id === profileId);

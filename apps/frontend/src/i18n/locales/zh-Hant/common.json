@@ -450,6 +450,8 @@
     "delete": "刪除個人資料",
     "deleteHelp": "永久刪除此個人資料及其本機資料。",
     "resetDataTitle": "重設所有資料",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "清除此個人資料的所有帳戶、活動與設定，並從歡迎畫面重新開始。此操作無法復原。",
     "resetDataButton": "重設所有資料",
     "resetDataProgress": "再按一次以確認（{{pressed}}/{{total}}）",

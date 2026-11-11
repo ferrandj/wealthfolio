@@ -426,6 +426,8 @@
     "delete": "حذف الملف الشخصي",
     "deleteHelp": "إزالة هذا الملف الشخصي وبياناته المحلية نهائيًا.",
     "resetDataTitle": "إعادة تعيين كلمة المرور",
+    "holdingsOf": "Holdings of…",
+    "holdingsAll": "All contacts",
     "resetDataHelp": "مسح جميع الحسابات والأنشطة والإعدادات في هذا الملف الشخصي والبدء من جديد من شاشة الترحيب. لا يمكن التراجع عن هذا الإجراء.",
     "resetDataButton": "إعادة تعيين كل البيانات",
     "resetDataProgress": "اضغط مرة أخرى للتأكيد ({{pressed}}/{{total}})",
