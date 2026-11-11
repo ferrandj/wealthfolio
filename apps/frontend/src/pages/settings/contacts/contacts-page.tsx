@@ -227,13 +227,7 @@ export default function ContactsPage() {
         </TabsContent>
 
         <TabsContent value="unidentified">
-          <UnresolvedList
-            onCreate={({ name, identifiers }) =>
-              setDialog({
-                initial: { form: { displayName: name }, identifiers },
-              })
-            }
-          />
+          <UnresolvedList />
         </TabsContent>
       </Tabs>
 

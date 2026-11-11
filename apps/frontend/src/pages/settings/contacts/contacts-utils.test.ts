@@ -8,6 +8,10 @@ import {
   formatIban,
   formToInput,
   isFormComplete,
+  joinFirstNames,
+  parsePrintedName,
+  splitFirstNames,
+  suggestContact,
 } from "./contacts-utils";
 
 const contact = (over: Partial<Contact>): Contact => ({
@@ -136,5 +140,51 @@ describe("filterContacts", () => {
       "c2",
       "c3",
     ]);
+  });
+});
+
+describe("names printed by a bank", () => {
+  it("reads civility, family name and given names", () => {
+    expect(parsePrintedName("M FERRAND JEREMIE")).toEqual({
+      civility: "M.",
+      lastName: "Ferrand",
+      firstName: "Jeremie",
+    });
+    expect(parsePrintedName("MLE FERRAND AMANDINE")).toEqual({
+      civility: "Mlle",
+      lastName: "Ferrand",
+      firstName: "Amandine",
+    });
+    expect(parsePrintedName("MME DUPONT-MARTIN ANNE SOPHIE").firstName).toBe("Anne Sophie");
+    expect(parsePrintedName("Kraken")).toEqual({ civility: "", lastName: "Kraken", firstName: "" });
+  });
+
+  it("keeps up to three given names in three boxes", () => {
+    expect(splitFirstNames("Anne Sophie")).toEqual(["Anne", "Sophie", ""]);
+    expect(splitFirstNames("A B C D")).toEqual(["A", "B", "C D"]);
+    expect(joinFirstNames(["Anne", "", " Sophie "])).toBe("Anne Sophie");
+  });
+});
+
+describe("proposing the owner of an account", () => {
+  const summary = (id: string, displayName: string, firstName: string, lastName: string) =>
+    ({
+      contact: { id, displayName, firstName, lastName, birthName: null },
+      identifiers: [],
+    }) as unknown as ContactSummary;
+  const list = [
+    summary("jeremie", "Jérémie Ferrand", "Jérémie", "Ferrand"),
+    summary("amandine", "Amandine Ferrand", "Amandine", "Ferrand"),
+  ];
+
+  it("finds the same words in any order, accents and civility aside", () => {
+    expect(suggestContact(list, "M FERRAND JEREMIE")).toBe("jeremie");
+    expect(suggestContact(list, "MR Jérémie Ferrand")).toBe("jeremie");
+    expect(suggestContact(list, "MLE FERRAND AMANDINE")).toBe("amandine");
+  });
+
+  it("does not guess from the family name alone", () => {
+    expect(suggestContact(list, "FERRAND")).toBeNull();
+    expect(suggestContact(list, "KRAKEN KRAKEN")).toBeNull();
   });
 });

@@ -1,78 +1,33 @@
-import { addContactIdentifier, listContacts, listUnresolvedCounterparties } from "@/adapters";
+import { listUnresolvedCounterparties } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { maskIban, maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
-import type { NewContactIdentifier, UnresolvedCounterparty } from "@/lib/types/contacts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  Icons,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Skeleton,
-  Switch,
-} from "@wealthfolio/ui";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import type { UnresolvedCounterparty } from "@/lib/types/contacts";
+import { useQuery } from "@tanstack/react-query";
+import { Badge, Button, Card, CardContent, Icons, Skeleton, Switch } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatIban, toNumber } from "../contacts-utils";
-
-interface Props {
-  /** Open the contact dialog to create a card for this counterparty. */
-  onCreate: (initial: { name: string; identifiers: NewContactIdentifier[] }) => void;
-}
+import { IdentifyWizard } from "./identify-wizard";
 
 const amount = (value: string | number) =>
   new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
     toNumber(value),
   );
 
-/** Who the imported operations were with, that no contact recognises yet: create a card or attach to one. */
-export function UnresolvedList({ onCreate }: Props) {
+/** Who the imported operations were with, that no contact recognises yet: identified one account at a time. */
+export function UnresolvedList() {
   const { t } = useTranslation();
   const { isBalanceHidden: hidden } = useBalancePrivacy();
-  const queryClient = useQueryClient();
   const { accounts } = useAccounts({ filterActive: false, includeArchived: true });
   const [shops, setShops] = useState(false);
-  const [target, setTarget] = useState<Record<string, string>>({});
+  // the accounts being identified (one, or all of them one after the other)
+  const [wizard, setWizard] = useState<UnresolvedCounterparty[] | null>(null);
 
   const list = useQuery({
     queryKey: [QueryKeys.UNRESOLVED_COUNTERPARTIES, shops],
     queryFn: () => listUnresolvedCounterparties(shops),
-  });
-  const contacts = useQuery({ queryKey: [QueryKeys.CONTACTS], queryFn: listContacts });
-
-  const attach = useMutation({
-    mutationFn: ({ item, contactId }: { item: UnresolvedCounterparty; contactId: string }) => {
-      const identifier: NewContactIdentifier =
-        item.kind === "iban" && item.iban
-          ? { kind: "iban", value: item.iban, label: item.name }
-          : { kind: "name", value: item.name ?? item.key };
-      return addContactIdentifier(contactId, identifier);
-    },
-    onSuccess: () => {
-      for (const key of [
-        QueryKeys.CONTACTS,
-        QueryKeys.CONTACT,
-        QueryKeys.UNRESOLVED_COUNTERPARTIES,
-      ]) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
-      toast({ title: t("settings:contacts.attached") });
-    },
-    onError: (e) =>
-      toast({
-        title: t("settings:contacts.error"),
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      }),
   });
 
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? id;
@@ -88,6 +43,13 @@ export function UnresolvedList({ onCreate }: Props) {
           {t("settings:contacts.unresolved_show_shops")}
         </label>
       </div>
+      {(list.data ?? []).length > 1 && (
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setWizard(list.data ?? [])}>
+            {t("settings:contacts.wizard_identify_all", { count: (list.data ?? []).length })}
+          </Button>
+        </div>
+      )}
 
       {list.isLoading ? (
         <Skeleton className="h-40 w-full" />
@@ -101,7 +63,6 @@ export function UnresolvedList({ onCreate }: Props) {
         <div className="grid gap-3">
           {(list.data ?? []).map((item) => {
             const id = `${item.kind}:${item.key}`;
-            const chosen = target[id] ?? "";
             return (
               <Card key={id}>
                 <CardContent className="grid gap-3 py-4">
@@ -148,71 +109,18 @@ export function UnresolvedList({ onCreate }: Props) {
                         </Badge>
                       ) : null}
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        onCreate({
-                          name: item.name ?? "",
-                          identifiers:
-                            item.kind === "iban" && item.iban
-                              ? [
-                                  { kind: "iban", value: item.iban, label: item.name },
-                                  ...(item.name
-                                    ? [{ kind: "name" as const, value: item.name }]
-                                    : []),
-                                ]
-                              : [{ kind: "name", value: item.name ?? item.key }],
-                        })
-                      }
-                    >
+                    <Button size="sm" onClick={() => setWizard([item])}>
                       <Icons.Plus className="mr-1 size-4" />
-                      {t("settings:contacts.unresolved_create")}
+                      {t("settings:contacts.wizard_identify")}
                     </Button>
                   </div>
-                  {(contacts.data ?? []).length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select
-                        items={(contacts.data ?? []).map((c) => ({
-                          value: c.contact.id,
-                          label: c.contact.displayName,
-                        }))}
-                        value={chosen}
-                        onValueChange={(v) =>
-                          setTarget((current) => ({ ...current, [id]: v ?? "" }))
-                        }
-                      >
-                        <SelectTrigger
-                          className="w-64"
-                          aria-label={t("settings:contacts.unresolved_attach_placeholder")}
-                        >
-                          <SelectValue
-                            placeholder={t("settings:contacts.unresolved_attach_placeholder")}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(contacts.data ?? []).map((c) => (
-                            <SelectItem key={c.contact.id} value={c.contact.id}>
-                              {c.contact.displayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!chosen || attach.isPending}
-                        onClick={() => attach.mutate({ item, contactId: chosen })}
-                      >
-                        {t("settings:contacts.unresolved_attach")}
-                      </Button>
-                    </div>
-                  ) : null}
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+      {wizard ? <IdentifyWizard items={wizard} onClose={() => setWizard(null)} /> : null}
     </div>
   );
 }
