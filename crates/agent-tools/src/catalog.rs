@@ -51,6 +51,7 @@ impl AgentToolCatalog {
         tools.extend(crate::tools::transaction_category_tools());
         tools.extend(crate::tools::asset_market_data_tools());
         tools.extend(crate::tools::portfolio_setup_tools());
+        tools.extend(crate::tools::domain_tools());
         Self::new(tools)
     }
 

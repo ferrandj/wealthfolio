@@ -8605,6 +8605,7 @@ version = "3.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "log",
  "rust_decimal",

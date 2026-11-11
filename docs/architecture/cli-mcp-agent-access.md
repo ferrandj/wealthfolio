@@ -8,6 +8,9 @@ Spending read/organization/budget grants are independent of asset
 classification; old stored tokens require explicit reauthorization. Default and
 monthly budgets share `budget:write` and retain native inheritance semantics.
 
+See [MCP: documents, contacts, rates, goals and portfolios](mcp-documents-contacts-rates.md) for the document
+import, review and validation tools, contact ownership and rates.
+
 ## Editing API key permissions
 
 Existing API key permissions can be edited from AI Agent Access through the

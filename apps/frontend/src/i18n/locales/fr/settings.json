@@ -1529,6 +1529,34 @@
       "holdings_write": {
         "label": "Positions — écrire",
         "description": "Enregistrer des instantanés de positions (positions et liquidités à une date) pour les comptes qui suivent des positions, et ajouter des actifs alternatifs et des passifs. Nécessite la portée positions (lecture)."
+      },
+      "documents_read": {
+        "label": "Documents — lecture",
+        "description": "Lire les relevés et documents de compte : liste, file de revue, opérations, identités (titulaires, IBAN, BIC), couverture et prêts, et analyser un fichier sans le stocker."
+      },
+      "contacts_read": {
+        "label": "Contacts — lecture",
+        "description": "Lire les contacts, leurs identifiants et comptes rattachés, le propriétaire de chaque compte, les avoirs de chaque contact et les contreparties à identifier."
+      },
+      "rates_read": {
+        "label": "Taux — lecture",
+        "description": "Lire les taux d'épargne, de prêt et de fiscalité et savoir s'ils doivent être confirmés à nouveau."
+      },
+      "documents_write": {
+        "label": "Documents — écrire",
+        "description": "Téléverser et importer des documents, valider ou revalider leurs opérations, rattacher ou supprimer des documents, modifier les identités de compte, marquer des mois comme normaux et fixer les dates de prêt. Nécessite la portée documents (lecture)."
+      },
+      "contacts_write": {
+        "label": "Contacts — écrire",
+        "description": "Créer, modifier, fusionner et supprimer des contacts, ajouter des identifiants, et définir le propriétaire de chaque compte et sa part. Nécessite la portée contacts (lecture)."
+      },
+      "rates_write": {
+        "label": "Taux — écrire",
+        "description": "Modifier ou supprimer des taux et confirmer la révision semestrielle. Nécessite la portée taux (lecture)."
+      },
+      "financial_planning_write": {
+        "label": "Planification — écrire",
+        "description": "Créer, modifier et supprimer des objectifs et les financer à partir des comptes. Nécessite la portée planification (lecture)."
       }
     },
     "preset": {

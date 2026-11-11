@@ -372,8 +372,8 @@ async fn mcp_pat_lifecycle() {
         .collect();
     assert_eq!(
         tools.len(),
-        46,
-        "read-only catalog must expose 46 tools (including Spending reads and proposals): {names:?}"
+        48,
+        "read-only catalog must expose 48 tools (including Spending reads and proposals): {names:?}"
     );
 
     // (h) tools/call succeeds and writes an audit row (awaited before the
@@ -567,8 +567,8 @@ async fn mcp_write_scoped_token_sees_write_tools() {
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
         tools.len(),
-        83,
-        "full-scope token must see all 83 tools: {names:?}"
+        88,
+        "full-scope token must see all 88 tools: {names:?}"
     );
     for name in [
         "list_categorization_rules",
@@ -3010,6 +3010,90 @@ async fn csv_quote_import_still_revalues() {
     .await;
     assert_eq!(imported[0]["validationStatus"], "valid", "{imported}");
     await_valuation(&server, &pat, &session, &account, "2026-08-31", 30.0).await;
+}
+
+/// The app's own domains over MCP: contacts, rates and documents are gated by their own scopes, a write scope
+/// needs its read scope, owners are set by linking accounts to contacts, and bad input is a tool error.
+#[tokio::test]
+async fn mcp_manages_contacts_rates_and_documents_with_their_own_scopes() {
+    let server = spawn_server(true, false).await;
+    let cookie = login(&server).await;
+
+    let (status, _) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({ "name": "contacts write only", "scopes": ["contacts:write"] }),
+    )
+    .await;
+    assert_eq!(status, 400, "contacts:write needs contacts:read");
+
+    let account = create_eur_account(&server, &cookie, "Joint").await["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (status, token) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({
+            "name": "domains",
+            "scopes": ["contacts:read", "contacts:write", "rates:read", "documents:read", "accounts:read"]
+        }),
+    )
+    .await;
+    assert_eq!(status, 201);
+    let pat = token["token"].as_str().unwrap().to_string();
+    let session = mcp_initialize(&server, &pat).await;
+
+    let created = mcp_call_tool(
+        &server,
+        &pat,
+        &session,
+        "create_contact",
+        serde_json::json!({ "kind": "self", "firstName": "Jean", "lastName": "Dupont" }),
+    )
+    .await;
+    let contact_id = created["contact"]["id"].as_str().unwrap().to_string();
+    assert_eq!(created["contact"]["displayName"], "Jean Dupont");
+
+    let linked = mcp_call_tool(
+        &server,
+        &pat,
+        &session,
+        "link_contact_account",
+        serde_json::json!({ "contactId": contact_id, "accountId": account }),
+    )
+    .await;
+    assert_eq!(linked["linkedAccountIds"][0], account, "{linked}");
+
+    let review = mcp_call_tool(
+        &server,
+        &pat,
+        &session,
+        "get_rates_review",
+        serde_json::json!({}),
+    )
+    .await;
+    assert!(review["lastRevision"].is_string(), "{review}");
+
+    // documents:read lets a token analyze, not import
+    let bad = mcp_call_tool_error(
+        &server,
+        &pat,
+        &session,
+        "analyze_statement_document",
+        serde_json::json!({ "fileName": "x.pdf", "contentBase64": "%%%" }),
+    )
+    .await;
+    assert!(bad.contains("base64"), "{bad}");
+    let denied = mcp_call_tool_error(
+        &server,
+        &pat,
+        &session,
+        "import_statement_document",
+        serde_json::json!({ "fileName": "x.pdf", "contentBase64": "AA==" }),
+    )
+    .await;
+    assert!(denied.contains("documents:write"), "{denied}");
 }
 
 /// Calls an MCP tool that is expected to fail and returns the tool error text.

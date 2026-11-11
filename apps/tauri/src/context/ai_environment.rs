@@ -81,6 +81,9 @@ pub struct TauriAiEnvironment {
     portfolio_jobs: PortfolioJobBinding,
     fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
+    statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait>,
+    contacts_service: Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>,
+    rates_service: Arc<dyn wealthfolio_core::rates::RatesServiceTrait>,
 }
 
 impl TauriAiEnvironment {
@@ -120,6 +123,9 @@ impl TauriAiEnvironment {
         portfolio_jobs: PortfolioJobBinding,
         fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
         alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
+        statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait>,
+        contacts_service: Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>,
+        rates_service: Arc<dyn wealthfolio_core::rates::RatesServiceTrait>,
     ) -> Self {
         Self {
             base_currency,
@@ -155,6 +161,9 @@ impl TauriAiEnvironment {
             portfolio_jobs,
             fx_service,
             alternative_asset_service,
+            statement_service,
+            contacts_service,
+            rates_service,
         }
     }
 }
@@ -286,6 +295,22 @@ impl AgentEnvironment for TauriAiEnvironment {
 
     fn alternative_asset_service(&self) -> Option<Arc<dyn AlternativeAssetServiceTrait>> {
         Some(self.alternative_asset_service.clone())
+    }
+
+    fn statement_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::statements::StatementServiceTrait>> {
+        Some(self.statement_service.clone())
+    }
+
+    fn contacts_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>> {
+        Some(self.contacts_service.clone())
+    }
+
+    fn rates_service(&self) -> Option<Arc<dyn wealthfolio_core::rates::RatesServiceTrait>> {
+        Some(self.rates_service.clone())
     }
 
     async fn run_health_checks(&self) -> wealthfolio_core::Result<HealthStatus> {

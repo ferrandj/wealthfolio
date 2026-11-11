@@ -1489,6 +1489,34 @@
       "holdings_write": {
         "label": "Bestände — schreiben",
         "description": "Bestandsaufnahmen (Positionen und Bargeld zu einem Datum) für Konten speichern, die Bestände erfassen, und alternative Vermögenswerte sowie Verbindlichkeiten hinzufügen. Erfordert die Berechtigung Bestände & Wert (Lesen)."
+      },
+      "documents_read": {
+        "label": "Documents — read",
+        "description": "Read statements and account documents: the list, the review queue, operations, identities (holders, IBAN, BIC), coverage and loans, and analyze a file without storing it."
+      },
+      "contacts_read": {
+        "label": "Contacts — read",
+        "description": "Read contacts, their identifiers and linked accounts, who owns each account, what each contact holds, and the counterparties still to identify."
+      },
+      "rates_read": {
+        "label": "Rates — read",
+        "description": "Read the savings, loan and tax rates and whether they must be confirmed again."
+      },
+      "documents_write": {
+        "label": "Documents — write",
+        "description": "Upload and import documents, validate or revalidate their operations, link or delete documents, edit account identities, mark months as normal and set loan dates. Requires the documents read scope."
+      },
+      "contacts_write": {
+        "label": "Contacts — write",
+        "description": "Create, edit, merge and delete contacts, add identifiers, and set who owns each account and its share. Requires the contacts read scope."
+      },
+      "rates_write": {
+        "label": "Rates — write",
+        "description": "Change or delete rates and confirm the half-yearly review. Requires the rates read scope."
+      },
+      "financial_planning_write": {
+        "label": "Financial planning — write",
+        "description": "Create, edit and delete goals and fund them from accounts. Requires the financial planning read scope."
       }
     },
     "preset": {

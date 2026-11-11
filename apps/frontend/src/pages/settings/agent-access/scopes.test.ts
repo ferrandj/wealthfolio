@@ -17,6 +17,24 @@ describe("Spending permission composition", () => {
     expect(applyScopeDependencies(["accounts:write"])).toEqual(["accounts:read", "accounts:write"]);
     expect(applyScopeDependencies(["holdings:write"])).toEqual(["holdings:read", "holdings:write"]);
   });
+  it("requires reading documents, contacts and rates to write them", () => {
+    expect(applyScopeDependencies(["documents:write"])).toEqual([
+      "documents:read",
+      "documents:write",
+    ]);
+    expect(applyScopeDependencies(["contacts:write"])).toEqual(["contacts:read", "contacts:write"]);
+    expect(applyScopeDependencies(["rates:write"])).toEqual(["rates:read", "rates:write"]);
+    expect(applyScopeDependencies(["financial-planning:write"])).toEqual([
+      "financial-planning:read",
+      "financial-planning:write",
+    ]);
+    for (const preset of SCOPE_PRESETS) {
+      expect(preset.scopes).not.toContain("documents:write");
+      expect(preset.scopes).not.toContain("contacts:write");
+      expect(preset.scopes).not.toContain("rates:write");
+      expect(preset.scopes).not.toContain("financial-planning:write");
+    }
+  });
   it("requires reading accounts to manage them and keeps it out of every preset", () => {
     expect(applyScopeDependencies(["accounts:write"])).toEqual(["accounts:read", "accounts:write"]);
     for (const preset of SCOPE_PRESETS) {

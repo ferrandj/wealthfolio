@@ -24,6 +24,7 @@ pub mod commit_activity;
 pub mod commit_asset_classification;
 pub mod commit_categorization_rule;
 pub mod commit_transaction_categories;
+pub mod contact_tools;
 pub mod contribution_limits;
 pub mod create_categorization_rule;
 pub mod exchange_rates;
@@ -34,18 +35,22 @@ pub mod holdings_snapshots;
 pub mod income;
 pub mod net_worth;
 pub mod performance;
+pub mod planning_tools;
 pub mod portfolios;
 pub mod propose_categories;
 pub mod quote_import;
+pub mod rate_tools;
 pub mod record_activities;
 pub mod record_activity;
 pub mod refresh_market_data;
+pub mod service_tools;
 pub mod spending_budgets;
 pub mod spending_events;
 pub mod spending_import_metadata;
 pub mod spending_reads;
 pub mod spending_rule_management;
 pub mod spending_splits;
+pub mod statement_tools;
 #[cfg(test)]
 pub(crate) mod test_support;
 pub mod transaction_categories;
@@ -362,6 +367,68 @@ pub fn portfolio_setup_tools() -> Vec<Arc<dyn AgentTool>> {
     ]
 }
 
+/// The MCP-only tools for the app's own domains: documents and statements (upload, analysis, import, review,
+/// validation, identities, coverage, loans), contacts (owners of accounts, shares, identifiers, merges) and rates.
+/// Scoped `documents:*`, `contacts:*` and `rates:*`; not exposed to the in-app assistant.
+pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
+    use contact_tools::*;
+    use planning_tools::*;
+    use rate_tools::*;
+    use statement_tools::*;
+    vec![
+        Arc::new(ListStatementDocuments),
+        Arc::new(GetStatementReviewQueue),
+        Arc::new(ReviewStatementDocument),
+        Arc::new(GetStatementDocumentContent),
+        Arc::new(ListSupportedStatementInstitutions),
+        Arc::new(AnalyzeStatementDocument),
+        Arc::new(ImportStatementDocument),
+        Arc::new(ValidateStatementDocument),
+        Arc::new(RevalidateStatementDocument),
+        Arc::new(RevalidateAllStatementDocuments),
+        Arc::new(InvalidateAllStatementDocuments),
+        Arc::new(DeleteStatementDocument),
+        Arc::new(LinkStatementDocument),
+        Arc::new(ListAccountIdentities),
+        Arc::new(GetAccountIdentity),
+        Arc::new(SaveAccountIdentity),
+        Arc::new(GetStatementCoverage),
+        Arc::new(GetOutdatedStatementDocuments),
+        Arc::new(SetStatementMonthNormal),
+        Arc::new(GetLoans),
+        Arc::new(SetLoanFirstDue),
+        Arc::new(ListContacts),
+        Arc::new(GetContact),
+        Arc::new(CreateContact),
+        Arc::new(UpdateContact),
+        Arc::new(DeleteContact),
+        Arc::new(MergeContacts),
+        Arc::new(AddContactIdentifier),
+        Arc::new(RemoveContactIdentifier),
+        Arc::new(LinkContactAccount),
+        Arc::new(UnlinkContactAccount),
+        Arc::new(SetContactAccountShare),
+        Arc::new(GetContactOverview),
+        Arc::new(GetContactsSpending),
+        Arc::new(ListUnresolvedCounterparties),
+        Arc::new(ListMissingOwnAccounts),
+        Arc::new(ListRates),
+        Arc::new(GetRatesReview),
+        Arc::new(SaveRate),
+        Arc::new(DeleteRate),
+        Arc::new(ConfirmRates),
+        Arc::new(CreateGoal),
+        Arc::new(UpdateGoal),
+        Arc::new(DeleteGoal),
+        Arc::new(GetGoalFunding),
+        Arc::new(GetGoalPlan),
+        Arc::new(SaveGoalFunding),
+        Arc::new(CreatePortfolio),
+        Arc::new(UpdatePortfolio),
+        Arc::new(DeletePortfolio),
+    ]
+}
+
 /// A currency code as core reads it: letters only, any length (USDT is one
 /// too). A minor unit such as GBp or ZAc keeps its spelling, since GBp
 /// (pence) and GBP (pounds) differ a hundredfold; any other code is
@@ -416,6 +483,69 @@ mod tests {
                 tool.name()
             );
         }
+    }
+
+    #[test]
+    fn domain_tools_are_scoped_and_audited_without_private_data() {
+        use crate::scope::AgentScope::*;
+        let mut names = std::collections::BTreeSet::new();
+        for tool in domain_tools() {
+            assert!(names.insert(tool.name()), "duplicate {}", tool.name());
+            let scopes = tool.required_scopes();
+            assert!(
+                scopes.iter().all(|s| matches!(
+                    s,
+                    DocumentsRead
+                        | DocumentsWrite
+                        | ContactsRead
+                        | ContactsWrite
+                        | RatesRead
+                        | RatesWrite
+                        | FinancialPlanningRead
+                        | FinancialPlanningWrite
+                        | AccountsWrite
+                )),
+                "{}",
+                tool.name()
+            );
+            let writes = matches!(tool.access_level(), crate::tool::AgentToolAccess::Write);
+            let has_write_scope = scopes.iter().any(|s| {
+                matches!(
+                    s,
+                    DocumentsWrite
+                        | ContactsWrite
+                        | RatesWrite
+                        | FinancialPlanningWrite
+                        | AccountsWrite
+                )
+            });
+            assert_eq!(writes, has_write_scope, "{}", tool.name());
+            let schema = tool.input_schema();
+            assert_eq!(schema["type"], "object", "{}", tool.name());
+            let audited = tool
+                .sanitize_args_for_audit(&serde_json::json!({
+                    "contentBase64": "private-financial-detail",
+                    "firstName": "private-financial-detail",
+                    "iban": "private-financial-detail",
+                    "overrides": [{"identity": {"iban": "private-financial-detail"}}],
+                    "documentId": "doc-1",
+                    "removeOperations": true
+                }))
+                .to_string();
+            assert!(
+                !audited.contains("private-financial-detail"),
+                "{}",
+                tool.name()
+            );
+            assert!(
+                audited.contains("doc-1") && audited.contains("true"),
+                "{}",
+                tool.name()
+            );
+        }
+        assert!(names.contains("import_statement_document"));
+        assert!(names.contains("validate_statement_document"));
+        assert!(names.contains("link_contact_account"));
     }
 
     /// The catalog order is LLM-visible (tool listing) and mirrors the

@@ -14,6 +14,9 @@ export type ScopeKey =
   | "health:read"
   | "classification:read"
   | "spending:read"
+  | "documents:read"
+  | "contacts:read"
+  | "rates:read"
   | "spending:write"
   | "budget:write"
   | "activities:draft"
@@ -22,7 +25,11 @@ export type ScopeKey =
   | "classification:write"
   | "market-data:write"
   | "accounts:write"
-  | "holdings:write";
+  | "holdings:write"
+  | "documents:write"
+  | "contacts:write"
+  | "rates:write"
+  | "financial-planning:write";
 
 export type ScopeGroup = "read" | "write";
 
@@ -43,6 +50,9 @@ export const SCOPES: ScopeMeta[] = [
   { key: "health:read", i18n: "health_read", group: "read" },
   { key: "classification:read", i18n: "classification_read", group: "read" },
   { key: "spending:read", i18n: "spending_read", group: "read" },
+  { key: "documents:read", i18n: "documents_read", group: "read" },
+  { key: "contacts:read", i18n: "contacts_read", group: "read" },
+  { key: "rates:read", i18n: "rates_read", group: "read" },
   { key: "activities:draft", i18n: "activities_draft", group: "write" },
   { key: "activities:write", i18n: "activities_write", group: "write" },
   { key: "classification:suggest", i18n: "classification_suggest", group: "write" },
@@ -52,6 +62,10 @@ export const SCOPES: ScopeMeta[] = [
   { key: "budget:write", i18n: "budget_write", group: "write" },
   { key: "accounts:write", i18n: "accounts_write", group: "write" },
   { key: "holdings:write", i18n: "holdings_write", group: "write" },
+  { key: "documents:write", i18n: "documents_write", group: "write" },
+  { key: "contacts:write", i18n: "contacts_write", group: "write" },
+  { key: "rates:write", i18n: "rates_write", group: "write" },
+  { key: "financial-planning:write", i18n: "financial_planning_write", group: "write" },
 ];
 
 /** The read scopes, in canonical order. */
@@ -141,6 +155,9 @@ export function applyScopeDependencies(scopes: Iterable<string>): ScopeKey[] {
   }
   if (set.has("spending:write") || set.has("budget:write")) {
     set.add("spending:read");
+  }
+  for (const domain of ["documents", "contacts", "rates", "financial-planning"]) {
+    if (set.has(`${domain}:write`)) set.add(`${domain}:read`);
   }
   return SCOPES.filter((scope) => set.has(scope.key)).map((scope) => scope.key);
 }

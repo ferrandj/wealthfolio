@@ -43,7 +43,12 @@ export function ScopeSelector({
       scope.key === "accounts:read" && selectedScopes.includes("accounts:write");
     const lockedByClassification =
       scope.key === "classification:suggest" && selectedScopes.includes("classification:write");
+    const lockedByDomain =
+      scope.key.endsWith(":read") &&
+      ["documents", "contacts", "rates", "financial-planning"].includes(scope.key.split(":")[0]) &&
+      selectedScopes.includes(scope.key.replace(":read", ":write") as ScopeKey);
     const locked =
+      lockedByDomain ||
       lockedBySpending ||
       lockedByMarketData ||
       lockedByHoldings ||

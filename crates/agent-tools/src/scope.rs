@@ -20,6 +20,9 @@ pub enum AgentScope {
     HealthRead,
     ClassificationRead,
     SpendingRead,
+    DocumentsRead,
+    ContactsRead,
+    RatesRead,
     ActivitiesDraft,
     ActivitiesWrite,
     ClassificationSuggest,
@@ -29,6 +32,10 @@ pub enum AgentScope {
     BudgetWrite,
     AccountsWrite,
     HoldingsWrite,
+    DocumentsWrite,
+    ContactsWrite,
+    RatesWrite,
+    FinancialPlanningWrite,
 }
 
 impl AgentScope {
@@ -43,6 +50,9 @@ impl AgentScope {
         AgentScope::HealthRead,
         AgentScope::ClassificationRead,
         AgentScope::SpendingRead,
+        AgentScope::DocumentsRead,
+        AgentScope::ContactsRead,
+        AgentScope::RatesRead,
         AgentScope::ActivitiesDraft,
         AgentScope::ActivitiesWrite,
         AgentScope::ClassificationSuggest,
@@ -52,6 +62,10 @@ impl AgentScope {
         AgentScope::BudgetWrite,
         AgentScope::AccountsWrite,
         AgentScope::HoldingsWrite,
+        AgentScope::DocumentsWrite,
+        AgentScope::ContactsWrite,
+        AgentScope::RatesWrite,
+        AgentScope::FinancialPlanningWrite,
     ];
 
     /// The read-only scopes — what the `read-only` preset grants. Kept
@@ -66,6 +80,9 @@ impl AgentScope {
         AgentScope::HealthRead,
         AgentScope::ClassificationRead,
         AgentScope::SpendingRead,
+        AgentScope::DocumentsRead,
+        AgentScope::ContactsRead,
+        AgentScope::RatesRead,
     ];
 
     /// Canonical wire format, e.g. `"accounts:read"`.
@@ -88,6 +105,13 @@ impl AgentScope {
             AgentScope::BudgetWrite => "budget:write",
             AgentScope::AccountsWrite => "accounts:write",
             AgentScope::HoldingsWrite => "holdings:write",
+            AgentScope::DocumentsRead => "documents:read",
+            AgentScope::DocumentsWrite => "documents:write",
+            AgentScope::ContactsRead => "contacts:read",
+            AgentScope::ContactsWrite => "contacts:write",
+            AgentScope::RatesRead => "rates:read",
+            AgentScope::RatesWrite => "rates:write",
+            AgentScope::FinancialPlanningWrite => "financial-planning:write",
         }
     }
 
@@ -241,6 +265,19 @@ impl AgentScopeSet {
                 return Some(format!("{scope} requires spending:read"));
             }
         }
+        for (write, read) in [
+            (AgentScope::DocumentsWrite, AgentScope::DocumentsRead),
+            (AgentScope::ContactsWrite, AgentScope::ContactsRead),
+            (AgentScope::RatesWrite, AgentScope::RatesRead),
+            (
+                AgentScope::FinancialPlanningWrite,
+                AgentScope::FinancialPlanningRead,
+            ),
+        ] {
+            if self.contains(write) && !self.contains(read) {
+                return Some(format!("{write} requires {read}"));
+            }
+        }
         None
     }
 }
@@ -287,6 +324,10 @@ mod tests {
         assert!(!set.contains(AgentScope::MarketDataWrite));
         assert!(!set.contains(AgentScope::AccountsWrite));
         assert!(!set.contains(AgentScope::HoldingsWrite));
+        assert!(!set.contains(AgentScope::DocumentsWrite));
+        assert!(!set.contains(AgentScope::ContactsWrite));
+        assert!(!set.contains(AgentScope::RatesWrite));
+        assert!(!set.contains(AgentScope::FinancialPlanningWrite));
     }
 
     #[test]

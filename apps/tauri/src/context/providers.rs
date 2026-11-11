@@ -754,6 +754,9 @@ async fn build_context(
         portfolio_job_binding.clone(),
         fx_service.clone(),
         alternative_asset_service.clone(),
+        statement_service.clone(),
+        contacts_service.clone(),
+        rates_service.clone(),
     ));
     let agent_environment: Arc<dyn wealthfolio_agent_tools::AgentEnvironment> =
         ai_environment.clone();

@@ -142,6 +142,29 @@ pub trait AgentEnvironment: Send + Sync {
         None
     }
 
+    /// The statements service (bank statements and other account documents:
+    /// import, review, validation, identities, coverage and loans). The
+    /// default has none, as for [`Self::snapshot_service`].
+    fn statement_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::statements::StatementServiceTrait>> {
+        None
+    }
+
+    /// The contacts service (people and organizations, their identifiers,
+    /// linked accounts and shares). The default has none.
+    fn contacts_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>> {
+        None
+    }
+
+    /// The rates service (savings, loan and tax rates and their review).
+    /// The default has none.
+    fn rates_service(&self) -> Option<Arc<dyn wealthfolio_core::rates::RatesServiceTrait>> {
+        None
+    }
+
     /// Run the Health Center's full checks, as its "run checks" does, and
     /// cache the result. Hosts implement it with the services the checks
     /// read; the default reports that this environment cannot run them.
