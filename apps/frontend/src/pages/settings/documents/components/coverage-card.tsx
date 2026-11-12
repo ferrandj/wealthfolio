@@ -21,21 +21,16 @@ export function CoverageCard() {
   const mark = useMutation({
     mutationFn: (v: { accountId: string; month: string; normal: boolean }) =>
       setStatementMonthNormal(v.accountId, v.month, v.normal),
-    onSuccess: (next) =>
-      queryClient.setQueryData([QueryKeys.STATEMENT_COVERAGE], next),
+    onSuccess: (next) => queryClient.setQueryData([QueryKeys.STATEMENT_COVERAGE], next),
   });
 
-  const open = (data ?? []).filter(
-    (c) => c.balanceBreaks.length > 0 || c.missingMonths.length > 0,
-  );
+  const open = (data ?? []).filter((c) => c.balanceBreaks.length > 0 || c.missingMonths.length > 0);
   if (open.length === 0) return null;
   const nameOf = (id: string) => accounts?.find((a) => a.id === id)?.name ?? id;
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold">
-        {t("settings:documents.coverage_title")}
-      </h2>
+      <h2 className="text-lg font-semibold">{t("settings:documents.coverage_title")}</h2>
       {open.map((c) => (
         <Card key={c.accountId}>
           <CardContent className="space-y-3 p-4">
@@ -51,13 +46,8 @@ export function CoverageCard() {
                   {t("settings:documents.coverage_missing")}
                 </span>
                 {c.missingMonths.map((m) => (
-                  <span
-                    key={m.month}
-                    className="inline-flex items-center gap-1"
-                  >
-                    <Badge variant={m.normal ? "secondary" : "destructive"}>
-                      {m.month}
-                    </Badge>
+                  <span key={m.month} className="inline-flex items-center gap-1">
+                    <Badge variant={m.normal ? "secondary" : "destructive"}>{m.month}</Badge>
                     <Button
                       type="button"
                       variant="ghost"

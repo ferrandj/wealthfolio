@@ -1133,6 +1133,41 @@ mod tests {
     }
 
     #[test]
+    fn the_first_instalment_is_read_in_the_bank_statements() {
+        use crate::statements::{first_due_from_debits, BankDebit};
+        let view = view_of(day(2026, 11, 10));
+        let total = view
+            .plan
+            .rows
+            .iter()
+            .find(|r| r.kind == "installment")
+            .unwrap()
+            .total;
+        let debit = |date, amount, label: &str| BankDebit {
+            date,
+            amount,
+            label: label.into(),
+        };
+        let debits = vec![
+            // the right amount, but not a loan
+            debit(day(2025, 1, 10), total, "CARTE SUPERMARCHE"),
+            // a loan label, but not the instalment
+            debit(
+                day(2025, 2, 15),
+                Decimal::new(1200, 2),
+                "PRLV ECHEANCE PRET",
+            ),
+            debit(day(2025, 4, 15), total, "PRLV ECHEANCE PRET"),
+            debit(day(2025, 3, 15), total, "PRLV ECHEANCE PRET"),
+        ];
+        assert_eq!(
+            first_due_from_debits(&view, &debits),
+            Some(day(2025, 3, 15))
+        );
+        assert_eq!(first_due_from_debits(&view, &debits[..2]), None);
+    }
+
+    #[test]
     fn the_repayment_and_the_new_instalment_become_dated_changes() {
         use crate::statements::{changes_of, LoanChange};
         let changes = changes_of(&view_of(day(2026, 11, 10)));

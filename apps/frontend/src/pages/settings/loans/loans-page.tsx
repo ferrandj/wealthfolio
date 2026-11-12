@@ -21,23 +21,13 @@ import { LoanAssetLinkSection } from "./loan-asset-link";
 import { LoanChecks, LoanDocuments, LoanFacts, LoanPlan } from "./loan-details";
 import { needsFirstDue, problemCount } from "./loans-utils";
 
-function FirstDue({
-  loan,
-  onSave,
-}: {
-  loan: LoanView;
-  onSave: (value: string | null) => void;
-}) {
+function FirstDue({ loan, onSave }: { loan: LoanView; onSave: (value: string | null) => void }) {
   const { t } = useTranslation();
-  const [value, setValue] = useState(
-    loan.firstDue ?? loan.inferredFirstDue ?? "",
-  );
+  const [value, setValue] = useState(loan.firstDue ?? loan.inferredFirstDue ?? "");
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="space-y-1">
-        <div className="text-muted-foreground text-xs">
-          {t("settings:loans.first_due")}
-        </div>
+        <div className="text-muted-foreground text-xs">{t("settings:loans.first_due")}</div>
         <Input
           type="date"
           className="w-44"
@@ -81,7 +71,14 @@ function LoanCard({
       <CardContent className="space-y-4">
         <LoanFacts loan={loan} />
 
-        {needsFirstDue(loan) && <FirstDue loan={loan} onSave={onFirstDue} />}
+        {needsFirstDue(loan) && (
+          <>
+            <p className="text-muted-foreground text-sm">
+              {t("settings:loans.dates_from_statements")}
+            </p>
+            <FirstDue loan={loan} onSave={onFirstDue} />
+          </>
+        )}
 
         <LoanChecks loan={loan} />
 
@@ -126,17 +123,12 @@ export default function LoansPage() {
   const loans = data ?? [];
   return (
     <div className="space-y-6">
-      <SettingsHeader
-        heading={t("settings:loans.title")}
-        text={t("settings:loans.subtitle")}
-      />
+      <SettingsHeader heading={t("settings:loans.title")} text={t("settings:loans.subtitle")} />
       <Separator />
       {isLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : loans.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("settings:loans.empty")}
-        </p>
+        <p className="text-muted-foreground text-sm">{t("settings:loans.empty")}</p>
       ) : (
         loans.map((loan) => (
           <LoanCard

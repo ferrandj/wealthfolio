@@ -1,11 +1,7 @@
 import { getAlternativeHoldings, linkStatementLoanAsset } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AlternativeAssetHolding } from "@/lib/types";
-import type {
-  LoanAssetLink,
-  LoanView,
-  NewLoanAsset,
-} from "@/lib/types/statements";
+import type { LoanAssetLink, LoanView, NewLoanAsset } from "@/lib/types/statements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -21,12 +17,7 @@ import {
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  addressLines,
-  attachableAssets,
-  newAssetOf,
-  type NewAssetForm,
-} from "./loans-utils";
+import { addressLines, attachableAssets, newAssetOf, type NewAssetForm } from "./loans-utils";
 
 const NEW_ASSET = "__new__";
 const KINDS: NewLoanAsset["kind"][] = ["PROPERTY", "VEHICLE", "OTHER"];
@@ -100,23 +91,16 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
   ];
   const newAsset = choice === NEW_ASSET ? newAssetOf(form) : null;
   const canSave = choice === NEW_ASSET ? newAsset !== null : choice !== "";
-  const set = (patch: Partial<NewAssetForm>) =>
-    setForm((f) => ({ ...f, ...patch }));
+  const set = (patch: Partial<NewAssetForm>) => setForm((f) => ({ ...f, ...patch }));
 
   return (
     <div className="space-y-2">
-      <div className="text-muted-foreground text-xs">
-        {t("settings:loans.asset")}
-      </div>
+      <div className="text-muted-foreground text-xs">{t("settings:loans.asset")}</div>
       {linked && !editing ? (
         <div className="flex flex-wrap items-start justify-between gap-2">
           <AssetSummary asset={linked} />
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setEditing(true)}
-            >
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
               {t("settings:loans.asset_change")}
             </Button>
             <Button
@@ -131,15 +115,9 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-muted-foreground text-xs">
-            {t("settings:loans.asset_hint")}
-          </p>
+          <p className="text-muted-foreground text-xs">{t("settings:loans.asset_hint")}</p>
           <div className="grid max-w-md gap-1.5">
-            <Select
-              items={items}
-              value={choice}
-              onValueChange={(v) => setChoice(v ?? "")}
-            >
+            <Select items={items} value={choice} onValueChange={(v) => setChoice(v ?? "")}>
               <SelectTrigger aria-label={t("settings:loans.asset")}>
                 <SelectValue placeholder={t("settings:loans.asset_choose")} />
               </SelectTrigger>
@@ -162,9 +140,7 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
                     label: t(`settings:loans.asset_kind_${k.toLowerCase()}`),
                   }))}
                   value={form.kind}
-                  onValueChange={(v) =>
-                    v && set({ kind: v as NewLoanAsset["kind"] })
-                  }
+                  onValueChange={(v) => v && set({ kind: v as NewLoanAsset["kind"] })}
                 >
                   <SelectTrigger aria-label={t("settings:loans.asset_kind")}>
                     <SelectValue />
@@ -180,17 +156,11 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
               </div>
               <div className="grid gap-1.5">
                 <Label>{t("settings:loans.asset_name")}</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => set({ name: e.target.value })}
-                />
+                <Input value={form.name} onChange={(e) => set({ name: e.target.value })} />
               </div>
               <div className="grid gap-1.5 sm:col-span-2">
                 <Label>{t("settings:loans.asset_street")}</Label>
-                <Input
-                  value={form.street}
-                  onChange={(e) => set({ street: e.target.value })}
-                />
+                <Input value={form.street} onChange={(e) => set({ street: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
                 <Label>{t("settings:loans.asset_postal_code")}</Label>
@@ -201,10 +171,7 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
               </div>
               <div className="grid gap-1.5">
                 <Label>{t("settings:loans.asset_city")}</Label>
-                <Input
-                  value={form.city}
-                  onChange={(e) => set({ city: e.target.value })}
-                />
+                <Input value={form.city} onChange={(e) => set({ city: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
                 <Label>{t("settings:loans.asset_value")}</Label>
@@ -220,20 +187,12 @@ export function LoanAssetLinkSection({ loan }: { loan: LoanView }) {
             <Button
               size="sm"
               disabled={!canSave || save.isPending}
-              onClick={() =>
-                save.mutate(
-                  choice === NEW_ASSET ? { newAsset } : { assetId: choice },
-                )
-              }
+              onClick={() => save.mutate(choice === NEW_ASSET ? { newAsset } : { assetId: choice })}
             >
               {t("settings:loans.asset_save")}
             </Button>
             {editing && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditing(false)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                 {t("settings:loans.asset_cancel")}
               </Button>
             )}

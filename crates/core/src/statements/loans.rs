@@ -62,6 +62,42 @@ pub struct LoanView {
     pub linked_asset_id: Option<String>,
 }
 
+/// A debit found in the imported bank statements.
+#[derive(Debug, Clone)]
+pub struct BankDebit {
+    pub date: NaiveDate,
+    pub amount: Decimal,
+    pub label: String,
+}
+
+/// The first instalment of a loan whose papers do not date it, read from the bank statements: the earliest debit
+/// of exactly the instalment, whose label names the loan (its reference) or says it is a loan instalment.
+pub fn first_due_from_debits(view: &LoanView, debits: &[BankDebit]) -> Option<NaiveDate> {
+    let instalment = view
+        .plan
+        .rows
+        .iter()
+        .find(|r| r.kind == "installment")?
+        .total;
+    let key = view.key.trim().to_uppercase();
+    let digits: String = key.chars().filter(char::is_ascii_digit).collect();
+    let names_the_loan = |label: &str| {
+        let label = label.to_uppercase();
+        (key != "?" && !key.is_empty() && label.contains(&key))
+            || (digits.len() >= 6 && label.contains(&digits))
+            || ["PRET", "ECHEANCE", "ÉCHÉANCE", "CREDIT IMMO"]
+                .iter()
+                .any(|w| label.contains(w))
+    };
+    debits
+        .iter()
+        .filter(|d| {
+            (d.amount.abs() - instalment).abs() < Decimal::new(1, 2) && names_the_loan(&d.label)
+        })
+        .map(|d| d.date)
+        .min()
+}
+
 /// The sort key of a loan paper inside its loan.
 fn payload_of(data: &LoanDocumentData) -> &Value {
     &data.payload

@@ -27,12 +27,7 @@ import {
   type StatementChoice,
 } from "../statement-files";
 
-export type PendingStatus =
-  | "analyzing"
-  | "ready"
-  | "importing"
-  | "done"
-  | "error";
+export type PendingStatus = "analyzing" | "ready" | "importing" | "done" | "error";
 
 export interface PendingFile {
   id: string;
@@ -97,9 +92,7 @@ function StatementBlock({
           {preview.accountLabel ?? statement.suggestedAccountName}
         </span>
         {preview.iban && (
-          <span className="text-muted-foreground font-mono text-xs">
-            {preview.iban}
-          </span>
+          <span className="text-muted-foreground font-mono text-xs">{preview.iban}</span>
         )}
         {preview.periodStart && preview.periodEnd && (
           <Badge variant="secondary">
@@ -107,16 +100,12 @@ function StatementBlock({
           </Badge>
         )}
         {preview.confidence === "low" && (
-          <Badge variant="destructive">
-            {t("settings:documents.low_confidence")}
-          </Badge>
+          <Badge variant="destructive">{t("settings:documents.low_confidence")}</Badge>
         )}
       </div>
 
       {documentOnly ? (
-        <p className="text-muted-foreground text-sm">
-          {t("settings:documents.document_only")}
-        </p>
+        <p className="text-muted-foreground text-sm">{t("settings:documents.document_only")}</p>
       ) : (
         <p className="text-muted-foreground text-sm">
           {t("settings:documents.operations_count", {
@@ -153,9 +142,7 @@ function StatementBlock({
               </li>
             ))}
           </ul>
-          <p className="text-muted-foreground">
-            {t("settings:documents.overlap_question")}
-          </p>
+          <p className="text-muted-foreground">{t("settings:documents.overlap_question")}</p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -192,9 +179,7 @@ function StatementBlock({
         <Select
           items={items}
           value={choice.account}
-          onValueChange={(value) =>
-            onChoose({ account: String(value), skip: false })
-          }
+          onValueChange={(value) => onChoose({ account: String(value), skip: false })}
           disabled={disabled || choice.skip}
         >
           <SelectTrigger aria-label={t("settings:documents.account")}>
@@ -215,9 +200,7 @@ function StatementBlock({
           disabled={disabled}
           onClick={() => onChoose({ skip: !choice.skip })}
         >
-          {choice.skip
-            ? t("settings:documents.include")
-            : t("settings:documents.skip")}
+          {choice.skip ? t("settings:documents.include") : t("settings:documents.skip")}
         </Button>
       </div>
 
@@ -238,10 +221,7 @@ function StatementBlock({
           </summary>
           <ul className="mt-2 max-h-56 space-y-1 overflow-auto">
             {preview.transactions.slice(0, 200).map((tx, i) => (
-              <li
-                key={`${tx.date}-${i}`}
-                className="flex justify-between gap-3"
-              >
+              <li key={`${tx.date}-${i}`} className="flex justify-between gap-3">
                 <span className="min-w-0 truncate">
                   <span className="text-muted-foreground me-2">{tx.date}</span>
                   {tx.label}
@@ -271,17 +251,14 @@ export function PendingFileCard({
   const analysis = file.analysis;
   const busy = file.status === "analyzing" || file.status === "importing";
   const info = analysis?.analysis;
-  const needsReading =
-    !!info && !info.chosenAdapterId && info.candidates.length > 0;
+  const needsReading = !!info && !info.chosenAdapterId && info.candidates.length > 0;
   const existing = analysis?.existingDocument;
   const canImport =
     file.status === "ready" &&
     !!analysis &&
     analysis.statements.length > 0 &&
     (!existing || file.allowDuplicateDocument) &&
-    !analysis.statements.some((s) =>
-      needsOverlapDecision(s, file.choices[s.preview.index]),
-    );
+    !analysis.statements.some((s) => needsOverlapDecision(s, file.choices[s.preview.index]));
 
   return (
     <Card>
@@ -297,9 +274,7 @@ export function PendingFileCard({
             </div>
           </div>
           {busy && <Icons.Spinner className="size-4 animate-spin" />}
-          {file.status === "done" && (
-            <Icons.Check className="text-success size-5" />
-          )}
+          {file.status === "done" && <Icons.Check className="text-success size-5" />}
           <Button
             type="button"
             variant="ghost"
@@ -324,15 +299,11 @@ export function PendingFileCard({
           </p>
         )}
 
-        {info && info.message && (
-          <p className="text-muted-foreground text-sm">{info.message}</p>
-        )}
+        {info && info.message && <p className="text-muted-foreground text-sm">{info.message}</p>}
 
         {needsReading && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">
-              {t("settings:documents.choose_reading")}
-            </p>
+            <p className="text-sm font-medium">{t("settings:documents.choose_reading")}</p>
             <div className="flex flex-wrap gap-2">
               {info.candidates.map((c) => (
                 <Button
@@ -351,9 +322,7 @@ export function PendingFileCard({
         )}
 
         {info && info.candidates.length === 0 && !info.error && (
-          <p className="text-destructive text-sm">
-            {t("settings:documents.unknown_format")}
-          </p>
+          <p className="text-destructive text-sm">{t("settings:documents.unknown_format")}</p>
         )}
 
         {existing && file.status !== "done" && (
@@ -401,14 +370,12 @@ export function PendingFileCard({
             {file.result.outcomes.map((o) => (
               <div key={o.index}>
                 <span className="font-medium">{o.accountName ?? "—"}</span>
-                {o.createdAccount &&
-                  ` · ${t("settings:documents.created_account")}`}
+                {o.createdAccount && ` · ${t("settings:documents.created_account")}`}
                 {` · ${t("settings:documents.result_summary", {
                   imported: o.imported,
                   duplicates: o.duplicates,
                 })}`}
-                {o.openingBalanceAdded &&
-                  ` · ${t("settings:documents.opening_balance")}`}
+                {o.openingBalanceAdded && ` · ${t("settings:documents.opening_balance")}`}
                 {o.toReview > 0 &&
                   ` · ${t("settings:documents.review_to_check", { count: o.toReview })}`}
                 {o.messages.map((m) => (
@@ -423,11 +390,7 @@ export function PendingFileCard({
 
         {(file.status === "ready" || file.status === "importing") && (
           <div className="flex justify-end">
-            <Button
-              type="button"
-              onClick={onImport}
-              disabled={!canImport || busy}
-            >
+            <Button type="button" onClick={onImport} disabled={!canImport || busy}>
               {file.status === "importing" && (
                 <Icons.Spinner className="me-2 size-4 animate-spin" />
               )}

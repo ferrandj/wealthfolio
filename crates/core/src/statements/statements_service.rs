@@ -1278,12 +1278,58 @@ impl StatementService {
     }
 
     fn build_loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
-        Ok(super::assemble_loans(
+        self.assemble_with_bank(
             &self.repository.list_loan_documents()?,
             &self.repository.list_documents()?,
-            &self.repository.list_loan_settings()?,
             today,
-        ))
+        )
+    }
+
+    /// The loans of these papers. A loan the papers do not date gets the date of its first instalment from the
+    /// bank statements already imported: the instalments really debited are the ones that date the schedule.
+    fn assemble_with_bank(
+        &self,
+        data: &[super::LoanDocumentData],
+        documents: &[StatementDocument],
+        today: chrono::NaiveDate,
+    ) -> Result<Vec<super::LoanView>> {
+        let mut settings = self.repository.list_loan_settings()?;
+        let views = super::assemble_loans(data, documents, &settings, today);
+        if views.iter().all(|v| v.inferred_first_due.is_some()) {
+            return Ok(views);
+        }
+        let debits: Vec<super::BankDebit> = self
+            .activity_service
+            .get_activities()?
+            .into_iter()
+            .filter(|a| matches!(a.activity_type.as_str(), "WITHDRAWAL" | "TRANSFER_OUT"))
+            .filter_map(|a| {
+                Some(super::BankDebit {
+                    date: a.activity_date.date_naive(),
+                    amount: a.amount?,
+                    label: format!(
+                        "{} {}",
+                        a.notes.unwrap_or_default(),
+                        a.metadata.map(|m| m.to_string()).unwrap_or_default()
+                    ),
+                })
+            })
+            .collect();
+        let mut found = false;
+        for view in views.iter().filter(|v| v.inferred_first_due.is_none()) {
+            if let Some(date) = super::first_due_from_debits(view, &debits) {
+                let value = Some(date.format("%Y-%m-%d").to_string());
+                match settings.iter_mut().find(|(k, _)| k == &view.key) {
+                    Some(entry) => entry.1 = value,
+                    None => settings.push((view.key.clone(), value)),
+                }
+                found = true;
+            }
+        }
+        if !found {
+            return Ok(views);
+        }
+        Ok(super::assemble_loans(data, documents, &settings, today))
     }
 
     /// Deleting a document takes back what its import added, the account included when the import created it and
@@ -1331,12 +1377,7 @@ impl StatementService {
                     .any(|x| x.id == d.document_id && x.status == DOCUMENT_STATUS_VALIDATED)
             })
             .collect();
-        Ok(super::assemble_loans(
-            &data,
-            &documents,
-            &self.repository.list_loan_settings()?,
-            today,
-        ))
+        self.assemble_with_bank(&data, &documents, today)
     }
 
     /// The papers of a loan belong to the account of its contract: a letter or a table that arrived without an
@@ -1407,8 +1448,7 @@ impl StatementService {
             let Some(problems) = super::document_problems(&views, &document.id) else {
                 continue;
             };
-            // a loan paper is never validated by itself: it waits for the person, who is asked what the papers
-            // leave open (the date of the first instalment)
+            // a loan paper is never validated by itself: it waits for the person
             let reason = ReviewReason {
                 doubts: 0,
                 balance_gap: None,
@@ -2114,7 +2154,7 @@ impl StatementServiceTrait for StatementService {
             .map(|k| super::is_loan_kind(&k))
             .unwrap_or(false);
         if loan_paper {
-            // what the papers leave open is asked before the loan is kept: the date of the first instalment
+            // the instalments really debited are dated by the bank statements, so no date is asked here
             let views = self.build_loans(Utc::now().date_naive())?;
             let problems = super::document_problems(&views, id).unwrap_or_default();
             if !problems.is_empty() {
@@ -2128,11 +2168,6 @@ impl StatementServiceTrait for StatementService {
                 .find(|v| v.documents.iter().any(|d| d.document_id == id));
             if view.map(|v| v.key.as_str()).unwrap_or("?") == "?" {
                 return Err(invalid("This paper does not name the loan it belongs to"));
-            }
-            if view.and_then(|v| v.inferred_first_due).is_none() {
-                return Err(invalid(
-                    "The date of the first instalment is needed: set it for this loan, then validate",
-                ));
             }
         }
         let review = self.review_document(id).await?;

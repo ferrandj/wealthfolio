@@ -12,7 +12,8 @@ mod statements_service;
 mod statements_traits;
 
 pub use loans::{
-    assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
+    assemble_loans, document_problems, first_due_from_debits, is_loan_kind, BankDebit,
+    LoanDocumentData, LoanDocumentRef, LoanView,
 };
 pub use loans_liabilities::{
     changes_of, setup_of, LoanAssetLink, LoanAssetLinked, LoanChange, LoanLiabilities,

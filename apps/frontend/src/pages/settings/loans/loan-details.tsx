@@ -38,25 +38,14 @@ export function LoanFacts({ loan }: { loan: LoanView }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {loan.product && (
-          <Fact label={t("settings:loans.product")} value={loan.product} />
-        )}
-        {loan.borrower && (
-          <Fact label={t("settings:loans.borrower")} value={loan.borrower} />
-        )}
-        <Fact
-          label={t("settings:loans.borrowed")}
-          value={euros(loan.principal)}
-        />
+        {loan.product && <Fact label={t("settings:loans.product")} value={loan.product} />}
+        {loan.borrower && <Fact label={t("settings:loans.borrower")} value={loan.borrower} />}
+        <Fact label={t("settings:loans.borrowed")} value={euros(loan.principal)} />
         <Fact label={t("settings:loans.rate")} value={percent(loan.rate)} />
         <Fact label={t("settings:loans.taeg")} value={percent(loan.taeg)} />
         <Fact
           label={t("settings:loans.duration")}
-          value={
-            loan.duration
-              ? t("settings:loans.months", { count: loan.duration })
-              : "—"
-          }
+          value={loan.duration ? t("settings:loans.months", { count: loan.duration }) : "—"}
         />
       </div>
 
@@ -67,9 +56,7 @@ export function LoanFacts({ loan }: { loan: LoanView }) {
             <Fact label={t("settings:loans.owed")} value={euros(s.owed)} />
             <Fact
               label={t("settings:loans.next_payment")}
-              value={
-                s.next ? `${euros(s.next.total)} · ${day(s.next.date)}` : "—"
-              }
+              value={s.next ? `${euros(s.next.total)} · ${day(s.next.date)}` : "—"}
             />
             <Fact label={t("settings:loans.end")} value={day(s.endDate)} />
             <Fact
@@ -79,27 +66,12 @@ export function LoanFacts({ loan }: { loan: LoanView }) {
                 remaining: s.remainingCount,
               })}
             />
-            <Fact
-              label={t("settings:loans.future_interest")}
-              value={euros(s.futureInterest)}
-            />
-            <Fact
-              label={t("settings:loans.future_insurance")}
-              value={euros(s.futureInsurance)}
-            />
-            <Fact
-              label={t("settings:loans.future_total")}
-              value={euros(s.futureTotal)}
-            />
-            <Fact
-              label={t("settings:loans.lifetime_interest")}
-              value={euros(s.lifetimeInterest)}
-            />
+            <Fact label={t("settings:loans.future_interest")} value={euros(s.futureInterest)} />
+            <Fact label={t("settings:loans.future_insurance")} value={euros(s.futureInsurance)} />
+            <Fact label={t("settings:loans.future_total")} value={euros(s.futureTotal)} />
+            <Fact label={t("settings:loans.lifetime_interest")} value={euros(s.lifetimeInterest)} />
             {Number(s.repaidEarly) > 0 && (
-              <Fact
-                label={t("settings:loans.repaid_early")}
-                value={euros(s.repaidEarly)}
-              />
+              <Fact label={t("settings:loans.repaid_early")} value={euros(s.repaidEarly)} />
             )}
             {s.saved && (
               <Fact
@@ -136,19 +108,12 @@ export function LoanDocuments({ loan }: { loan: LoanView }) {
   const { t } = useTranslation();
   return (
     <div className="space-y-1">
-      <div className="text-muted-foreground text-xs">
-        {t("settings:loans.documents")}
-      </div>
+      <div className="text-muted-foreground text-xs">{t("settings:loans.documents")}</div>
       {loan.documents.map((d) => (
-        <div
-          key={d.documentId}
-          className="flex flex-wrap items-center gap-2 text-sm"
-        >
+        <div key={d.documentId} className="flex flex-wrap items-center gap-2 text-sm">
           <Icons.FileText className="text-muted-foreground size-4" />
           <span>{d.fileName}</span>
-          <Badge variant="outline">
-            {t(`settings:loans.kind.${d.kind}`, d.kind)}
-          </Badge>
+          <Badge variant="outline">{t(`settings:loans.kind.${d.kind}`, d.kind)}</Badge>
           <Badge variant={d.status === "validated" ? "secondary" : "outline"}>
             {t(`settings:loans.status.${d.status}`, d.status)}
           </Badge>
@@ -159,13 +124,7 @@ export function LoanDocuments({ loan }: { loan: LoanView }) {
 }
 
 /** The full schedule, row by row; `defaultOpen` shows it without a click. */
-export function LoanPlan({
-  loan,
-  defaultOpen = false,
-}: {
-  loan: LoanView;
-  defaultOpen?: boolean;
-}) {
+export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaultOpen?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -179,21 +138,11 @@ export function LoanPlan({
             <thead className="bg-background text-muted-foreground sticky top-0 text-left text-xs">
               <tr>
                 <th className="py-1 pr-3">{t("settings:loans.col_date")}</th>
-                <th className="pr-3 text-right">
-                  {t("settings:loans.col_capital")}
-                </th>
-                <th className="pr-3 text-right">
-                  {t("settings:loans.col_interest")}
-                </th>
-                <th className="pr-3 text-right">
-                  {t("settings:loans.col_insurance")}
-                </th>
-                <th className="pr-3 text-right">
-                  {t("settings:loans.col_total")}
-                </th>
-                <th className="pr-3 text-right">
-                  {t("settings:loans.col_remaining")}
-                </th>
+                <th className="pr-3 text-right">{t("settings:loans.col_capital")}</th>
+                <th className="pr-3 text-right">{t("settings:loans.col_interest")}</th>
+                <th className="pr-3 text-right">{t("settings:loans.col_insurance")}</th>
+                <th className="pr-3 text-right">{t("settings:loans.col_total")}</th>
+                <th className="pr-3 text-right">{t("settings:loans.col_remaining")}</th>
                 <th>{t("settings:loans.col_source")}</th>
               </tr>
             </thead>
@@ -212,19 +161,13 @@ export function LoanPlan({
                   }
                   title={r.note || undefined}
                 >
-                  <td className="py-1 pr-3">
-                    {r.date ? day(r.date) : `n° ${r.number ?? ""}`}
-                  </td>
+                  <td className="py-1 pr-3">{r.date ? day(r.date) : `n° ${r.number ?? ""}`}</td>
                   <td className="pr-3 text-right">{euros(r.capital)}</td>
                   <td className="pr-3 text-right">{euros(r.interest)}</td>
                   <td className="pr-3 text-right">{euros(r.insurance)}</td>
                   <td className="pr-3 text-right">{euros(r.total)}</td>
                   <td className="pr-3 text-right">{euros(r.remaining)}</td>
-                  <td>
-                    {r.kind === "prepayment"
-                      ? t("settings:loans.prepayment")
-                      : r.source}
-                  </td>
+                  <td>{r.kind === "prepayment" ? t("settings:loans.prepayment") : r.source}</td>
                 </tr>
               ))}
             </tbody>

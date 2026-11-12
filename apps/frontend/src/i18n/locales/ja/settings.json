@@ -2092,8 +2092,7 @@
     "overlap_keep": "Keep both (identical operations are not duplicated)",
     "overlap_skip": "Do not import this one",
     "loan_unknown": "This document does not name its loan: it cannot be validated.",
-    "loan_intro": "Nothing is added until you validate: once validated, the loan shows in Liabilities with its schedule; if you invalidate or delete the document, it goes away.",
-    "loan_first_due_ask": "The documents do not give the date of the first instalment: what is it?",
+    "loan_intro": "Nothing is added until you validate: once validated, the loan appears in Liabilities with its schedule as soon as the instalments are dated (by the papers or by the bank statements); if you invalidate or delete the document, it disappears.",
     "review_validate_loan": "Validate this loan",
     "loan": "Loan",
     "loan_in_liabilities": "In Liabilities",
@@ -2367,6 +2366,7 @@
     "asset_change": "Change",
     "asset_detach": "Detach",
     "product": "Product",
-    "borrower": "Borrower"
+    "borrower": "Borrower",
+    "dates_from_statements": "The papers do not date the instalments: the instalments actually debited will be determined when the bank statements are imported. You can also type the date of the first instalment by hand."
   }
 }

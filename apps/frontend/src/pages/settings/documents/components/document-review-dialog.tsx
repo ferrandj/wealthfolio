@@ -1,16 +1,6 @@
-import {
-  getStatementLoans,
-  reviewStatementDocument,
-  setStatementLoanFirstDue,
-  validateStatementDocument,
-} from "@/adapters";
+import { getStatementLoans, reviewStatementDocument, validateStatementDocument } from "@/adapters";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
-import {
-  LOAN_KINDS,
-  LoanValidationCard,
-  loanOfDocument,
-  needsDate,
-} from "./loan-validation-card";
+import { LOAN_KINDS, LoanValidationCard, loanOfDocument } from "./loan-validation-card";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { QueryKeys } from "@/lib/query-keys";
@@ -76,8 +66,7 @@ function useCategoryNames() {
       [INCOME, income],
       [SAVINGS, savings],
     ] as const) {
-      for (const c of query.data?.categories ?? [])
-        names.set(`${taxonomyId}:${c.id}`, c.name);
+      for (const c of query.data?.categories ?? []) names.set(`${taxonomyId}:${c.id}`, c.name);
     }
     return names;
   }, [spending, income, savings]);
@@ -90,19 +79,13 @@ interface ReviewDialogProps {
   onClose: () => void;
 }
 
-export function DocumentReviewDialog({
-  startId,
-  queue,
-  onClose,
-}: ReviewDialogProps) {
+export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogProps) {
   const [currentId, setCurrentId] = useState<string | null>(startId);
   const [skipped, setSkipped] = useState<string[]>([]);
   const open = currentId !== null;
 
   const next = (after: string) => {
-    const remaining = queue.filter(
-      (d) => d.id !== after && !skipped.includes(d.id),
-    );
+    const remaining = queue.filter((d) => d.id !== after && !skipped.includes(d.id));
     setCurrentId(remaining[0]?.id ?? null);
     if (remaining.length === 0) onClose();
   };
@@ -151,7 +134,6 @@ function ReviewBody({
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [onlyDoubts, setOnlyDoubts] = useState<boolean | null>(null);
   const [remember, setRemember] = useState(true);
-  const [firstDue, setFirstDue] = useState("");
 
   const {
     data: review,
@@ -172,21 +154,15 @@ function ReviewBody({
     enabled: isLoan && !review?.loan,
   });
   const loan = isLoan ? (review?.loan ?? loanOfDocument(loans, id)) : undefined;
-  const dateMissing = needsDate(loan) && !firstDue;
 
   const validate = useMutation({
     mutationFn: async () => {
-      // what the papers leave open is asked first: the date of the first instalment of the loan
-      if (loan && needsDate(loan) && firstDue)
-        await setStatementLoanFirstDue(loan.key, firstDue);
-      const decisions: ReviewDecision[] = Object.entries(choices).map(
-        ([activityId, c]) => ({
-          activityId,
-          taxonomyId: c.taxonomyId,
-          categoryId: c.categoryId,
-          remember,
-        }),
-      );
+      const decisions: ReviewDecision[] = Object.entries(choices).map(([activityId, c]) => ({
+        activityId,
+        taxonomyId: c.taxonomyId,
+        categoryId: c.categoryId,
+        remember,
+      }));
       return validateStatementDocument(id, decisions);
     },
     onSuccess: async () => {
@@ -222,9 +198,8 @@ function ReviewBody({
       (review?.statements ?? []).reduce(
         (sum, s) =>
           sum +
-          s.operations.filter(
-            (o) => o.needsReview && !(o.activityId && choices[o.activityId]),
-          ).length,
+          s.operations.filter((o) => o.needsReview && !(o.activityId && choices[o.activityId]))
+            .length,
         0,
       ),
     [review, choices],
@@ -235,9 +210,7 @@ function ReviewBody({
     return (
       <>
         <DialogTitle>{t("settings:documents.review_title")}</DialogTitle>
-        <DialogDescription>
-          {t("settings:documents.review_loading")}
-        </DialogDescription>
+        <DialogDescription>{t("settings:documents.review_loading")}</DialogDescription>
         <Skeleton className="h-48" />
       </>
     );
@@ -289,10 +262,7 @@ function ReviewBody({
           <Icons.Download className="size-4" />
         </Button>
         {!isLoan && (
-          <Badge
-            variant={doubtCount > 0 ? "outline" : "secondary"}
-            className="shrink-0"
-          >
+          <Badge variant={doubtCount > 0 ? "outline" : "secondary"} className="shrink-0">
             {doubtCount > 0
               ? t("settings:documents.review_to_check", { count: doubtCount })
               : t("settings:documents.review_nothing_doubtful")}
@@ -303,23 +273,15 @@ function ReviewBody({
       {review.earlierPending.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
           <Icons.AlertTriangle className="size-4 shrink-0 text-amber-600" />
-          <span className="min-w-0 flex-1">
-            {t("settings:documents.review_earlier_pending")}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onGoTo(review.earlierPending[0])}
-          >
+          <span className="min-w-0 flex-1">{t("settings:documents.review_earlier_pending")}</span>
+          <Button size="sm" variant="outline" onClick={() => onGoTo(review.earlierPending[0])}>
             {t("settings:documents.review_go_oldest")}
           </Button>
         </div>
       )}
 
       {!isLoan && doubtCount > 0 && (
-        <p className="text-muted-foreground text-sm">
-          {t("settings:documents.review_help")}
-        </p>
+        <p className="text-muted-foreground text-sm">{t("settings:documents.review_help")}</p>
       )}
 
       {!isLoan && (
@@ -343,9 +305,7 @@ function ReviewBody({
               size="sm"
               variant="outline"
               className="ms-auto"
-              onClick={() =>
-                setChoices((c) => confirmDoubts(review.statements, c))
-              }
+              onClick={() => setChoices((c) => confirmDoubts(review.statements, c))}
             >
               <Icons.Check className="mr-1 size-4" />
               {t("settings:documents.review_confirm_all", {
@@ -357,14 +317,7 @@ function ReviewBody({
       )}
 
       <div className="shrink-0 space-y-4 pr-1 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto">
-        {isLoan && (
-          <LoanValidationCard
-            loan={loan}
-            loading={loansLoading}
-            firstDue={firstDue}
-            onFirstDue={setFirstDue}
-          />
-        )}
+        {isLoan && <LoanValidationCard loan={loan} loading={loansLoading} />}
         {!isLoan && review.statements.length === 0 && (
           <p className="text-muted-foreground text-sm">
             {t("settings:documents.review_no_operations")}
@@ -378,9 +331,7 @@ function ReviewBody({
               choices={choices}
               onlyDoubts={showOnlyDoubts}
               label={label}
-              onChoose={(activityId, choice) =>
-                setChoices((c) => ({ ...c, [activityId]: choice }))
-              }
+              onChoose={(activityId, choice) => setChoices((c) => ({ ...c, [activityId]: choice }))}
             />
           ))}
       </div>
@@ -399,17 +350,10 @@ function ReviewBody({
         <Button variant="ghost" onClick={onClose}>
           {t("settings:documents.review_close")}
         </Button>
-        <Button
-          variant="outline"
-          onClick={onSkip}
-          disabled={validate.isPending}
-        >
+        <Button variant="outline" onClick={onSkip} disabled={validate.isPending}>
           {t("settings:documents.review_skip")}
         </Button>
-        <Button
-          onClick={() => validate.mutate()}
-          disabled={validate.isPending || dateMissing}
-        >
+        <Button onClick={() => validate.mutate()} disabled={validate.isPending}>
           <Icons.Check className="mr-1 size-4" />
           {t(
             isLoan
@@ -438,16 +382,12 @@ function StatementSection({
   const { t } = useTranslation();
   const hasGap = !!statement.balanceGap;
   const operations = statement.operations.filter(
-    (o) =>
-      !onlyDoubts ||
-      (o.needsReview && !(o.activityId && choices[o.activityId])),
+    (o) => !onlyDoubts || (o.needsReview && !(o.activityId && choices[o.activityId])),
   );
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        {statement.accountName && (
-          <span className="font-medium">{statement.accountName}</span>
-        )}
+        {statement.accountName && <span className="font-medium">{statement.accountName}</span>}
         <span className="text-muted-foreground">
           {t("settings:documents.review_opening")}{" "}
           {money(statement.openingBalance, statement.currency)}
@@ -464,10 +404,7 @@ function StatementSection({
         )}
         {statement.computedBalance != null &&
           (hasGap ? (
-            <Badge
-              variant="outline"
-              className="border-amber-500 text-amber-700"
-            >
+            <Badge variant="outline" className="border-amber-500 text-amber-700">
               {t("settings:documents.review_balance_gap", {
                 gap: money(statement.balanceGap, statement.currency),
               })}
@@ -515,15 +452,12 @@ function OperationRow({
 }) {
   const { t } = useTranslation();
   const outgoing = Number(op.amount) < 0;
-  const taxonomyId =
-    choice?.taxonomyId ?? op.taxonomyId ?? op.suggestedTaxonomyId;
-  const categoryId =
-    choice?.categoryId ?? op.categoryId ?? op.suggestedCategoryId;
+  const taxonomyId = choice?.taxonomyId ?? op.taxonomyId ?? op.suggestedTaxonomyId;
+  const categoryId = choice?.categoryId ?? op.categoryId ?? op.suggestedCategoryId;
   const doubtful = op.needsReview && !choice;
   const suggestion = suggestedChoice(op);
   const showCounterparty =
-    !!op.counterparty &&
-    !op.label.toLowerCase().includes(op.counterparty.toLowerCase());
+    !!op.counterparty && !op.label.toLowerCase().includes(op.counterparty.toLowerCase());
   return (
     <li
       className={cn(
@@ -531,23 +465,14 @@ function OperationRow({
         doubtful && "bg-amber-500/10",
       )}
     >
-      <div className="text-muted-foreground w-24 shrink-0 text-xs tabular-nums">
-        {op.date}
-      </div>
+      <div className="text-muted-foreground w-24 shrink-0 text-xs tabular-nums">{op.date}</div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium break-words">{op.label}</div>
         {showCounterparty && (
-          <div className="text-muted-foreground text-xs break-words">
-            {op.counterparty}
-          </div>
+          <div className="text-muted-foreground text-xs break-words">{op.counterparty}</div>
         )}
         {op.reason && (doubtful || op.confidence !== "high") && (
-          <div
-            className={cn(
-              "text-xs",
-              doubtful ? "text-amber-700" : "text-muted-foreground",
-            )}
-          >
+          <div className={cn("text-xs", doubtful ? "text-amber-700" : "text-muted-foreground")}>
             {op.reason}
           </div>
         )}
@@ -578,27 +503,17 @@ function OperationRow({
             {t("settings:documents.review_doubt")}
           </Badge>
         ) : choice || op.categorySource === "manual" ? (
-          <Badge variant="secondary">
-            {t("settings:documents.review_confirmed")}
-          </Badge>
+          <Badge variant="secondary">{t("settings:documents.review_confirmed")}</Badge>
         ) : op.confidence === "medium" ? (
-          <Badge variant="outline">
-            {t("settings:documents.review_estimated")}
-          </Badge>
+          <Badge variant="outline">{t("settings:documents.review_estimated")}</Badge>
         ) : null}
         {op.activityId ? (
           <QuickCategorizePopover
             scope={outgoing ? "expense" : "income"}
             selectedCategoryId={categoryId}
-            onSelect={(tax, cat) =>
-              onChoose(op.activityId!, { taxonomyId: tax, categoryId: cat })
-            }
+            onSelect={(tax, cat) => onChoose(op.activityId!, { taxonomyId: tax, categoryId: cat })}
             trigger={
-              <Button
-                variant="outline"
-                size="sm"
-                className="min-w-0 flex-1 justify-start"
-              >
+              <Button variant="outline" size="sm" className="min-w-0 flex-1 justify-start">
                 <span className="truncate">
                   {taxonomyId && categoryId
                     ? label(taxonomyId, categoryId)
@@ -624,9 +539,7 @@ function OperationRow({
             <Button
               size="sm"
               variant="outline"
-              onClick={() =>
-                onChoose(op.activityId!, ownTransferChoice(op.amount))
-              }
+              onClick={() => onChoose(op.activityId!, ownTransferChoice(op.amount))}
               title={t("settings:documents.review_own_transfer_hint")}
             >
               <Icons.ArrowRightLeft className="mr-1 size-4" />
