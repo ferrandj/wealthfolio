@@ -2117,7 +2117,14 @@
     "overlap_question": "What now? Decide here, nothing is imported before.",
     "overlap_replace": "Replace the old one with this one",
     "overlap_keep": "Keep both (identical operations are not duplicated)",
-    "overlap_skip": "Do not import this one"
+    "overlap_skip": "Do not import this one",
+    "loan_unknown": "This document does not name its loan: it cannot be validated.",
+    "loan_intro": "Nothing is added until you validate: once validated, the loan shows in Liabilities with its schedule; if you invalidate or delete the document, it goes away.",
+    "loan_first_due_ask": "The documents do not give the date of the first instalment: what is it?",
+    "review_validate_loan": "Validate this loan",
+    "loan": "Loan",
+    "loan_in_liabilities": "In Liabilities",
+    "loan_waiting": "To validate: not in Liabilities yet"
   },
   "identity": {
     "title": "Account details",

@@ -1,5 +1,11 @@
-import { reviewStatementDocument, validateStatementDocument } from "@/adapters";
+import {
+  getStatementLoans,
+  reviewStatementDocument,
+  setStatementLoanFirstDue,
+  validateStatementDocument,
+} from "@/adapters";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
+import { LOAN_KINDS, LoanValidationCard, loanOfDocument, needsDate } from "./loan-validation-card";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { QueryKeys } from "@/lib/query-keys";
@@ -130,6 +136,7 @@ function ReviewBody({
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [onlyDoubts, setOnlyDoubts] = useState<boolean | null>(null);
   const [remember, setRemember] = useState(true);
+  const [firstDue, setFirstDue] = useState("");
 
   const {
     data: review,
@@ -142,8 +149,19 @@ function ReviewBody({
     gcTime: 0,
   });
 
+  const isLoan = LOAN_KINDS.includes(review?.document.documentKind ?? "");
+  const { data: loans } = useQuery({
+    queryKey: [QueryKeys.STATEMENT_LOANS],
+    queryFn: getStatementLoans,
+    enabled: isLoan,
+  });
+  const loan = isLoan ? loanOfDocument(loans, id) : undefined;
+  const dateMissing = needsDate(loan) && !firstDue;
+
   const validate = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      // what the papers leave open is asked first: the date of the first instalment of the loan
+      if (loan && needsDate(loan) && firstDue) await setStatementLoanFirstDue(loan.key, firstDue);
       const decisions: ReviewDecision[] = Object.entries(choices).map(([activityId, c]) => ({
         activityId,
         taxonomyId: c.taxonomyId,
@@ -157,6 +175,9 @@ function ReviewBody({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
         queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE] }),
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_LOANS] }),
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] }),
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] }),
       ]);
       invalidateSpendingCaches(queryClient);
       onValidated();
@@ -287,7 +308,8 @@ function ReviewBody({
       </div>
 
       <div className="shrink-0 space-y-4 pr-1 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto">
-        {review.statements.length === 0 && (
+        {isLoan && <LoanValidationCard loan={loan} firstDue={firstDue} onFirstDue={setFirstDue} />}
+        {!isLoan && review.statements.length === 0 && (
           <p className="text-muted-foreground text-sm">
             {t("settings:documents.review_no_operations")}
           </p>
@@ -315,9 +337,13 @@ function ReviewBody({
         <Button variant="outline" onClick={onSkip} disabled={validate.isPending}>
           {t("settings:documents.review_skip")}
         </Button>
-        <Button onClick={() => validate.mutate()} disabled={validate.isPending}>
+        <Button onClick={() => validate.mutate()} disabled={validate.isPending || dateMissing}>
           <Icons.Check className="mr-1 size-4" />
-          {t("settings:documents.review_validate")}
+          {t(
+            isLoan
+              ? "settings:documents.review_validate_loan"
+              : "settings:documents.review_validate",
+          )}
         </Button>
       </div>
     </>

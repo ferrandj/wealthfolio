@@ -532,7 +532,8 @@
       "teamChanged": "Votre foyer a changé. Reconnectez Wealthfolio Connect pour continuer.",
       "rebind": "Reconnectez Wealthfolio Connect pour confirmer le compte et le foyer de ce profil.",
       "cooldown_many": "Trop de tentatives. Réessayez dans {{count}} secondes."
-    }
+    },
+    "resetDataManage": "Gérer le profil"
   },
   "remove": "Supprimer",
   "remove_item": "Retirer {{name}}",

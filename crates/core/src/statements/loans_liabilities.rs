@@ -59,6 +59,17 @@ pub fn setup_of(view: &LoanView) -> Option<LoanSetup> {
     })
 }
 
+/// Whether the liability holds an event that no paper states: a repayment or an instalment change that is stored
+/// but is not among the changes of the loan rebuilt from the papers.
+fn has_stale_events(stored: &Value, view: &LoanView) -> bool {
+    let changes = changes_of(view);
+    event_entries(stored).iter().any(|entry| {
+        let kind = entry.get("type").and_then(Value::as_str);
+        matches!(kind, Some("extra_repayment" | "payment_change"))
+            && !changes.iter().any(|c| c.is_stored(entry))
+    })
+}
+
 /// A dated change the papers state after the contract.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoanChange {
@@ -361,10 +372,35 @@ impl LoanLiabilities {
         })
     }
 
+    /// Delete the liabilities of the loans that no validated paper supports any more (`keep` holds the references of
+    /// the loans that do): invalidating or deleting the papers takes back what they added.
+    pub async fn prune(&self, keep: &[String]) -> Result<Vec<String>> {
+        let mut removed = Vec::new();
+        for h in self.assets.get_alternative_holdings()? {
+            if h.kind != AssetKind::Liability {
+                continue;
+            }
+            let Some(reference) = h
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get(LOAN_REFERENCE_KEY))
+                .and_then(Value::as_str)
+            else {
+                continue;
+            };
+            if !keep.iter().any(|k| k == reference) {
+                self.assets.delete_alternative_asset(&h.id).await?;
+                removed.push(h.id);
+            }
+        }
+        Ok(removed)
+    }
+
     /// Create the liability of every consistent loan and bring it up to date with the papers. Returns the ids of
     /// the liabilities created or changed.
     pub async fn sync(&self, views: &[LoanView], currency: &str) -> Result<Vec<String>> {
         let mut touched = Vec::new();
+        let mut relink: Option<String> = None;
         for view in views {
             // a loan whose papers disagree waits for the person: nothing is built on figures that do not match
             if view.key == "?" || view.plan.problems() > 0 {
@@ -376,7 +412,18 @@ impl LoanLiabilities {
             let Some(origination) = setup.origination_date else {
                 continue;
             };
-            let (asset_id, stored) = match self.find(&view.key)? {
+            let found = match self.find(&view.key)? {
+                // events the papers no longer state (a letter that was deleted) cannot be taken back one by one:
+                // the liability is built again from the papers that remain, and keeps its asset
+                Some((asset_id, stored)) if has_stale_events(&stored, view) => {
+                    let linked = self.state_of(&view.key)?.and_then(|(_, linked)| linked);
+                    self.assets.delete_alternative_asset(&asset_id).await?;
+                    relink = linked;
+                    None
+                }
+                other => other,
+            };
+            let (asset_id, stored) = match found {
                 Some(found) => found,
                 None => {
                     let created = self
@@ -393,7 +440,7 @@ impl LoanLiabilities {
                                 "sub_type": "mortgage",
                                 LOAN_REFERENCE_KEY: view.key,
                             })),
-                            linked_asset_id: None,
+                            linked_asset_id: relink.take(),
                             loan: Some(setup),
                         })
                         .await?;

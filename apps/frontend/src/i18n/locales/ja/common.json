@@ -508,7 +508,8 @@
       "accountMismatch": "このプロフィールに最初にリンクされたConnectアカウントでログインしてください。",
       "teamChanged": "世帯が変更されました。続行するにはWealthfolio Connectに再接続してください。",
       "rebind": "Wealthfolio Connectに再接続して、このプロフィールのアカウントと世帯を確認してください。"
-    }
+    },
+    "resetDataManage": "Manage profile"
   },
   "remove": "削除",
   "remove_item": "{{name}} を削除",

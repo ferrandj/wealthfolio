@@ -1,3 +1,4 @@
+import { Button } from "@wealthfolio/ui";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useTranslation } from "react-i18next";
 import { usePlatform } from "@/hooks/use-platform";
@@ -36,18 +37,24 @@ export default function GeneralSettingsPage() {
           <AutoUpdateSettings />
         </div>
       )}
-      {profile?.profile && profile.resetProfile && (
+      {profile?.resetProfile && (
         <section className="border-destructive/25 space-y-2 border-t pt-6">
           <h2 className="font-medium">{tc("profiles.resetDataTitle")}</h2>
           <p className="text-muted-foreground text-sm">
             {tc(
-              profile.profile.lockEnabled
+              profile.profile?.lockEnabled
                 ? "profiles.resetDataProtected"
                 : "profiles.resetDataHelp",
             )}
           </p>
-          {/* Deleting a protected profile asks for its password, so only unprotected ones reset here. */}
-          {!profile.profile.lockEnabled && <ResetProfileButton onConfirm={profile.resetProfile} />}
+          {/* Deleting a protected profile asks for its password: its management screen does that. */}
+          {profile.profile?.lockEnabled && profile.manageProfile ? (
+            <Button type="button" variant="destructive" onClick={profile.manageProfile}>
+              {tc("profiles.resetDataManage")}
+            </Button>
+          ) : (
+            <ResetProfileButton onConfirm={profile.resetProfile} />
+          )}
         </section>
       )}
     </div>

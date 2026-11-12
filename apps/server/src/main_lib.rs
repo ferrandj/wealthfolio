@@ -992,6 +992,16 @@ async fn initialize_profile_state(
     statement_concrete.attach_loan_liabilities(Arc::new(
         wealthfolio_core::statements::LoanLiabilities::new(alternative_asset_service.clone()),
     ));
+    // the loans imported before their liabilities existed catch up once, in the background
+    {
+        let statements = statement_concrete.clone();
+        tokio::spawn(async move {
+            use wealthfolio_core::statements::StatementServiceTrait;
+            if let Err(e) = statements.sync_loan_liabilities().await {
+                warn!("could not bring the loan liabilities up to date: {e}");
+            }
+        });
+    }
 
     // Custom asset logo overrides
     let asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync> =

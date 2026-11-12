@@ -26,11 +26,14 @@ pub struct ReviewReason {
     /// Warnings the reader raised.
     #[serde(default)]
     pub warnings: u32,
+    /// The document brings no operations to check but still waits for the person to validate it (a loan paper).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub confirm: bool,
 }
 
 impl ReviewReason {
     pub fn is_clear(&self) -> bool {
-        self.doubts == 0 && self.balance_gap.is_none() && self.warnings == 0
+        self.doubts == 0 && self.balance_gap.is_none() && self.warnings == 0 && !self.confirm
     }
 
     pub fn to_json(&self) -> Option<String> {
@@ -44,6 +47,7 @@ impl ReviewReason {
     pub fn merge(&mut self, other: ReviewReason) {
         self.doubts += other.doubts;
         self.warnings += other.warnings;
+        self.confirm |= other.confirm;
         if self.balance_gap.is_none() {
             self.balance_gap = other.balance_gap;
         }
@@ -82,6 +86,7 @@ pub fn assess(preview: &StatementPreview, doubts: u32) -> ReviewReason {
         doubts,
         balance_gap: balance_gap(preview).map(|g| g.normalize().to_string()),
         warnings: preview.warnings.len() as u32,
+        confirm: false,
     }
 }
 
@@ -383,5 +388,26 @@ mod transfer_tests {
             Some("cat_transfers_own"),
             "high"
         ));
+    }
+
+    #[test]
+    fn a_loan_paper_waits_for_the_person_even_when_nothing_is_wrong() {
+        let waiting = ReviewReason {
+            confirm: true,
+            ..ReviewReason::default()
+        };
+        assert!(!waiting.is_clear());
+        assert!(waiting.to_json().unwrap().contains("confirm"));
+        // once the person validates, nothing is left to check, and the stored reason of other papers is unchanged
+        assert!(ReviewReason::default().is_clear());
+        assert_eq!(
+            ReviewReason {
+                doubts: 2,
+                ..ReviewReason::default()
+            }
+            .to_json()
+            .unwrap(),
+            "{\"doubts\":2,\"balanceGap\":null,\"warnings\":0}"
+        );
     }
 }

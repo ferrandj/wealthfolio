@@ -2,6 +2,7 @@ import {
   deleteStatementDocument,
   getStatementOutdated,
   invalidateAllStatementDocuments,
+  getStatementLoans,
   linkStatementDocument,
   listStatementDocuments,
   revalidateAllStatementDocuments,
@@ -12,6 +13,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { StatementDocument } from "@/lib/types/statements";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
+import { LOAN_KINDS, loanOfDocument } from "./loan-validation-card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -56,6 +58,10 @@ export function DocumentsLibrary() {
   const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "tree">("list");
 
+  const { data: loans } = useQuery({
+    queryKey: [QueryKeys.STATEMENT_LOANS],
+    queryFn: getStatementLoans,
+  });
   const { data: documents, isLoading } = useQuery({
     queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
     queryFn: listStatementDocuments,
@@ -209,101 +215,118 @@ export function DocumentsLibrary() {
         })
       : t("settings:documents.revalidate_one");
 
-  const renderDoc = (doc: StatementDocument) => (
-    <Card key={doc.id}>
-      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
-        <Icons.FileText className="text-muted-foreground hidden size-5 shrink-0 md:block" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium" title={doc.storedName}>
-            {doc.storedName}
+  const renderDoc = (doc: StatementDocument) => {
+    const isLoan = LOAN_KINDS.includes(doc.documentKind ?? "");
+    const loan = isLoan ? loanOfDocument(loans, doc.id) : undefined;
+    return (
+      <Card key={doc.id}>
+        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
+          <Icons.FileText className="text-muted-foreground hidden size-5 shrink-0 md:block" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium" title={doc.storedName}>
+              {doc.storedName}
+            </div>
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+              <span>{doc.createdAt.slice(0, 10)}</span>
+              <span>{formatBytes(doc.sizeBytes)}</span>
+              {doc.periodStart && doc.periodEnd && (
+                <span>
+                  {doc.periodStart} → {doc.periodEnd}
+                </span>
+              )}
+              {doc.status === "STORED" ? (
+                <Badge variant="outline">{t("settings:documents.kept_only")}</Badge>
+              ) : (
+                <>
+                  <Badge variant="secondary">
+                    {t("settings:documents.operations_added", { count: doc.importedCount })}
+                  </Badge>
+                  <StatusBadge doc={doc} />
+                  {outdatedIds.has(doc.id) && (
+                    <Badge variant="outline">{t("settings:documents.reader_outdated")}</Badge>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
-            <span>{doc.createdAt.slice(0, 10)}</span>
-            <span>{formatBytes(doc.sizeBytes)}</span>
-            {doc.periodStart && doc.periodEnd && (
-              <span>
-                {doc.periodStart} → {doc.periodEnd}
-              </span>
-            )}
-            {doc.status === "STORED" ? (
-              <Badge variant="outline">{t("settings:documents.kept_only")}</Badge>
+          <div className="w-full md:w-56">
+            {isLoan ? (
+              <div className="space-y-0.5 text-sm">
+                <div className="truncate font-medium">
+                  {loan?.label ?? t("settings:documents.loan")}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {loan?.liabilityId
+                    ? t("settings:documents.loan_in_liabilities")
+                    : t("settings:documents.loan_waiting")}
+                </div>
+              </div>
             ) : (
-              <>
-                <Badge variant="secondary">
-                  {t("settings:documents.operations_added", { count: doc.importedCount })}
-                </Badge>
-                <StatusBadge doc={doc} />
-                {outdatedIds.has(doc.id) && (
-                  <Badge variant="outline">{t("settings:documents.reader_outdated")}</Badge>
-                )}
-              </>
+              <Select
+                items={accountItems}
+                value={doc.accountId ?? NO_ACCOUNT}
+                onValueChange={(value) =>
+                  link.mutate({
+                    id: doc.id,
+                    accountId: value === NO_ACCOUNT ? null : String(value),
+                  })
+                }
+              >
+                <SelectTrigger aria-label={t("settings:documents.account")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {accountItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
-        </div>
-        <div className="w-full md:w-56">
-          <Select
-            items={accountItems}
-            value={doc.accountId ?? NO_ACCOUNT}
-            onValueChange={(value) =>
-              link.mutate({
-                id: doc.id,
-                accountId: value === NO_ACCOUNT ? null : String(value),
-              })
-            }
-          >
-            <SelectTrigger aria-label={t("settings:documents.account")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {accountItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex gap-1">
-          {doc.status === "PENDING" && (
-            <Button type="button" size="sm" onClick={() => setReviewing(doc.id)}>
-              {t("settings:documents.review_one")}
-            </Button>
-          )}
-          {doc.status !== "STORED" && (
+          <div className="flex gap-1">
+            {doc.status === "PENDING" && (
+              <Button type="button" size="sm" onClick={() => setReviewing(doc.id)}>
+                {t("settings:documents.review_one")}
+              </Button>
+            )}
+            {doc.status !== "STORED" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={revalidateOne.isPending || revalidateAll.isPending}
+                onClick={() => onRevalidateClick(doc)}
+                aria-label={t("settings:documents.revalidate_one")}
+                title={revalidateTitle(doc)}
+              >
+                <Icons.RefreshCw className="size-4" />
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              disabled={revalidateOne.isPending || revalidateAll.isPending}
-              onClick={() => onRevalidateClick(doc)}
-              aria-label={t("settings:documents.revalidate_one")}
-              title={revalidateTitle(doc)}
+              onClick={() => void download(doc)}
+              aria-label={t("settings:documents.download")}
             >
-              <Icons.RefreshCw className="size-4" />
+              <Icons.Download className="size-4" />
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => void download(doc)}
-            aria-label={t("settings:documents.download")}
-          >
-            <Icons.Download className="size-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setToDelete(doc)}
-            aria-label={t("settings:documents.delete")}
-          >
-            <Icons.Trash className="size-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setToDelete(doc)}
+              aria-label={t("settings:documents.delete")}
+            >
+              <Icons.Trash className="size-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   // institution → account → kind → year
   const renderTree = () => {

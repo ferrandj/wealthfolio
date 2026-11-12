@@ -127,12 +127,10 @@ fn mode_of(preview: &StatementPreview) -> ImportMode {
     }
 }
 
-/// The account a document that brings no cash operations still belongs to: the contract of a loan or of a life
-/// insurance. Letters, fee summaries and the like belong to an account that already exists.
+/// The account a document that brings no cash operations still belongs to: the contract of a life insurance. Letters, fee summaries and the like belong to an account that already exists.
 fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
     let kind = preview.document_kind.as_deref().unwrap_or("");
     match (kind, preview.account_type.as_deref()) {
-        ("loan_offer", _) => Some(account_types::CASH),
         ("statement", Some("life_insurance")) => Some(account_types::SECURITIES),
         // an arbitrage letter names the contract it moves money in: the contract exists even before its first statement
         ("info", Some("life_insurance")) if preview.account_number.is_some() => {
@@ -1288,6 +1286,59 @@ impl StatementService {
         ))
     }
 
+    /// Deleting a document takes back what its import added, the account included when the import created it and
+    /// nothing else is left in it: no operation, no other document. An account that existed before is never removed.
+    async fn remove_account_made_by(&self, document: &StatementDocument) -> Result<()> {
+        let Some(account_id) = document.account_id.as_deref() else {
+            return Ok(());
+        };
+        let account = self.account_service.get_account(account_id)?;
+        let made_by_the_import = chrono::DateTime::parse_from_rfc3339(&document.created_at)
+            .map(|at| {
+                let gap = at.naive_utc() - account.created_at;
+                gap >= chrono::Duration::seconds(-60) && gap <= chrono::Duration::minutes(15)
+            })
+            .unwrap_or(false);
+        if !made_by_the_import {
+            return Ok(());
+        }
+        let other_documents = self
+            .repository
+            .list_documents()?
+            .iter()
+            .any(|d| d.account_id.as_deref() == Some(account_id));
+        let operations = self
+            .activity_service
+            .get_activities()?
+            .iter()
+            .any(|a| a.account_id == account_id);
+        if !other_documents && !operations {
+            self.account_service.delete_account(account_id).await?;
+        }
+        Ok(())
+    }
+
+    /// The loans rebuilt from the validated papers only.
+    fn build_validated_loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
+        let documents = self.repository.list_documents()?;
+        let data: Vec<_> = self
+            .repository
+            .list_loan_documents()?
+            .into_iter()
+            .filter(|d| {
+                documents
+                    .iter()
+                    .any(|x| x.id == d.document_id && x.status == DOCUMENT_STATUS_VALIDATED)
+            })
+            .collect();
+        Ok(super::assemble_loans(
+            &data,
+            &documents,
+            &self.repository.list_loan_settings()?,
+            today,
+        ))
+    }
+
     /// The papers of a loan belong to the account of its contract: a letter or a table that arrived without an
     /// account is attached to it.
     async fn attach_loan_papers(&self, views: &[super::LoanView]) -> Result<()> {
@@ -1316,21 +1367,33 @@ impl StatementService {
 
     /// Bring the liabilities of the loans up to date with the papers.
     async fn sync_liabilities(&self, views: &[super::LoanView]) -> Result<Vec<String>> {
-        match self.loan_liabilities.get() {
-            Some(liabilities) => liabilities.sync(views, "EUR").await,
-            None => Ok(Vec::new()),
-        }
+        let Some(liabilities) = self.loan_liabilities.get() else {
+            return Ok(Vec::new());
+        };
+        // `views` are rebuilt from the validated papers only: the others add nothing, and what an invalidated or
+        // deleted paper added is taken back
+        let validated = views;
+        let keep: Vec<String> = validated.iter().map(|v| v.key.clone()).collect();
+        let mut done = liabilities.prune(&keep).await?;
+        done.extend(liabilities.sync(validated, "EUR").await?);
+        Ok(done)
     }
 
     /// A loan paper is validated when the loan rebuilt from all the papers holds together; otherwise it waits for
     /// review with the problems found.
     async fn sync_loan_statuses(&self) -> Result<()> {
-        let views = self.build_loans(Utc::now().date_naive())?;
+        let today = Utc::now().date_naive();
+        let views = self.build_loans(today)?;
         if let Err(e) = self.attach_loan_papers(&views).await {
             warn!("could not attach the loan papers to their account: {e}");
         }
-        if let Err(e) = self.sync_liabilities(&views).await {
-            warn!("could not keep the liabilities of the loans: {e}");
+        match self.build_validated_loans(today) {
+            Ok(validated) => {
+                if let Err(e) = self.sync_liabilities(&validated).await {
+                    warn!("could not keep the liabilities of the loans: {e}");
+                }
+            }
+            Err(e) => warn!("could not read the validated loan papers: {e}"),
         }
         for document in self.repository.list_documents()? {
             if !document
@@ -1344,10 +1407,13 @@ impl StatementService {
             let Some(problems) = super::document_problems(&views, &document.id) else {
                 continue;
             };
+            // a loan paper is never validated by itself: it waits for the person, who is asked what the papers
+            // leave open (the date of the first instalment)
             let reason = ReviewReason {
                 doubts: 0,
                 balance_gap: None,
                 warnings: (document.warnings.len() + problems.len()) as u32,
+                confirm: document.status != DOCUMENT_STATUS_VALIDATED,
             };
             let mut updated = document.clone();
             apply_reason(&mut updated, &reason);
@@ -1968,6 +2034,11 @@ impl StatementServiceTrait for StatementService {
             }
         }
         self.repository.delete_document(id).await?;
+        if remove_operations {
+            if let Err(e) = self.remove_account_made_by(&document).await {
+                warn!("could not remove the account this document had created: {e}");
+            }
+        }
         if let Err(e) = self.sync_loan_statuses().await {
             warn!("could not update the loan documents: {e}");
         }
@@ -2028,6 +2099,34 @@ impl StatementServiceTrait for StatementService {
         id: &str,
         decisions: Vec<ReviewDecision>,
     ) -> Result<StatementDocument> {
+        let loan_paper = self
+            .repository
+            .get_document(id)?
+            .and_then(|d| d.document_kind)
+            .map(|k| super::is_loan_kind(&k))
+            .unwrap_or(false);
+        if loan_paper {
+            // what the papers leave open is asked before the loan is kept: the date of the first instalment
+            let views = self.build_loans(Utc::now().date_naive())?;
+            let problems = super::document_problems(&views, id).unwrap_or_default();
+            if !problems.is_empty() {
+                return Err(invalid(format!(
+                    "The papers of this loan do not agree: {}",
+                    problems.join("; ")
+                )));
+            }
+            let view = views
+                .iter()
+                .find(|v| v.documents.iter().any(|d| d.document_id == id));
+            if view.map(|v| v.key.as_str()).unwrap_or("?") == "?" {
+                return Err(invalid("This paper does not name the loan it belongs to"));
+            }
+            if view.and_then(|v| v.inferred_first_due).is_none() {
+                return Err(invalid(
+                    "The date of the first instalment is needed: set it for this loan, then validate",
+                ));
+            }
+        }
         let review = self.review_document(id).await?;
         let chosen: HashMap<&str, &ReviewDecision> = decisions
             .iter()
@@ -2108,7 +2207,13 @@ impl StatementServiceTrait for StatementService {
         }
         let mut document = review.document;
         apply_reason(&mut document, &ReviewReason::default());
-        self.repository.update_document(document).await
+        let saved = self.repository.update_document(document).await?;
+        if loan_paper {
+            // the liability of the loan is made from the papers the person validated
+            self.sync_loan_statuses().await?;
+            return Ok(self.repository.get_document(id)?.unwrap_or(saved));
+        }
+        Ok(saved)
     }
 
     async fn revalidate_document(&self, id: &str) -> Result<StatementDocument> {
@@ -2125,17 +2230,31 @@ impl StatementServiceTrait for StatementService {
     async fn invalidate_all(&self) -> Result<u32> {
         let mut invalidated = 0;
         for mut document in self.repository.list_documents()? {
-            // only the statements that were validated: letters and loan papers have nothing to look at again
-            if document.status != DOCUMENT_STATUS_VALIDATED
-                || !matches!(document.document_kind.as_deref(), None | Some("statement"))
-                || document.import_run_id.is_none()
-            {
+            // the statements that were validated, and the loan papers (invalidating them takes back their liability)
+            let loan_paper = document
+                .document_kind
+                .as_deref()
+                .map(super::is_loan_kind)
+                .unwrap_or(false);
+            let statement = matches!(document.document_kind.as_deref(), None | Some("statement"))
+                && document.import_run_id.is_some();
+            if document.status != DOCUMENT_STATUS_VALIDATED || !(statement || loan_paper) {
                 continue;
             }
             document.status = DOCUMENT_STATUS_PENDING.to_string();
             document.validated_at = None;
+            if loan_paper {
+                document.review_reason = ReviewReason {
+                    confirm: true,
+                    ..ReviewReason::default()
+                }
+                .to_json();
+            }
             self.repository.update_document(document).await?;
             invalidated += 1;
+        }
+        if let Err(e) = self.sync_loan_statuses().await {
+            warn!("could not update the loan documents: {e}");
         }
         Ok(invalidated)
     }
@@ -2198,6 +2317,7 @@ impl StatementServiceTrait for StatementService {
                             doubts: 0,
                             balance_gap: None,
                             warnings: 1,
+                            confirm: false,
                         },
                     );
                     let saved = self
@@ -2364,10 +2484,8 @@ mod tests {
             p.account_number = number.map(str::to_string);
             own_account_type(&p)
         };
-        assert_eq!(
-            own("loan_offer", Some("mortgage"), None),
-            Some(account_types::CASH)
-        );
+        // a loan is a liability, kept when its papers are validated: it has no account
+        assert_eq!(own("loan_offer", Some("mortgage"), None), None);
         assert_eq!(
             own("statement", Some("life_insurance"), Some("123")),
             Some(account_types::SECURITIES)

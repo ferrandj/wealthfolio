@@ -544,7 +544,8 @@
     "unlock": "إلغاء القفل",
     "unlockLabel": "فتح قفل {{name}}",
     "welcome": "مرحبًا، {{name}}",
-    "yourProfile": "ملفك الشخصي"
+    "yourProfile": "ملفك الشخصي",
+    "resetDataManage": "Manage profile"
   },
   "quantity": "الكمية",
   "refresh": "تحديث",

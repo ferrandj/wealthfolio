@@ -674,6 +674,16 @@ async fn build_context(
     statement_concrete.attach_loan_liabilities(Arc::new(
         wealthfolio_core::statements::LoanLiabilities::new(alternative_asset_service.clone()),
     ));
+    // the loans imported before their liabilities existed catch up once, in the background
+    {
+        let statements = statement_concrete.clone();
+        tokio::spawn(async move {
+            use wealthfolio_core::statements::StatementServiceTrait;
+            if let Err(e) = statements.sync_loan_liabilities().await {
+                log::warn!("could not bring the loan liabilities up to date: {e}");
+            }
+        });
+    }
 
     let asset_logo_repository = Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone()));
     let asset_logo_service = Arc::new(AssetLogoService::new(

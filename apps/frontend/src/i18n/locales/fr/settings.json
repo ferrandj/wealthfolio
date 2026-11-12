@@ -2173,7 +2173,14 @@
     "overlap_question": "Que faire ? Choisissez maintenant, rien n'est importé avant.",
     "overlap_replace": "Remplacer l'ancien par celui-ci",
     "overlap_keep": "Garder les deux (opérations identiques non doublées)",
-    "overlap_skip": "Ne pas importer celui-ci"
+    "overlap_skip": "Ne pas importer celui-ci",
+    "loan_unknown": "Ce document ne nomme pas son prêt : il ne peut pas être validé.",
+    "loan_intro": "Rien n'est ajouté tant que vous n'avez pas validé : à la validation, le prêt apparaît dans Passifs avec son échéancier ; si vous invalidez ou supprimez le document, il disparaît.",
+    "loan_first_due_ask": "Les documents ne donnent pas la date de la 1re échéance : quelle est-elle ?",
+    "review_validate_loan": "Valider ce prêt",
+    "loan": "Prêt",
+    "loan_in_liabilities": "Dans Passifs",
+    "loan_waiting": "À valider : pas encore dans Passifs"
   },
   "identity": {
     "title": "Coordonnées du compte",
