@@ -113,3 +113,13 @@ missing / uncovered, the debited account). Two tools complete them:
 `set_loan_answers` (account debited, no early repayment, instalments unchanged)
 and `link_loan_document` (attach a letter without loan number to a loan).
 Validating one paper of a loan validates the loan, with all its papers.
+
+Loan accounts: each loan paper is attached to its loan account (a liability) as
+soon as it is imported (`attach_loan_document`: an existing liability, or a new
+account made empty and pending, prefilled from the paper). The account stays
+empty (metadata `statement_loan_status = pending`) until the loan is validated
+as a whole (`validate_loan`, or validating any of its papers): all its papers
+are validated in order (contract, dated tables, letters) and the liability is
+filled from them. Invalidating empties it again; deleting its last paper removes
+an account made at import, never one the person already had.
+`link_loan_document` is replaced by `attach_loan_document`.

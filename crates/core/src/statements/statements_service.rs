@@ -1472,15 +1472,24 @@ impl StatementService {
     }
 
     /// Bring the liabilities of the loans up to date with the papers.
-    async fn sync_liabilities(&self, views: &[super::LoanView]) -> Result<Vec<String>> {
+    async fn sync_liabilities(
+        &self,
+        views: &[super::LoanView],
+        all: &[super::LoanView],
+    ) -> Result<Vec<String>> {
         let Some(liabilities) = self.loan_liabilities.get() else {
             return Ok(Vec::new());
         };
         // `views` are rebuilt from the validated papers only: the others add nothing, and what an invalidated or
-        // deleted paper added is taken back
+        // deleted paper added is taken back; `all` tells which loans still have papers (their account stays, empty)
         let validated = views;
         let keep: Vec<String> = validated.iter().map(|v| v.key.clone()).collect();
-        let mut done = liabilities.prune(&keep).await?;
+        let attached: Vec<String> = all
+            .iter()
+            .filter(|v| v.key != "?")
+            .map(|v| v.key.clone())
+            .collect();
+        let mut done = liabilities.prune(&keep, &attached).await?;
         done.extend(liabilities.sync(validated, "EUR").await?);
         Ok(done)
     }
@@ -1495,7 +1504,7 @@ impl StatementService {
         }
         match self.build_validated_loans(today) {
             Ok(validated) => {
-                if let Err(e) = self.sync_liabilities(&validated).await {
+                if let Err(e) = self.sync_liabilities(&validated, &views).await {
                     warn!("could not keep the liabilities of the loans: {e}");
                 }
             }
@@ -2219,36 +2228,18 @@ impl StatementServiceTrait for StatementService {
             .map(|k| super::is_loan_kind(&k))
             .unwrap_or(false);
         if loan_paper {
-            // the instalments really debited are dated by the bank statements, so no date is asked here
-            let views = self.build_loans(Utc::now().date_naive())?;
-            let problems = super::document_problems(&views, id).unwrap_or_default();
-            if !problems.is_empty() {
-                return Err(invalid(format!(
-                    "The papers of this loan do not agree: {}",
-                    problems.join("; ")
-                )));
-            }
-            let view = views
-                .iter()
-                .find(|v| v.documents.iter().any(|d| d.document_id == id));
-            if view.map(|v| v.key.as_str()).unwrap_or("?") == "?" {
-                return Err(invalid("This paper does not name the loan it belongs to"));
-            }
-            let blocking: Vec<&str> = view
-                .map(|v| {
-                    v.gaps
-                        .iter()
-                        .filter(|g| g.blocking)
-                        .map(|g| g.text.as_str())
-                        .collect()
-                })
-                .unwrap_or_default();
-            if !blocking.is_empty() {
-                return Err(invalid(format!(
-                    "Information is missing to validate this loan: {}",
-                    blocking.join(" ")
-                )));
-            }
+            // a loan is validated as a whole, its papers in their order: the paper only says which loan
+            let key = self
+                .build_loans(Utc::now().date_naive())?
+                .into_iter()
+                .find(|v| v.documents.iter().any(|d| d.document_id == id))
+                .map(|v| v.key)
+                .unwrap_or_else(|| "?".to_string());
+            self.validate_loan(&key).await?;
+            return self
+                .repository
+                .get_document(id)?
+                .ok_or_else(|| invalid("Document not found"));
         }
         let review = self.review_document(id).await?;
         let chosen: HashMap<&str, &ReviewDecision> = decisions
@@ -2330,30 +2321,7 @@ impl StatementServiceTrait for StatementService {
         }
         let mut document = review.document;
         apply_reason(&mut document, &ReviewReason::default());
-        let saved = self.repository.update_document(document).await?;
-        if loan_paper {
-            // the person validates the loan, as the dialog shows it with all its papers: the others are validated
-            // with it, and the liability is made from them
-            let views = self.build_loans(Utc::now().date_naive())?;
-            let siblings: Vec<String> = views
-                .iter()
-                .filter(|v| v.documents.iter().any(|d| d.document_id == id))
-                .flat_map(|v| v.documents.iter().map(|d| d.document_id.clone()))
-                .filter(|other| other != id)
-                .collect();
-            for other in siblings {
-                let Some(mut sibling) = self.repository.get_document(&other)? else {
-                    continue;
-                };
-                if sibling.status != DOCUMENT_STATUS_VALIDATED {
-                    apply_reason(&mut sibling, &ReviewReason::default());
-                    self.repository.update_document(sibling).await?;
-                }
-            }
-            self.sync_loan_statuses().await?;
-            return Ok(self.repository.get_document(id)?.unwrap_or(saved));
-        }
-        Ok(saved)
+        self.repository.update_document(document).await
     }
 
     async fn revalidate_document(&self, id: &str) -> Result<StatementDocument> {
@@ -2512,10 +2480,29 @@ impl StatementServiceTrait for StatementService {
     fn loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
         let mut views = self.build_loans(today)?;
         if let Some(liabilities) = self.loan_liabilities.get() {
+            let accounts = liabilities.accounts()?;
             for view in &mut views {
-                if let Some((liability_id, linked)) = liabilities.state_of(&view.key)? {
-                    view.liability_id = Some(liability_id);
-                    view.linked_asset_id = linked;
+                match accounts.iter().find(|a| a.key == view.key) {
+                    Some(account) => {
+                        view.liability_id = Some(account.id.clone());
+                        view.linked_asset_id = account.linked_asset_id.clone();
+                        view.liability_name = Some(account.name.clone());
+                        view.liability_pending = account.pending;
+                    }
+                    None if view.key != "?" => view.gaps.insert(
+                        0,
+                        super::LoanGap {
+                            code: "no_account".into(),
+                            text: "Ces papiers ne sont rattachés à aucun compte d'emprunt : créez le compte \
+                                   (prérempli avec ce que disent les papiers, modifiable) ou rattachez-les à un \
+                                   compte d'emprunt que vous avez déjà."
+                                .into(),
+                            found_in: Vec::new(),
+                            blocking: true,
+                            answer: Some("attach_account".into()),
+                        },
+                    ),
+                    None => {}
                 }
             }
         }
@@ -2534,9 +2521,11 @@ impl StatementServiceTrait for StatementService {
     }
 
     async fn sync_loan_liabilities(&self) -> Result<Vec<String>> {
-        let views = self.build_loans(Utc::now().date_naive())?;
+        let today = Utc::now().date_naive();
+        let views = self.build_loans(today)?;
         self.attach_loan_papers(&views).await?;
-        self.sync_liabilities(&views).await
+        let validated = self.build_validated_loans(today)?;
+        self.sync_liabilities(&validated, &views).await
     }
 
     async fn set_loan_first_due(
@@ -2553,30 +2542,129 @@ impl StatementServiceTrait for StatementService {
         self.sync_loan_statuses().await
     }
 
-    async fn link_loan_document(&self, document_id: &str, loan_key: Option<String>) -> Result<()> {
+    async fn attach_loan_document(
+        &self,
+        document_id: &str,
+        choice: super::LoanAccountChoice,
+    ) -> Result<String> {
+        let Some(liabilities) = self.loan_liabilities.get() else {
+            return Err(invalid("The liabilities are not available here"));
+        };
         let mut data = self
             .repository
             .list_loan_documents()?
             .into_iter()
             .find(|d| d.document_id == document_id)
             .ok_or_else(|| invalid("This document is not a loan paper"))?;
-        if data.kind != super::loans::KIND_EVENT {
+        let current = self
+            .build_loans(Utc::now().date_naive())?
+            .into_iter()
+            .find(|v| v.documents.iter().any(|d| d.document_id == document_id))
+            .map(|v| v.key)
+            .filter(|k| k != "?")
+            .or_else(|| data.reference.clone());
+        let generated = || {
+            format!(
+                "PRET-{}",
+                uuid::Uuid::new_v4().simple().to_string()[..8].to_uppercase()
+            )
+        };
+        let key = match (choice.liability_id, choice.new_account) {
+            (Some(_), Some(_)) => {
+                return Err(invalid(
+                    "Give either an existing loan account or a new one, not both",
+                ))
+            }
+            (Some(id), None) => {
+                let fallback = current.clone().unwrap_or_else(generated);
+                liabilities.adopt(&id, &fallback).await?
+            }
+            (None, Some(new)) => {
+                let key = new
+                    .key
+                    .map(|k| k.trim().to_string())
+                    .filter(|k| !k.is_empty() && k != "?")
+                    .or(current.clone())
+                    .unwrap_or_else(generated);
+                liabilities.create_pending(&new.name, &key, "EUR").await?;
+                key
+            }
+            (None, None) => return Err(invalid("Choose a loan account or a new one")),
+        };
+        if let Some(object) = data.payload.as_object_mut() {
+            object.insert(super::loans::ACCOUNT_KEY.into(), serde_json::json!(key));
+        }
+        self.repository.save_loan_document(data).await?;
+        self.sync_loan_statuses().await?;
+        Ok(key)
+    }
+
+    async fn validate_loan(&self, loan_key: &str) -> Result<Vec<StatementDocument>> {
+        if loan_key == "?" {
             return Err(invalid(
-                "Only a letter without loan number (early repayment notice) can be attached by hand: the offer and the table name their loan",
+                "This paper is not attached to a loan account: attach it to one first",
             ));
         }
-        if let Some(key) = &loan_key {
-            let known = self
-                .build_loans(Utc::now().date_naive())?
-                .iter()
-                .any(|v| &v.key == key && v.key != "?");
-            if !known {
-                return Err(invalid("Unknown loan"));
-            }
+        let view = self
+            .loans(Utc::now().date_naive())?
+            .into_iter()
+            .find(|v| v.key == loan_key)
+            .ok_or_else(|| invalid("Unknown loan"))?;
+        let problems: Vec<&str> = view
+            .plan
+            .checks
+            .iter()
+            .filter(|c| c.status == "warn")
+            .map(|c| c.text.as_str())
+            .collect();
+        if !problems.is_empty() {
+            return Err(invalid(format!(
+                "The papers of this loan do not agree: {}",
+                problems.join("; ")
+            )));
         }
-        data.reference = loan_key;
-        self.repository.save_loan_document(data).await?;
-        self.sync_loan_statuses().await
+        let blocking: Vec<&str> = view
+            .gaps
+            .iter()
+            .filter(|g| g.blocking)
+            .map(|g| g.text.as_str())
+            .collect();
+        if !blocking.is_empty() {
+            return Err(invalid(format!(
+                "Information is missing to validate this loan: {}",
+                blocking.join(" ")
+            )));
+        }
+        // the contract first, then the dated tables, then the letters; each in the order of its dates
+        let documents = self.repository.list_documents()?;
+        let rank = |kind: &str| match kind {
+            super::loans::KIND_OFFER => 0,
+            super::loans::KIND_SCHEDULE => 1,
+            _ => 2,
+        };
+        let mut papers: Vec<(u8, String, StatementDocument)> = view
+            .documents
+            .iter()
+            .filter_map(|r| {
+                let d = documents.iter().find(|d| d.id == r.document_id)?.clone();
+                let when = d
+                    .period_start
+                    .clone()
+                    .unwrap_or_else(|| d.created_at.clone());
+                Some((rank(&r.kind), when, d))
+            })
+            .collect();
+        papers.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        let mut validated = Vec::new();
+        for (_, _, mut paper) in papers {
+            if paper.status != DOCUMENT_STATUS_VALIDATED {
+                apply_reason(&mut paper, &ReviewReason::default());
+                paper = self.repository.update_document(paper).await?;
+            }
+            validated.push(paper);
+        }
+        self.sync_loan_statuses().await?;
+        Ok(validated)
     }
 
     async fn set_loan_answers(&self, loan_key: &str, answers: super::LoanAnswers) -> Result<()> {

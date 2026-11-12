@@ -1115,6 +1115,8 @@ mod tests {
             plan,
             liability_id: None,
             linked_asset_id: None,
+            liability_name: None,
+            liability_pending: false,
             first_due_source: None,
             answers: Default::default(),
             gaps: Vec::new(),

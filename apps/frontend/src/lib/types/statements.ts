@@ -394,6 +394,12 @@ export interface LoanDocumentRef {
   status: string;
 }
 
+/** Where an imported loan paper goes: an existing loan account, or a new one (empty, pending). */
+export interface LoanAccountChoice {
+  liabilityId?: string | null;
+  newAccount?: { name: string; key?: string | null } | null;
+}
+
 /** What the person told about a loan, when the papers could not. */
 export interface LoanAnswers {
   debitAccountId?: string | null;
@@ -408,7 +414,7 @@ export interface LoanGap {
   /** loan_offer | loan_event | loan_schedule | statement */
   foundIn: string[];
   blocking: boolean;
-  /** first_due | debit_account | no_early_repayment | payments_unchanged */
+  /** first_due | debit_account | no_early_repayment | payments_unchanged | attach_account */
   answer?: string | null;
 }
 
@@ -454,6 +460,10 @@ export interface LoanView {
   liabilityId?: string | null;
   /** The asset (house, car…) this loan finances. */
   linkedAssetId?: string | null;
+  /** The loan account (liability) the papers are attached to. */
+  liabilityName?: string | null;
+  /** The loan account exists but waits for its papers to be validated (it stays empty). */
+  liabilityPending?: boolean;
   /** Where instalment n°1 comes from: papers | statements | typed. */
   firstDueSource?: "papers" | "statements" | "typed" | null;
   answers?: LoanAnswers;

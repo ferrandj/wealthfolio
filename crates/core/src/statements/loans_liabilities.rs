@@ -19,11 +19,49 @@ use crate::assets::loan::{
 };
 use crate::assets::{
     AlternativeAssetServiceTrait, AssetKind, CreateAlternativeAssetRequest, LinkLiabilityRequest,
+    UpdateAssetDetailsRequest,
 };
 use crate::errors::{Error, Result, ValidationError};
 
 /// The metadata key that ties a liability to the loan reference printed on the papers.
 pub const LOAN_REFERENCE_KEY: &str = "statement_loan_key";
+/// "pending" while the loan account waits for its papers to be validated: it exists, empty.
+pub const LOAN_STATUS_KEY: &str = "statement_loan_status";
+/// How the loan account came: "import" (made when a paper was imported) or "adopted" (an account the person already
+/// had, to which the papers were attached; it is never deleted with them).
+pub const LOAN_ORIGIN_KEY: &str = "statement_loan_origin";
+
+/// Where a loan paper goes when it is imported: an account the person already has, or a new one.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoanAccountChoice {
+    #[serde(default)]
+    pub liability_id: Option<String>,
+    #[serde(default)]
+    pub new_account: Option<NewLoanAccount>,
+}
+
+/// A new loan account, prefilled from the paper and edited by the person.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewLoanAccount {
+    pub name: String,
+    /// The loan reference; the paper's when left empty.
+    #[serde(default)]
+    pub key: Option<String>,
+}
+
+/// A loan account (liability) tied to a loan.
+#[derive(Debug, Clone)]
+pub struct LoanAccount {
+    pub id: String,
+    pub name: String,
+    pub key: String,
+    pub linked_asset_id: Option<String>,
+    pub pending: bool,
+    pub origin: Option<String>,
+    pub metadata: Value,
+}
 
 fn amount(v: Decimal) -> f64 {
     v.round_dp(2).to_f64().unwrap_or(0.0)
@@ -279,35 +317,126 @@ impl LoanLiabilities {
         Self { assets }
     }
 
-    /// The liability of a loan, if it exists: its asset id and stored metadata.
-    fn find(&self, reference: &str) -> Result<Option<(String, Value)>> {
+    /// Every loan account (liability tied to a loan).
+    pub fn accounts(&self) -> Result<Vec<LoanAccount>> {
         Ok(self
             .assets
             .get_alternative_holdings()?
             .into_iter()
             .filter(|h| h.kind == AssetKind::Liability)
-            .find_map(|h| {
+            .filter_map(|h| {
                 let metadata = h.metadata?;
-                (metadata.get(LOAN_REFERENCE_KEY).and_then(Value::as_str) == Some(reference))
-                    .then_some((h.id, metadata))
-            }))
+                let key = metadata.get(LOAN_REFERENCE_KEY)?.as_str()?.to_string();
+                let text = |k: &str| metadata.get(k).and_then(Value::as_str).map(str::to_string);
+                Some(LoanAccount {
+                    id: h.id,
+                    name: h.name,
+                    key,
+                    linked_asset_id: h.linked_asset_id,
+                    pending: text(LOAN_STATUS_KEY).as_deref() == Some("pending"),
+                    origin: text(LOAN_ORIGIN_KEY),
+                    metadata: metadata.clone(),
+                })
+            })
+            .collect())
+    }
+
+    /// The loan account of a loan, if it exists.
+    pub fn account(&self, reference: &str) -> Result<Option<LoanAccount>> {
+        Ok(self.accounts()?.into_iter().find(|a| a.key == reference))
     }
 
     /// The liability of a loan and the asset it is attached to.
     pub fn state_of(&self, reference: &str) -> Result<Option<(String, Option<String>)>> {
-        Ok(self
+        Ok(self.account(reference)?.map(|a| (a.id, a.linked_asset_id)))
+    }
+
+    async fn create_empty(
+        &self,
+        name: &str,
+        key: &str,
+        origin: &str,
+        currency: &str,
+        linked_asset_id: Option<String>,
+    ) -> Result<String> {
+        let created = self
+            .assets
+            .create_alternative_asset(CreateAlternativeAssetRequest {
+                kind: AssetKind::Liability,
+                name: name.to_string(),
+                currency: currency.to_string(),
+                current_value: Decimal::ZERO,
+                value_date: Utc::now().date_naive(),
+                purchase_price: None,
+                purchase_date: None,
+                metadata: Some(json!({
+                    "sub_type": "mortgage",
+                    LOAN_REFERENCE_KEY: key,
+                    LOAN_STATUS_KEY: "pending",
+                    LOAN_ORIGIN_KEY: origin,
+                })),
+                linked_asset_id,
+                loan: None,
+            })
+            .await?;
+        Ok(created.asset_id)
+    }
+
+    /// Make the loan account of a paper being imported, empty and not validated yet: what the papers say fills it
+    /// when they are validated.
+    pub async fn create_pending(&self, name: &str, key: &str, currency: &str) -> Result<String> {
+        if name.trim().is_empty() {
+            return Err(invalid("The loan account needs a name"));
+        }
+        if key.trim().is_empty() || key == "?" {
+            return Err(invalid("The loan account needs a reference"));
+        }
+        if self.account(key)?.is_some() {
+            return Err(invalid(format!(
+                "A loan account already has the reference {key}: attach the paper to it"
+            )));
+        }
+        self.create_empty(name.trim(), key.trim(), "import", currency, None)
+            .await
+    }
+
+    /// Tie a liability the person already has to a loan: its reference, or `key` if it has none yet.
+    pub async fn adopt(&self, liability_id: &str, key: &str) -> Result<String> {
+        let holding = self
             .assets
             .get_alternative_holdings()?
             .into_iter()
-            .filter(|h| h.kind == AssetKind::Liability)
-            .find(|h| {
-                h.metadata
-                    .as_ref()
-                    .and_then(|m| m.get(LOAN_REFERENCE_KEY))
-                    .and_then(Value::as_str)
-                    == Some(reference)
+            .find(|h| h.id == liability_id)
+            .ok_or_else(|| invalid("This loan account does not exist"))?;
+        if holding.kind != AssetKind::Liability {
+            return Err(invalid("A paper of a loan is attached to a liability"));
+        }
+        if let Some(existing) = holding
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get(LOAN_REFERENCE_KEY))
+            .and_then(Value::as_str)
+        {
+            return Ok(existing.to_string());
+        }
+        if self.account(key)?.is_some() {
+            return Err(invalid(format!(
+                "Another loan account already has the reference {key}"
+            )));
+        }
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert(LOAN_REFERENCE_KEY.to_string(), Some(key.to_string()));
+        metadata.insert(LOAN_ORIGIN_KEY.to_string(), Some("adopted".to_string()));
+        self.assets
+            .update_asset_details(UpdateAssetDetailsRequest {
+                asset_id: liability_id.to_string(),
+                name: None,
+                notes: None,
+                metadata: Some(metadata),
+                loan: None,
             })
-            .map(|h| (h.id, h.linked_asset_id)))
+            .await?;
+        Ok(key.to_string())
     }
 
     /// Attach the loan to the asset it finances (an existing one, or one created here), or detach it.
@@ -400,25 +529,35 @@ impl LoanLiabilities {
         })
     }
 
-    /// Delete the liabilities of the loans that no validated paper supports any more (`keep` holds the references of
-    /// the loans that do): invalidating or deleting the papers takes back what they added.
-    pub async fn prune(&self, keep: &[String]) -> Result<Vec<String>> {
+    /// Take back what the papers added once no validated paper supports a loan any more (`keep` holds the
+    /// references of the loans that are validated, `attached` those that still have papers): the account of a loan
+    /// whose papers wait for validation becomes empty and pending again; the account made at import goes with its
+    /// last paper; an account the person had before is kept.
+    pub async fn prune(&self, keep: &[String], attached: &[String]) -> Result<Vec<String>> {
         let mut removed = Vec::new();
-        for h in self.assets.get_alternative_holdings()? {
-            if h.kind != AssetKind::Liability {
+        for account in self.accounts()? {
+            if keep.contains(&account.key) {
                 continue;
             }
-            let Some(reference) = h
-                .metadata
-                .as_ref()
-                .and_then(|m| m.get(LOAN_REFERENCE_KEY))
-                .and_then(Value::as_str)
-            else {
+            if attached.contains(&account.key) {
+                if !account.pending {
+                    self.assets.delete_alternative_asset(&account.id).await?;
+                    let origin = account.origin.clone().unwrap_or_else(|| "import".into());
+                    self.create_empty(
+                        &account.name,
+                        &account.key,
+                        &origin,
+                        "EUR",
+                        account.linked_asset_id.clone(),
+                    )
+                    .await?;
+                    removed.push(account.id);
+                }
                 continue;
-            };
-            if !keep.iter().any(|k| k == reference) {
-                self.assets.delete_alternative_asset(&h.id).await?;
-                removed.push(h.id);
+            }
+            if account.origin.as_deref() != Some("adopted") {
+                self.assets.delete_alternative_asset(&account.id).await?;
+                removed.push(account.id);
             }
         }
         Ok(removed)
@@ -440,18 +579,27 @@ impl LoanLiabilities {
             let Some(origination) = setup.origination_date else {
                 continue;
             };
-            let found = match self.find(&view.key)? {
-                // events the papers no longer state (a letter that was deleted) cannot be taken back one by one:
-                // the liability is built again from the papers that remain, and keeps its asset
-                Some((asset_id, stored))
-                    if has_stale_events(&stored, view) || has_stale_terms(&stored, &setup) =>
+            let existing = self.account(&view.key)?;
+            let name = existing
+                .as_ref()
+                .map(|a| a.name.clone())
+                .unwrap_or_else(|| view.label.clone());
+            let origin = existing.as_ref().and_then(|a| a.origin.clone());
+            let found = match existing {
+                // an account waiting for its papers is filled now, and so is one whose events or terms the papers
+                // no longer state (a letter that was deleted): built again from the papers, it keeps its name and
+                // its asset
+                Some(account)
+                    if account.pending
+                        || has_stale_events(&account.metadata, view)
+                        || has_stale_terms(&account.metadata, &setup) =>
                 {
-                    let linked = self.state_of(&view.key)?.and_then(|(_, linked)| linked);
-                    self.assets.delete_alternative_asset(&asset_id).await?;
-                    relink = linked;
+                    self.assets.delete_alternative_asset(&account.id).await?;
+                    relink = account.linked_asset_id;
                     None
                 }
-                other => other,
+                Some(account) => Some((account.id, account.metadata)),
+                None => None,
             };
             let (asset_id, stored) = match found {
                 Some(found) => found,
@@ -460,7 +608,7 @@ impl LoanLiabilities {
                         .assets
                         .create_alternative_asset(CreateAlternativeAssetRequest {
                             kind: AssetKind::Liability,
-                            name: view.label.clone(),
+                            name: name.clone(),
                             currency: currency.to_string(),
                             current_value: view.principal.unwrap_or_default(),
                             value_date: origination,
@@ -469,6 +617,7 @@ impl LoanLiabilities {
                             metadata: Some(json!({
                                 "sub_type": "mortgage",
                                 LOAN_REFERENCE_KEY: view.key,
+                                LOAN_ORIGIN_KEY: origin.clone().unwrap_or_else(|| "import".into()),
                             })),
                             linked_asset_id: relink.take(),
                             loan: Some(setup),

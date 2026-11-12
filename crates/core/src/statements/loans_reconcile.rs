@@ -87,14 +87,14 @@ pub struct LoanPayments {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LoanGap {
-    /// loan_unknown | terms | first_due | debit_account | early_repayment | payments_changed | statements_missing | payment_missing
+    /// loan_unknown | no_account | terms | first_due | debit_account | early_repayment | payments_changed | statements_missing | payment_missing
     pub code: String,
     pub text: String,
     /// The papers where the missing fact can be found: loan_offer | loan_event | loan_schedule | statement.
     pub found_in: Vec<String>,
     /// A blocking gap keeps the loan from being validated.
     pub blocking: bool,
-    /// The answer the person can give instead: first_due | debit_account | no_early_repayment | payments_unchanged | link_loan.
+    /// The answer the person can give instead: first_due | debit_account | no_early_repayment | payments_unchanged | attach_account.
     pub answer: Option<String>,
 }
 
@@ -271,11 +271,11 @@ pub fn gaps_of(view: &LoanView) -> Vec<LoanGap> {
             "loan_unknown",
             "Ces papiers ne nomment pas leur prêt : un courrier de remboursement anticipé ne porte pas le numéro du \
              prêt. Il se rattache tout seul quand l'offre de prêt ou le tableau d'amortissement du prêt est \
-             importé (le capital restant dû y figure) ; vous pouvez aussi choisir le prêt auquel il appartient."
+             importé (le capital restant dû y figure) ; vous pouvez aussi le rattacher à un compte d'emprunt."
                 .into(),
             &[KIND_OFFER, KIND_SCHEDULE],
             true,
-            Some("link_loan"),
+            Some("attach_account"),
         ));
         return gaps;
     }

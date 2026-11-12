@@ -7,7 +7,8 @@ import { LoanValidationCard, blockingGaps, loanOfDocument } from "./loan-validat
 
 vi.mock("@/adapters", () => ({
   getStatementLoans: vi.fn(),
-  linkStatementLoanDocument: vi.fn(),
+  attachStatementLoanDocument: vi.fn(),
+  getAlternativeHoldings: vi.fn(),
   setStatementLoanAnswers: vi.fn(),
   setStatementLoanFirstDue: vi.fn(),
 }));

@@ -1,5 +1,7 @@
 import { analyzeStatement, importStatement, logger } from "@/adapters";
+import { LoanAccountDialog } from "../loans/loan-account-dialog";
 import { invalidateLoanCaches } from "../loans/loan-caches";
+import { LOAN_KINDS } from "./components/loan-validation-card";
 import { useAccounts } from "@/hooks/use-accounts";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { QueryKeys } from "@/lib/query-keys";
@@ -37,6 +39,8 @@ export default function DocumentsPage() {
   const [dragging, setDragging] = useState(false);
   // accounts this session's imports created: their owner is asked once the imports are done
   const [newAccounts, setNewAccounts] = useState<string[]>([]);
+  // each loan paper imported is attached to its loan account at once (made now, empty, if it does not exist)
+  const [attachQueue, setAttachQueue] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const patchFile = useCallback((id: string, patch: Partial<PendingFile>) => {
@@ -108,6 +112,14 @@ export default function DocumentsPage() {
           o.createdAccount && o.accountId ? [o.accountId] : [],
         );
         if (created.length > 0) setNewAccounts((list) => [...new Set([...list, ...created])]);
+        const imported = result.document;
+        if (
+          imported &&
+          !result.alreadyImported &&
+          LOAN_KINDS.includes(imported.documentKind ?? "")
+        ) {
+          setAttachQueue((list) => (list.includes(imported.id) ? list : [...list, imported.id]));
+        }
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
@@ -249,6 +261,10 @@ export default function DocumentsPage() {
         <h2 className="text-lg font-semibold">{t("settings:documents.library_title")}</h2>
         <DocumentsLibrary />
       </div>
+      <LoanAccountDialog
+        documentId={files.some((f) => f.status === "importing") ? null : (attachQueue[0] ?? null)}
+        onClose={() => setAttachQueue((list) => list.slice(1))}
+      />
       {newAccounts.length > 0 && !files.some((f) => f.status === "importing") ? (
         <AccountOwnerPrompt accountIds={newAccounts} onClose={() => setNewAccounts([])} />
       ) : null}

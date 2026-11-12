@@ -144,9 +144,16 @@ pub trait StatementServiceTrait: Send + Sync {
         first_due: Option<chrono::NaiveDate>,
     ) -> Result<()>;
 
-    /// Attach a letter of the bank (an early repayment notice carries no loan number) to a loan, or detach it
-    /// (`None`: the letter finds its loan by its figures again).
-    async fn link_loan_document(&self, document_id: &str, loan_key: Option<String>) -> Result<()>;
+    /// Attach a loan paper to its loan account when it is imported: an account the person already has (tied to the
+    /// loan), or a new one made empty and pending, prefilled from the paper. Returns the loan reference.
+    async fn attach_loan_document(
+        &self,
+        document_id: &str,
+        choice: super::LoanAccountChoice,
+    ) -> Result<String>;
+
+    /// Validate a loan account as a whole: all its papers, the contract first, once nothing blocking is missing.
+    async fn validate_loan(&self, loan_key: &str) -> Result<Vec<StatementDocument>>;
 
     /// What the person tells about a loan the papers cannot say: the account debited, "no early repayment",
     /// "instalments never changed".

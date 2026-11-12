@@ -11,14 +11,19 @@ export interface ReviewChoice {
   categoryId: string;
 }
 
+/** The papers of a loan come in their order: the contract, the dated tables, then the letters. */
+const loanRank = (kind: string | null | undefined): number =>
+  ({ loan_offer: 1, loan_schedule: 2, loan_event: 3 })[kind ?? ""] ?? 0;
+
 /**
  * The logical order to look at documents: account by account, oldest period first, so that each statement's
  * opening balance is the previous one's closing balance. Mirrors `logical_order` in the core crate.
  */
 export function logicalOrder(a: StatementDocument, b: StatementDocument): number {
-  const key = (d: StatementDocument): [number, string, number, string, string, string] => [
+  const key = (d: StatementDocument): [number, string, number, number, string, string, string] => [
     d.accountId ? 0 : 1,
     d.accountId ?? "",
+    loanRank(d.documentKind),
     d.periodStart ? 0 : 1,
     d.periodStart ?? "",
     d.periodEnd ?? "",

@@ -14,6 +14,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { StatementDocument } from "@/lib/types/statements";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
+import { LoanAccountDialog } from "../../loans/loan-account-dialog";
 import { LOAN_KINDS, loanOfDocument } from "./loan-validation-card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -58,6 +59,7 @@ export function DocumentsLibrary() {
   const [toDelete, setToDelete] = useState<StatementDocument | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [confirmInvalidate, setConfirmInvalidate] = useState(false);
+  const [attaching, setAttaching] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "tree">("list");
@@ -272,15 +274,29 @@ export function DocumentsLibrary() {
           </div>
           <div className="w-full md:w-56">
             {isLoan ? (
-              <div className="space-y-0.5 text-sm">
-                <div className="truncate font-medium">
-                  {loan?.label ?? t("settings:documents.loan")}
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <div className="min-w-0 space-y-0.5">
+                  <div className="truncate font-medium">
+                    {loan?.liabilityName ?? t("settings:loans.account_none")}
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    {!loan?.liabilityId
+                      ? t("settings:loans.account_to_attach")
+                      : loan.liabilityPending
+                        ? t("settings:loans.account_pending")
+                        : t("settings:loans.account_validated")}
+                  </div>
                 </div>
-                <div className="text-muted-foreground text-xs">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={loan?.liabilityId ? "ghost" : "default"}
+                  onClick={() => setAttaching(doc.id)}
+                >
                   {loan?.liabilityId
-                    ? t("settings:documents.loan_in_liabilities")
-                    : t("settings:documents.loan_waiting")}
-                </div>
+                    ? t("settings:loans.account_change")
+                    : t("settings:loans.account_open")}
+                </Button>
               </div>
             ) : (
               <Select
@@ -307,11 +323,6 @@ export function DocumentsLibrary() {
             )}
           </div>
           <div className="flex gap-1">
-            {doc.status === "PENDING" && (
-              <Button type="button" size="sm" onClick={() => setReviewing(doc.id)}>
-                {t("settings:documents.review_one")}
-              </Button>
-            )}
             {doc.status !== "STORED" && (
               <Button
                 type="button"
@@ -507,6 +518,13 @@ export function DocumentsLibrary() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <LoanAccountDialog
+        documentId={attaching}
+        onClose={() => {
+          setAttaching(null);
+          void refresh();
+        }}
+      />
       {reviewing && (
         <DocumentReviewDialog
           startId={reviewing}

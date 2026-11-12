@@ -478,24 +478,46 @@ service_tool!(
 );
 
 service_tool!(
-    LinkLoanDocument, "link_loan_document", Write, additive = false,
-    scopes = [DocumentsWrite],
-    description = "Attach a bank letter that carries no loan number (an early repayment notice, kind loan_event) to a loan (documentId from list_documents, loanKey from get_loans), or detach it with a null loanKey so that it finds its loan by its figures again. Returns the loans.",
+    AttachLoanDocument, "attach_loan_document", Write, additive = false,
+    scopes = [DocumentsWrite, HoldingsWrite],
+    description = "Attach an imported loan paper (documentId from list_documents) to its loan account: an existing liability (liabilityId, from the liabilities of get_holdings or the liabilityId of get_loans) or a new loan account made now, empty and pending until the loan is validated (newAccount: {name, key?}; prefill the name with the loan label of get_loans and the key with its reference). Returns the loans.",
     schema = object(json!({
         "documentId": {"type": "string"},
-        "loanKey": {"type": ["string", "null"], "description": "The loan's key, or null to detach."}
-    }), &["documentId", "loanKey"]),
+        "liabilityId": {"type": ["string", "null"]},
+        "newAccount": {"type": ["object", "null"], "properties": {
+            "name": {"type": "string"},
+            "key": {"type": ["string", "null"], "description": "The loan reference; the paper's when empty."}
+        }}
+    }), &["documentId"]),
     |env, args| {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct Args {
             document_id: String,
-            #[serde(deserialize_with = "required_nullable")]
-            loan_key: Option<String>,
+            #[serde(flatten)]
+            choice: wealthfolio_core::statements::LoanAccountChoice,
         }
         let args: Args = serde_json::from_value(args)?;
         let service = need(env.statement_service(), "Statements")?;
-        service.link_loan_document(&args.document_id, args.loan_key).await.map_err(fail)?;
+        service.attach_loan_document(&args.document_id, args.choice).await.map_err(fail)?;
+        reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
+    }
+);
+
+service_tool!(
+    ValidateLoan, "validate_loan", Write, additive = false,
+    scopes = [DocumentsWrite, HoldingsWrite],
+    description = "Validate a loan account as a whole (loanKey from get_loans): all its papers are validated in order (contract, dated tables, letters) and the liability is filled from them. Refused while a blocking gap remains or the papers disagree. Returns the loans.",
+    schema = object(json!({"loanKey": {"type": "string"}}), &["loanKey"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            loan_key: String,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        service.validate_loan(&args.loan_key).await.map_err(fail)?;
         reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
     }
 );

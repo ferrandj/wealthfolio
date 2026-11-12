@@ -1,13 +1,8 @@
-import {
-  getStatementLoans,
-  linkStatementLoanDocument,
-  setStatementLoanAnswers,
-  setStatementLoanFirstDue,
-} from "@/adapters";
+import { setStatementLoanAnswers, setStatementLoanFirstDue } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { LoanAnswers, LoanGap, LoanView } from "@/lib/types/statements";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Badge,
   Button,
@@ -22,6 +17,7 @@ import {
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { LoanAccountDialog } from "./loan-account-dialog";
 import { invalidateLoanCaches } from "./loan-caches";
 import { accountChoices } from "./loans-utils";
 
@@ -52,18 +48,7 @@ function useLoanMutations(loan: LoanView) {
     onSuccess: done,
     onError,
   });
-  const attach = useMutation({
-    mutationFn: async (loanKey: string) => {
-      let loans: LoanView[] = [];
-      for (const d of loan.documents.filter((d) => d.kind === "loan_event")) {
-        loans = await linkStatementLoanDocument(d.documentId, loanKey);
-      }
-      return loans;
-    },
-    onSuccess: done,
-    onError,
-  });
-  return { answer, firstDue, attach };
+  return { answer, firstDue };
 }
 
 function FoundIn({ gap }: { gap: LoanGap }) {
@@ -84,15 +69,11 @@ function FoundIn({ gap }: { gap: LoanGap }) {
 function GapAnswer({ loan, gap }: { loan: LoanView; gap: LoanGap }) {
   const { t } = useTranslation();
   const { data: accounts = [] } = useAccountsList();
-  const { answer, firstDue, attach } = useLoanMutations(loan);
-  const { data: loans = [] } = useQuery({
-    queryKey: [QueryKeys.STATEMENT_LOANS],
-    queryFn: getStatementLoans,
-    enabled: gap.answer === "link_loan",
-  });
+  const { answer, firstDue } = useLoanMutations(loan);
+  const [attaching, setAttaching] = useState<string | null>(null);
   const [date, setDate] = useState(loan.inferredFirstDue ?? "");
   const [account, setAccount] = useState("");
-  const pending = answer.isPending || firstDue.isPending || attach.isPending;
+  const pending = answer.isPending || firstDue.isPending;
 
   switch (gap.answer) {
     case "first_due":
@@ -140,32 +121,19 @@ function GapAnswer({ loan, gap }: { loan: LoanView; gap: LoanGap }) {
         </div>
       );
     }
-    case "link_loan": {
-      const items = loans
-        .filter((l) => l.key !== "?")
-        .map((l) => ({ value: l.key, label: l.label }));
+    case "attach_account":
       return (
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-64">
-            <Select items={items} value={account} onValueChange={(v) => setAccount(v ?? "")}>
-              <SelectTrigger aria-label={t("settings:loans.link_loan_choose")}>
-                <SelectValue placeholder={t("settings:loans.link_loan_choose")} />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button size="sm" disabled={!account || pending} onClick={() => attach.mutate(account)}>
-            {t("settings:loans.link_loan_save")}
+        <>
+          <Button
+            size="sm"
+            disabled={loan.documents.length === 0}
+            onClick={() => setAttaching(loan.documents[0]?.documentId ?? null)}
+          >
+            {t("settings:loans.account_open")}
           </Button>
-        </div>
+          <LoanAccountDialog documentId={attaching} onClose={() => setAttaching(null)} />
+        </>
       );
-    }
     case "no_early_repayment":
       return (
         <Button

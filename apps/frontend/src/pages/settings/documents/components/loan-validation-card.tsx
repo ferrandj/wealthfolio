@@ -12,10 +12,7 @@ import {
 
 export const LOAN_KINDS = ["loan_offer", "loan_schedule", "loan_event"];
 
-/** The loan a paper belongs to: nothing is kept (no liability) until the person validates it. */
-export function loanOfDocument(loans: LoanView[] | undefined, documentId: string) {
-  return loans?.find((l) => l.documents.some((d) => d.documentId === documentId));
-}
+export { loanOfDocument } from "../../loans/loans-utils";
 
 /** What keeps a loan from being validated: its blocking gaps. */
 export const blockingGaps = (loan: LoanView | undefined) =>

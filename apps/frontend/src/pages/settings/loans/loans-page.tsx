@@ -1,4 +1,4 @@
-import { getStatementLoans, setStatementLoanFirstDue } from "@/adapters";
+import { getStatementLoans, setStatementLoanFirstDue, validateStatementLoan } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { LoanView } from "@/lib/types/statements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -57,18 +57,51 @@ function LoanCard({
   onFirstDue: (v: string | null) => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const problems = problemCount(loan.plan.checks);
+  const blocked = (loan.gaps ?? []).some((g) => g.blocking) || problems > 0;
+  const validate = useMutation({
+    mutationFn: () => validateStatementLoan(loan.key),
+    onSuccess: (loans) => {
+      queryClient.setQueryData([QueryKeys.STATEMENT_LOANS], loans);
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] });
+      invalidateLoanCaches(queryClient);
+      toast({ title: t("settings:loans.account_validated_toast") });
+    },
+    onError: (e) =>
+      toast({ title: t("settings:loans.error"), description: String(e), variant: "destructive" }),
+  });
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <div>
-          <CardTitle>{loan.label}</CardTitle>
+          <CardTitle>{loan.liabilityName ?? loan.label}</CardTitle>
+          <div className="text-muted-foreground text-sm">
+            {loan.liabilityName ? `${loan.label} · ` : ""}
+            {!loan.liabilityId
+              ? t("settings:loans.account_to_attach")
+              : loan.liabilityPending
+                ? t("settings:loans.account_pending")
+                : t("settings:loans.account_validated")}
+          </div>
         </div>
-        <Badge variant={problems === 0 ? "secondary" : "destructive"}>
-          {problems === 0
-            ? t("settings:loans.consistent")
-            : t("settings:loans.problems", { count: problems })}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={problems === 0 ? "secondary" : "destructive"}>
+            {problems === 0
+              ? t("settings:loans.consistent")
+              : t("settings:loans.problems", { count: problems })}
+          </Badge>
+          {loan.liabilityPending && (
+            <Button
+              size="sm"
+              disabled={blocked || validate.isPending}
+              title={blocked ? t("settings:loans.account_validate_blocked") : undefined}
+              onClick={() => validate.mutate()}
+            >
+              {t("settings:loans.account_validate")}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <LoanFacts loan={loan} />

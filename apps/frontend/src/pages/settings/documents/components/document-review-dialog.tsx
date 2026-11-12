@@ -1,4 +1,10 @@
-import { getStatementLoans, reviewStatementDocument, validateStatementDocument } from "@/adapters";
+import {
+  getStatementLoans,
+  reviewStatementDocument,
+  validateStatementDocument,
+  validateStatementLoan,
+} from "@/adapters";
+import { invalidateLoanCaches } from "../../loans/loan-caches";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
 import {
   LOAN_KINDS,
@@ -89,8 +95,11 @@ export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogPr
   const [skipped, setSkipped] = useState<string[]>([]);
   const open = currentId !== null;
 
-  const next = (after: string) => {
-    const remaining = queue.filter((d) => d.id !== after && !skipped.includes(d.id));
+  const [done, setDone] = useState<string[]>([]);
+  const next = (after: string, validated: string[] = []) => {
+    const gone = [...done, ...validated, after];
+    setDone(gone);
+    const remaining = queue.filter((d) => !gone.includes(d.id) && !skipped.includes(d.id));
     setCurrentId(remaining[0]?.id ?? null);
     if (remaining.length === 0) onClose();
   };
@@ -102,13 +111,13 @@ export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogPr
           <ReviewBody
             key={currentId}
             id={currentId}
-            remaining={queue.filter((d) => !skipped.includes(d.id)).length}
+            remaining={queue.filter((d) => !skipped.includes(d.id) && !done.includes(d.id)).length}
             onGoTo={setCurrentId}
             onSkip={() => {
               setSkipped((s) => [...s, currentId]);
               next(currentId);
             }}
-            onValidated={() => next(currentId)}
+            onValidated={(validated) => next(currentId, validated)}
             onClose={onClose}
           />
         )}
@@ -129,7 +138,8 @@ function ReviewBody({
   remaining: number;
   onGoTo: (id: string) => void;
   onSkip: () => void;
-  onValidated: () => void;
+  /** The papers validated with this one (all the papers of a loan account). */
+  onValidated: (validated: string[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -170,9 +180,15 @@ function ReviewBody({
         categoryId: c.categoryId,
         remember,
       }));
-      return validateStatementDocument(id, decisions);
+      // a loan is validated as a whole: its account with all its papers, in their order
+      if (loan) {
+        await validateStatementLoan(loan.key);
+        return loan.documents.map((d) => d.documentId);
+      }
+      await validateStatementDocument(id, decisions);
+      return [id];
     },
-    onSuccess: async () => {
+    onSuccess: async (validated) => {
       toast({ title: t("settings:documents.review_validated_toast") });
       await Promise.all([
         queryClient.invalidateQueries({
@@ -190,7 +206,8 @@ function ReviewBody({
         queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] }),
       ]);
       invalidateSpendingCaches(queryClient);
-      onValidated();
+      invalidateLoanCaches(queryClient);
+      onValidated(validated);
     },
     onError: (e) =>
       toast({

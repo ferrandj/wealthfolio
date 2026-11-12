@@ -30,6 +30,17 @@ describe("statement review", () => {
     expect(docs.sort(logicalOrder).map((d) => d.id)).toEqual(["nov", "dec", "other", "orphan"]);
   });
 
+  it("puts the papers of a loan in their order: contract, dated table, letters", () => {
+    const paper = (id: string, documentKind: string, createdAt: string) =>
+      ({ ...doc(id, null, null), documentKind, createdAt }) as StatementDocument;
+    const docs = [
+      paper("letter", "loan_event", "2026-01-01"),
+      paper("table", "loan_schedule", "2026-01-02"),
+      paper("offer", "loan_offer", "2026-01-03"),
+    ];
+    expect(docs.sort(logicalOrder).map((d) => d.id)).toEqual(["offer", "table", "letter"]);
+  });
+
   it("reads why a document waits, and tolerates garbage", () => {
     expect(parseReviewReason('{"doubts":2,"balanceGap":"100.58","warnings":0}')).toEqual({
       doubts: 2,

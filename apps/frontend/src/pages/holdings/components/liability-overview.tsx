@@ -313,6 +313,11 @@ function LiabilityCard({
             <p className="text-muted-foreground text-2xs mt-0.5 truncate tracking-[0.15em] uppercase">
               {meta}
             </p>
+            {holding.metadata?.statement_loan_status === "pending" && (
+              <p className="mt-1 text-xs text-amber-600" data-testid="loan-account-pending">
+                {t("settings:loans.account_pending_holding")}
+              </p>
+            )}
           </div>
           {model.paidShare != null && (
             <div className="text-end">

@@ -28,6 +28,18 @@ pub struct LoanDocumentData {
     pub payload: Value,
 }
 
+/// Where the loan account a paper was attached to (at import, by the person) is kept, next to what the paper says.
+pub const ACCOUNT_KEY: &str = "account_key";
+
+/// The loan account a paper was attached to by the person, if any: it wins over the reference the paper prints.
+pub fn account_key_of(d: &LoanDocumentData) -> Option<String> {
+    d.payload
+        .get(ACCOUNT_KEY)
+        .and_then(|v| v.as_str())
+        .filter(|k| !k.trim().is_empty())
+        .map(str::to_string)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LoanDocumentRef {
@@ -61,6 +73,12 @@ pub struct LoanView {
     /// The asset (house, car…) this loan finances, if the person attached it.
     #[serde(default)]
     pub linked_asset_id: Option<String>,
+    /// The name of the loan account (the liability) the papers are attached to.
+    #[serde(default)]
+    pub liability_name: Option<String>,
+    /// The loan account exists but is not validated yet: it stays empty until the papers are.
+    #[serde(default)]
+    pub liability_pending: bool,
     /// Where the date of instalment n°1 comes from: papers | statements | typed.
     #[serde(default)]
     pub first_due_source: Option<String>,
@@ -119,9 +137,11 @@ pub fn assemble_loans(
             })
     };
 
-    // 1. papers with a reference
+    // 1. papers with a reference (or attached by the person to a loan account)
     for d in data.iter().filter(|d| d.kind != KIND_EVENT) {
-        let key = d.reference.clone().unwrap_or_else(|| "?".to_string());
+        let key = account_key_of(d)
+            .or_else(|| d.reference.clone())
+            .unwrap_or_else(|| "?".to_string());
         let input = inputs.entry(key.clone()).or_default();
         let id = identity.entry(key.clone()).or_default();
         match d.kind.as_str() {
@@ -156,11 +176,16 @@ pub fn assemble_loans(
         let Some(ev) = EventData::from_json(payload_of(d)) else {
             continue;
         };
-        // a letter the person attached to a loan goes to that loan; otherwise it is found by its figures
-        let linked = d
-            .reference
-            .clone()
-            .filter(|r| inputs.contains_key(r.as_str()));
+        // a letter the person attached to a loan account goes to that loan; otherwise it is found by its figures
+        let attached = account_key_of(d);
+        if let Some(key) = &attached {
+            inputs.entry(key.clone()).or_default();
+        }
+        let linked = attached.or_else(|| {
+            d.reference
+                .clone()
+                .filter(|r| inputs.contains_key(r.as_str()))
+        });
         let key = linked
             .or_else(|| owner_of_event(&ev, &inputs))
             .unwrap_or_else(|| {
@@ -204,6 +229,8 @@ pub fn assemble_loans(
                 plan,
                 liability_id: None,
                 linked_asset_id: None,
+                liability_name: None,
+                liability_pending: false,
                 first_due_source: None,
                 answers: LoanAnswers::default(),
                 gaps: Vec::new(),

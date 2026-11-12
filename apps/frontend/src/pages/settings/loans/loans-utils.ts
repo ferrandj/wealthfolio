@@ -76,3 +76,8 @@ export const accountChoices = (
   const ranked = [...accounts].sort((a, b) => Number(seen.has(b.id)) - Number(seen.has(a.id)));
   return ranked.map((a) => ({ value: a.id, label: a.name }));
 };
+
+/** The loan a paper belongs to. */
+export function loanOfDocument(loans: LoanView[] | undefined, documentId: string) {
+  return loans?.find((l) => l.documents.some((d) => d.documentId === documentId));
+}

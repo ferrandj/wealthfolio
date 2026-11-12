@@ -287,15 +287,31 @@ pub async fn set_statement_loan_first_due(
 }
 
 #[tauri::command]
-pub async fn link_statement_loan_document(
+pub async fn attach_statement_loan_document(
     document_id: String,
-    loan_key: Option<String>,
+    choice: wealthfolio_core::statements::LoanAccountChoice,
     state: ProfileAccess,
 ) -> Result<Vec<wealthfolio_core::statements::LoanView>, String> {
     let context = state.context()?;
     let service = context.statement_service();
     service
-        .link_loan_document(&document_id, loan_key)
+        .attach_loan_document(&document_id, choice)
+        .await
+        .map_err(|e| e.to_string())?;
+    service
+        .loans(chrono::Utc::now().date_naive())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn validate_statement_loan(
+    key: String,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::LoanView>, String> {
+    let context = state.context()?;
+    let service = context.statement_service();
+    service
+        .validate_loan(&key)
         .await
         .map_err(|e| e.to_string())?;
     service

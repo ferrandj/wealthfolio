@@ -7,6 +7,7 @@ import type {
   OutdatedDocuments,
   AccountIdentity,
   AccountIdentityInput,
+  LoanAccountChoice,
   LoanAnswers,
   DocumentReview,
   RevalidationResult,
@@ -137,12 +138,17 @@ export const setStatementLoanFirstDue = async (
   return invoke<LoanView[]>("set_statement_loan_first_due", { key, firstDue });
 };
 
-/** Attach a bank letter without loan number to a loan (or detach it with `null`). */
-export const linkStatementLoanDocument = async (
+/** Attach an imported loan paper to its loan account: an existing one, or a new one made empty and pending. */
+export const attachStatementLoanDocument = async (
   documentId: string,
-  loanKey: string | null,
+  choice: LoanAccountChoice,
 ): Promise<LoanView[]> => {
-  return invoke<LoanView[]>("link_statement_loan_document", { documentId, loanKey });
+  return invoke<LoanView[]>("attach_statement_loan_document", { documentId, choice });
+};
+
+/** Validate a loan account as a whole: all its papers, in their order. */
+export const validateStatementLoan = async (key: string): Promise<LoanView[]> => {
+  return invoke<LoanView[]>("validate_statement_loan", { key });
 };
 
 /** Tell what the papers cannot say: the account debited, no early repayment, instalments never changed. */

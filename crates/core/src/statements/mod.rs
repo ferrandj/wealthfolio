@@ -16,8 +16,8 @@ pub use loans::{
     assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
 };
 pub use loans_liabilities::{
-    changes_of, setup_of, LoanAssetLink, LoanAssetLinked, LoanChange, LoanLiabilities,
-    NewLoanAsset, LOAN_REFERENCE_KEY,
+    changes_of, setup_of, LoanAccountChoice, LoanAssetLink, LoanAssetLinked, LoanChange,
+    LoanLiabilities, NewLoanAccount, NewLoanAsset, LOAN_REFERENCE_KEY,
 };
 pub use loans_plan::{
     build_plan, DatedRow, EventData, LoanInput, OfferData, OfferRow, Plan, PlanCheck, PlanRow,
