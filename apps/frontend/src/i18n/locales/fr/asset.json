@@ -657,8 +657,8 @@
       "liability": "Conditions du prêt et informations sur l'actif lié",
       "other": "Détails supplémentaires pour cet actif"
     },
-    "address": "Adresse",
-    "address_placeholder": "123 rue Principale, Ville, Région, Code postal",
+    "address": "Adresse (rue)",
+    "address_placeholder": "123 rue Principale",
     "property_type": "Type de bien",
     "select_property_type": "Sélectionner le type de bien",
     "vehicle_type": "Type de véhicule",
@@ -714,7 +714,10 @@
       "interest_rate_must_be_0_or_greater": "Le taux d'intérêt doit être égal ou supérieur à 0",
       "description_must_be_less_than_200_characters": "La description doit comporter moins de 200 caractères",
       "original_amount_must_be_greater_than_0": "Le montant initial doit être supérieur à 0"
-    }
+    },
+    "address_street": "Adresse (rue)",
+    "address_postal_code": "Code postal",
+    "address_city": "Ville"
   },
   "updateValuation": {
     "title": "Mettre à jour la valeur : {{name}}",

@@ -3,6 +3,7 @@
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
 mod loans;
+mod loans_liabilities;
 mod loans_plan;
 mod statements_coverage;
 mod statements_model;
@@ -12,6 +13,10 @@ mod statements_traits;
 
 pub use loans::{
     assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
+};
+pub use loans_liabilities::{
+    changes_of, setup_of, LoanAssetLink, LoanAssetLinked, LoanChange, LoanLiabilities,
+    NewLoanAsset, LOAN_REFERENCE_KEY,
 };
 pub use loans_plan::{
     build_plan, DatedRow, EventData, LoanInput, OfferData, OfferRow, Plan, PlanCheck, PlanRow,

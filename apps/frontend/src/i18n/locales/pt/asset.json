@@ -714,7 +714,10 @@
       "interest_rate_must_be_0_or_greater": "A taxa de juros deve ser 0 ou superior",
       "description_must_be_less_than_200_characters": "A descrição deve ter menos de 200 caracteres",
       "original_amount_must_be_greater_than_0": "O valor original precisa ser maior que 0"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "Atualizar valor: {{name}}",

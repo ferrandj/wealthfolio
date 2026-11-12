@@ -654,7 +654,7 @@
       "other": "Additional details for this asset"
     },
     "address": "Address",
-    "address_placeholder": "123 Main Street, City, State ZIP",
+    "address_placeholder": "123 Main Street",
     "property_type": "Property Type",
     "select_property_type": "Select property type",
     "vehicle_type": "Vehicle Type",
@@ -710,7 +710,10 @@
       "interest_rate_must_be_0_or_greater": "Interest rate must be 0 or greater",
       "description_must_be_less_than_200_characters": "Description must be less than 200 characters",
       "original_amount_must_be_greater_than_0": "Original amount must be greater than 0"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "Update Value: {{name}}",

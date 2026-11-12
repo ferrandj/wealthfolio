@@ -714,7 +714,10 @@
       "interest_rate_must_be_0_or_greater": "Il tasso di interesse deve essere 0 o superiore",
       "description_must_be_less_than_200_characters": "La descrizione deve contenere meno di 200 caratteri",
       "original_amount_must_be_greater_than_0": "L'importo originale deve essere maggiore di 0"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "Aggiorna valore: {{name}}",

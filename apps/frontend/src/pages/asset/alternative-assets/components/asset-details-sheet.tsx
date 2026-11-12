@@ -70,6 +70,7 @@ import {
   LIABILITY_TYPES,
   liabilityLoanSetup,
 } from "./asset-details-sheet-schema";
+import { joinAddress, splitAddress } from "@/lib/address";
 import { paymentAccounts } from "../lib/loan-payments";
 import { type LinkableAsset } from "./alternative-asset-quick-add-modal";
 import { AlternativeAssetKind, ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
@@ -513,23 +514,47 @@ function PropertyFields({ form }: { form: ReturnType<typeof useForm<AssetDetails
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
-      <FormField
-        control={form.control}
-        name="address"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>{t("asset:detailsSheet.address")}</FormLabel>
-            <FormControl>
-              <Input
-                placeholder={t("asset:detailsSheet.address_placeholder")}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value || null)}
-              />
-            </FormControl>
-            <AssetFormMessage />
-          </FormItem>
-        )}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => {
+            const parts = splitAddress(field.value);
+            const change = (patch: Partial<typeof parts>) =>
+              field.onChange(joinAddress({ ...parts, ...patch }));
+            return (
+              <>
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>{t("asset:detailsSheet.address_street")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t("asset:detailsSheet.address_placeholder")}
+                      value={parts.street}
+                      onChange={(e) => change({ street: e.target.value })}
+                    />
+                  </FormControl>
+                  <AssetFormMessage />
+                </FormItem>
+                <FormItem>
+                  <FormLabel>{t("asset:detailsSheet.address_postal_code")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={parts.postalCode}
+                      onChange={(e) => change({ postalCode: e.target.value })}
+                    />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>{t("asset:detailsSheet.address_city")}</FormLabel>
+                  <FormControl>
+                    <Input value={parts.city} onChange={(e) => change({ city: e.target.value })} />
+                  </FormControl>
+                </FormItem>
+              </>
+            );
+          }}
+        />
+      </div>
 
       <FormField
         control={form.control}

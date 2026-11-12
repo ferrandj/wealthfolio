@@ -267,6 +267,26 @@ async fn set_loan_first_due(
     ))
 }
 
+async fn link_loan_asset(
+    Path(key): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(link): Json<wealthfolio_core::statements::LoanAssetLink>,
+) -> ApiResult<Json<wealthfolio_core::statements::LoanAssetLinked>> {
+    let linked = state.statement_service.link_loan_asset(&key, link).await?;
+    state.health_service.clear_cache().await;
+    Ok(Json(linked))
+}
+
+async fn sync_loan_liabilities(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<String>>> {
+    let touched = state.statement_service.sync_loan_liabilities().await?;
+    if !touched.is_empty() {
+        state.health_service.clear_cache().await;
+    }
+    Ok(Json(touched))
+}
+
 async fn supported() -> Json<Vec<SupportedInstitution>> {
     Json(supported_documents())
 }
@@ -285,6 +305,8 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/coverage", get(coverage))
         .route("/statements/outdated", get(outdated))
         .route("/statements/loans", get(loans))
+        .route("/statements/loans/sync", post(sync_loan_liabilities))
+        .route("/statements/loans/{key}/asset", put(link_loan_asset))
         .route("/statements/loans/{key}/first-due", put(set_loan_first_due))
         .route(
             "/statements/coverage/{account_id}/{month}",

@@ -1,6 +1,8 @@
 // Bank statements & account documents
 import type {
   AccountCoverage,
+  LoanAssetLink,
+  LoanAssetLinked,
   LoanView,
   OutdatedDocuments,
   AccountIdentity,
@@ -133,3 +135,16 @@ export const setStatementLoanFirstDue = async (
 ): Promise<LoanView[]> => {
   return invoke<LoanView[]>("set_statement_loan_first_due", { key, firstDue });
 };
+
+/** Attach a loan to the asset it finances (existing or new), or detach it with an empty link. */
+export async function linkStatementLoanAsset(
+  key: string,
+  link: LoanAssetLink,
+): Promise<LoanAssetLinked> {
+  return invoke<LoanAssetLinked>("link_statement_loan_asset", { key, link });
+}
+
+/** Create or bring up to date the liability (Passifs) of each loan whose papers hold together. */
+export async function syncStatementLoanLiabilities(): Promise<string[]> {
+  return invoke<string[]>("sync_statement_loan_liabilities");
+}

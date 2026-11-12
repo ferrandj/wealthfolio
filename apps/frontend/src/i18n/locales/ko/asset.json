@@ -710,7 +710,10 @@
       "interest_rate_must_be_0_or_greater": "이자율은 0 이상이어야 합니다.",
       "description_must_be_less_than_200_characters": "설명은 200자(영문 기준) 미만이어야 합니다.",
       "original_amount_must_be_greater_than_0": "원래 금액은 0보다 커야 합니다."
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "가치 업데이트: {{name}}",

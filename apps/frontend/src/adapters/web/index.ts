@@ -300,6 +300,8 @@ export {
   getStatementCoverage,
   getStatementLoans,
   setStatementLoanFirstDue,
+  linkStatementLoanAsset,
+  syncStatementLoanLiabilities,
   getStatementOutdated,
   setStatementMonthNormal,
 } from "../shared/statements";

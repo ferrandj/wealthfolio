@@ -290,7 +290,10 @@
       "interest_rate_must_be_0_or_greater": "يجب أن يكون سعر الفائدة 0 أو أكبر",
       "description_must_be_less_than_200_characters": "يجب أن يكون الوصف أقل من 200 حرف",
       "original_amount_must_be_greater_than_0": "يجب أن يكون المبلغ الأصلي أكبر من 0"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "editSheet": {
     "moex_symbol_placeholder": "مثل SBER، AFLT",

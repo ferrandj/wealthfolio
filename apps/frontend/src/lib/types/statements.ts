@@ -405,4 +405,33 @@ export interface LoanView {
   firstDue: string | null;
   inferredFirstDue: string | null;
   plan: LoanPlan;
+  /** The liability (Passifs) kept for this loan, once its papers hold together. */
+  liabilityId?: string | null;
+  /** The asset (house, car…) this loan finances. */
+  linkedAssetId?: string | null;
+}
+
+/** An asset created with the link: a property, a vehicle or another asset. */
+export interface NewLoanAsset {
+  kind: "PROPERTY" | "VEHICLE" | "OTHER";
+  name: string;
+  street?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  value: number;
+  valueDate?: string | null;
+  purchasePrice?: number | null;
+  purchaseDate?: string | null;
+}
+
+/** What a loan finances: an existing asset, a new one, or neither (removes the link). */
+export interface LoanAssetLink {
+  assetId?: string | null;
+  newAsset?: NewLoanAsset | null;
+}
+
+export interface LoanAssetLinked {
+  liabilityId: string;
+  linkedAssetId: string | null;
+  createdAsset: boolean;
 }

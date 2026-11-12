@@ -468,19 +468,20 @@ async fn build_context(
     let rates_service = Arc::new(wealthfolio_core::rates::RatesService::new(Arc::new(
         wealthfolio_storage_sqlite::rates::RatesRepository::new(pool.clone(), writer.clone()),
     )));
-    let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
-        Arc::new(wealthfolio_core::statements::StatementService::new(
-            Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
-            account_service.clone(),
-            activity_service.clone(),
-            Arc::new(
-                wealthfolio_spending::statement_categories::StatementCategoryAssigner::new(
-                    spending_settings_service.clone(),
-                    activity_assignments_repo.clone(),
-                ),
+    let statement_concrete = Arc::new(wealthfolio_core::statements::StatementService::new(
+        Arc::new(StatementRepository::new(pool.clone(), writer.clone())),
+        account_service.clone(),
+        activity_service.clone(),
+        Arc::new(
+            wealthfolio_spending::statement_categories::StatementCategoryAssigner::new(
+                spending_settings_service.clone(),
+                activity_assignments_repo.clone(),
             ),
-            contacts_service.clone(),
-        ));
+        ),
+        contacts_service.clone(),
+    ));
+    let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
+        statement_concrete.clone();
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),
         activity_repository.as_ref(),
@@ -669,6 +670,10 @@ async fn build_context(
         .with_event_sink(domain_event_sink.clone())
         .with_fx_registration(fx_service.clone(), base_currency.clone()),
     );
+    // each loan rebuilt from the bank papers is kept as a liability (Passifs)
+    statement_concrete.attach_loan_liabilities(Arc::new(
+        wealthfolio_core::statements::LoanLiabilities::new(alternative_asset_service.clone()),
+    ));
 
     let asset_logo_repository = Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone()));
     let asset_logo_service = Arc::new(AssetLogoService::new(

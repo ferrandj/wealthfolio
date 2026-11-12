@@ -397,6 +397,8 @@ pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(SetStatementMonthNormal),
         Arc::new(GetLoans),
         Arc::new(SetLoanFirstDue),
+        Arc::new(SyncLoanLiabilities),
+        Arc::new(LinkLoanToAsset),
         Arc::new(ListContacts),
         Arc::new(GetContact),
         Arc::new(CreateContact),
@@ -504,6 +506,8 @@ mod tests {
                         | FinancialPlanningRead
                         | FinancialPlanningWrite
                         | AccountsWrite
+                        // the loan tools create and attach the liabilities and assets of the holdings
+                        | HoldingsWrite
                 )),
                 "{}",
                 tool.name()

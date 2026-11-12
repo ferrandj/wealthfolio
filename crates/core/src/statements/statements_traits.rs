@@ -123,6 +123,17 @@ pub trait StatementServiceTrait: Send + Sync {
     /// The loans rebuilt from the bank papers kept as documents.
     fn loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>>;
 
+    /// Create or bring up to date the liability (Passifs) of every loan whose papers hold together, and attach the
+    /// letters and tables of a loan to the account of its contract. Returns the liabilities created or changed.
+    async fn sync_loan_liabilities(&self) -> Result<Vec<String>>;
+
+    /// Attach a loan to the asset it finances (an existing one or a new one), or detach it (an empty link).
+    async fn link_loan_asset(
+        &self,
+        loan_key: &str,
+        link: super::LoanAssetLink,
+    ) -> Result<super::LoanAssetLinked>;
+
     /// Type the date of instalment n°1 of a loan (`None` forgets it).
     async fn set_loan_first_due(
         &self,

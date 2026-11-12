@@ -1093,6 +1093,78 @@ mod tests {
         assert!(saved.months > 0 && saved.interest > Decimal::ZERO);
     }
 
+    fn view_of(today: NaiveDate) -> crate::statements::LoanView {
+        let input = LoanInput {
+            offer: Some(contract()),
+            events: vec![letter()],
+            ..Default::default()
+        };
+        let plan = build_plan(&input, today);
+        crate::statements::LoanView {
+            key: "FT14103062".into(),
+            label: "Prêt".into(),
+            borrower: None,
+            product: None,
+            principal: input.offer.as_ref().and_then(|o| o.principal),
+            duration: input.offer.as_ref().and_then(|o| o.duration),
+            rate: input.rate(),
+            taeg: None,
+            documents: vec![],
+            first_due: None,
+            inferred_first_due: input.infer_first_due(),
+            plan,
+            liability_id: None,
+            linked_asset_id: None,
+        }
+    }
+
+    #[test]
+    fn the_contract_becomes_the_terms_of_a_liability() {
+        let setup = crate::statements::setup_of(&view_of(day(2026, 11, 10))).unwrap();
+        assert_eq!(setup.original_amount, Some(122432.0));
+        assert_eq!(setup.origination_date, Some(day(2025, 2, 15)));
+        assert_eq!(setup.interest_rate, Some(3.44));
+        let schedule = setup.schedule.unwrap();
+        assert_eq!(schedule.first_payment_date, Some(day(2025, 3, 15)));
+        assert_eq!(schedule.amortization_months, Some(243));
+        // 726.06 € per instalment, of which 25.83 € of insurance that is not part of the loan
+        assert_eq!(schedule.payment_amount, Some(700.23));
+        assert_eq!(schedule.escrow_amount, Some(25.83));
+    }
+
+    #[test]
+    fn the_repayment_and_the_new_instalment_become_dated_changes() {
+        use crate::statements::{changes_of, LoanChange};
+        let changes = changes_of(&view_of(day(2026, 11, 10)));
+        assert_eq!(
+            changes,
+            vec![
+                LoanChange::Repayment {
+                    date: day(2026, 6, 6),
+                    amount: 12274.54,
+                    after: 104812.15,
+                    // the plan after the first instalment that follows: the figure the liability is held to
+                    next: Some((day(2026, 6, 15), 104412.88)),
+                },
+                LoanChange::Payment {
+                    date: day(2026, 6, 15),
+                    amount: 699.73,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn an_instalment_not_yet_paid_is_not_recorded() {
+        use crate::statements::{changes_of, LoanChange};
+        // on 10/06/2026 the first instalment after the repayment (15/06) has not been paid yet
+        let changes = changes_of(&view_of(day(2026, 6, 10)));
+        assert!(matches!(
+            changes.first(),
+            Some(LoanChange::Repayment { next: None, .. })
+        ));
+    }
+
     #[test]
     fn a_repayment_that_matches_no_instalment_is_reported() {
         let mut ev = letter();

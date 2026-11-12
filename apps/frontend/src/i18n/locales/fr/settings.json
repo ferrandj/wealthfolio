@@ -2423,6 +2423,23 @@
     "prepayment": "Remboursement anticipé",
     "error": "Impossible d'enregistrer",
     "months": "{{count}} mois",
-    "problems": "{{count}} point(s) à vérifier"
+    "problems": "{{count}} point(s) à vérifier",
+    "asset": "Actif financé",
+    "asset_hint": "Rattachez ce prêt à ce qu'il finance (maison, appartement, voiture…) : le passif apparaît avec l'actif.",
+    "asset_choose": "Choisir un actif",
+    "asset_new": "Nouvel actif…",
+    "asset_kind": "Type",
+    "asset_kind_property": "Bien immobilier",
+    "asset_kind_vehicle": "Véhicule",
+    "asset_kind_other": "Autre",
+    "asset_name": "Nom",
+    "asset_street": "Adresse (rue)",
+    "asset_postal_code": "Code postal",
+    "asset_city": "Ville",
+    "asset_value": "Valeur actuelle (€)",
+    "asset_save": "Rattacher",
+    "asset_cancel": "Annuler",
+    "asset_change": "Changer",
+    "asset_detach": "Détacher"
   }
 }

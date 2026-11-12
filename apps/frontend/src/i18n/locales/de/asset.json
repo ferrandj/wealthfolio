@@ -710,7 +710,10 @@
       "interest_rate_must_be_0_or_greater": "Der Zinssatz muss 0 oder höher sein",
       "description_must_be_less_than_200_characters": "Die Beschreibung muss weniger als 200 Zeichen lang sein",
       "original_amount_must_be_greater_than_0": "Der ursprüngliche Betrag muss größer als 0 sein"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "Wert aktualisieren: {{name}}",

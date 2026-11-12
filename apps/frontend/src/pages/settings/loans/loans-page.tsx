@@ -18,6 +18,7 @@ import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
+import { LoanAssetLinkSection } from "./loan-asset-link";
 import { day, euros, needsFirstDue, percent, problemCount } from "./loans-utils";
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -158,6 +159,13 @@ function LoanCard({
                 <CheckLine key={i} check={c} />
               ))}
             </ul>
+          </>
+        )}
+
+        {loan.liabilityId && (
+          <>
+            <Separator />
+            <LoanAssetLinkSection loan={loan} />
           </>
         )}
 

@@ -54,6 +54,12 @@ pub struct LoanView {
     /// The date of instalment n°1 deduced from the papers (or typed).
     pub inferred_first_due: Option<NaiveDate>,
     pub plan: Plan,
+    /// The liability (Passifs) kept for this loan, once the papers hold together.
+    #[serde(default)]
+    pub liability_id: Option<String>,
+    /// The asset (house, car…) this loan finances, if the person attached it.
+    #[serde(default)]
+    pub linked_asset_id: Option<String>,
 }
 
 /// The sort key of a loan paper inside its loan.
@@ -176,6 +182,8 @@ pub fn assemble_loans(
                 first_due: input.first_due,
                 inferred_first_due: input.infer_first_due(),
                 plan,
+                liability_id: None,
+                linked_asset_id: None,
                 key,
             }
         })

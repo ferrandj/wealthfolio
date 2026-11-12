@@ -710,7 +710,10 @@
       "interest_rate_must_be_0_or_greater": "利率必须为 0 或更大",
       "description_must_be_less_than_200_characters": "描述必须少于 200 个字符",
       "original_amount_must_be_greater_than_0": "原始金额必须大于0"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "更新价值：{{name}}",

@@ -470,6 +470,8 @@ pub fn run() {
             commands::statements::get_statement_coverage,
             commands::statements::get_statement_loans,
             commands::statements::set_statement_loan_first_due,
+            commands::statements::sync_statement_loan_liabilities,
+            commands::statements::link_statement_loan_asset,
             commands::statements::get_statement_outdated,
             commands::statements::set_statement_month_normal,
             commands::statements::list_account_identities,

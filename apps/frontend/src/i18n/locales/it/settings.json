@@ -2423,6 +2423,23 @@
     "prepayment": "Early repayment",
     "error": "Could not save",
     "months": "{{count}} month(s)",
-    "problems": "{{count}} point(s) to check"
+    "problems": "{{count}} point(s) to check",
+    "asset": "Financed asset",
+    "asset_hint": "Attach this loan to what it finances (house, flat, car…): the liability shows up with the asset.",
+    "asset_choose": "Choose an asset",
+    "asset_new": "New asset…",
+    "asset_kind": "Type",
+    "asset_kind_property": "Property",
+    "asset_kind_vehicle": "Vehicle",
+    "asset_kind_other": "Other",
+    "asset_name": "Name",
+    "asset_street": "Address (street)",
+    "asset_postal_code": "Postal code",
+    "asset_city": "City",
+    "asset_value": "Current value (€)",
+    "asset_save": "Attach",
+    "asset_cancel": "Cancel",
+    "asset_change": "Change",
+    "asset_detach": "Detach"
   }
 }

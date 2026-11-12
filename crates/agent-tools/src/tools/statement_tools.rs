@@ -423,6 +423,61 @@ service_tool!(
 );
 
 service_tool!(
+    SyncLoanLiabilities, "sync_loan_liabilities", Write, additive = false,
+    scopes = [DocumentsWrite, HoldingsWrite],
+    description = "Create or bring up to date the liability (Passifs) of every loan whose papers hold together (contract terms, early repayments, new instalment) and attach the loan's letters and tables to the account of its contract. Done automatically after each import; run it to repeat it. Returns the ids of the liabilities created or changed.",
+    schema = object(json!({}), &[]),
+    |env, _args| {
+        let service = need(env.statement_service(), "Statements")?;
+        reply(&service.sync_loan_liabilities().await.map_err(fail)?)
+    }
+);
+
+service_tool!(
+    LinkLoanToAsset, "link_loan_to_asset", Write, additive = false,
+    scopes = [DocumentsWrite, HoldingsWrite],
+    description = "Attach a loan (loanKey from get_loans; its liability exists once its papers hold together) to the asset it finances: an existing asset (assetId, from the holdings) or a new one (newAsset: kind PROPERTY, VEHICLE or OTHER, name, value, and the address as street, postalCode and city, or as one text in `address`). Send neither assetId nor newAsset to detach the loan. Returns the liability id, the linked asset id and whether the asset was created.",
+    schema = object(json!({
+        "loanKey": {"type": "string"},
+        "assetId": {"type": ["string", "null"], "description": "An existing property, vehicle or other asset."},
+        "newAsset": {
+            "type": ["object", "null"],
+            "properties": {
+                "kind": {"type": "string", "enum": ["PROPERTY", "VEHICLE", "OTHER"]},
+                "name": {"type": "string"},
+                "address": {"type": ["string", "null"], "description": "The whole address (street, then postal code and city on a second line)."},
+                "street": {"type": ["string", "null"]},
+                "postalCode": {"type": ["string", "null"]},
+                "city": {"type": ["string", "null"]},
+                "value": {"type": "number", "description": "What it is worth today."},
+                "valueDate": {"type": ["string", "null"], "description": "YYYY-MM-DD, today by default."},
+                "purchasePrice": {"type": ["number", "null"]},
+                "purchaseDate": {"type": ["string", "null"]}
+            },
+            "required": ["kind", "name", "value"]
+        }
+    }), &["loanKey"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            loan_key: String,
+            #[serde(default)]
+            asset_id: Option<String>,
+            #[serde(default)]
+            new_asset: Option<wealthfolio_core::statements::NewLoanAsset>,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        let link = wealthfolio_core::statements::LoanAssetLink {
+            asset_id: args.asset_id,
+            new_asset: args.new_asset,
+        };
+        reply(&service.link_loan_asset(&args.loan_key, link).await.map_err(fail)?)
+    }
+);
+
+service_tool!(
     SetLoanFirstDue, "set_loan_first_due", Write, additive = false,
     scopes = [DocumentsWrite],
     description = "Set the date of a loan's first instalment when the document does not say it (loanKey from get_loans), or clear it with null. Returns the loans.",

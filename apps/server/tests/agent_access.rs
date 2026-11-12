@@ -6969,3 +6969,62 @@ async fn internal_transfer_pair_reviews_match_commits_and_reject_stale_legs_atom
         }
     }
 }
+
+/// Every loan feature is reachable through MCP: the sync and the attachment to a financed asset are listed with their
+/// scopes, and a loan whose papers were never imported has no liability to attach.
+#[tokio::test]
+async fn mcp_links_loans_to_the_assets_they_finance() {
+    let server = spawn_server(true, false).await;
+    let cookie = login(&server).await;
+    let (status, token) = create_pat(
+        &server,
+        &cookie,
+        serde_json::json!({
+            "name": "loans",
+            "scopes": ["documents:read", "documents:write", "holdings:read", "holdings:write"]
+        }),
+    )
+    .await;
+    assert_eq!(status, 201, "{token}");
+    let pat = token["token"].as_str().unwrap().to_string();
+    let session = mcp_initialize(&server, &pat).await;
+
+    let list = mcp_post(
+        &server,
+        Some(&pat),
+        Some(&session),
+        serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
+    )
+    .await;
+    let list = parse_sse_data(&list.text().await.unwrap());
+    let names: Vec<&str> = list["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"sync_loan_liabilities"), "{names:?}");
+    assert!(names.contains(&"link_loan_to_asset"), "{names:?}");
+
+    let response = mcp_post(
+        &server,
+        Some(&pat),
+        Some(&session),
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": { "name": "link_loan_to_asset", "arguments": {
+                "loanKey": "FT0000000000",
+                "newAsset": { "kind": "PROPERTY", "name": "Maison", "value": 100000,
+                              "street": "1 rue des Lilas", "postalCode": "75011", "city": "Paris" }
+            } }
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), 200);
+    let result = parse_sse_data(&response.text().await.unwrap());
+    assert_eq!(result["result"]["isError"], true, "{result}");
+    assert!(
+        result.to_string().contains("no liability yet"),
+        "no asset is created for a loan that has no liability: {result}"
+    );
+}

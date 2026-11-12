@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type { AlternativeAssetHolding } from "@/lib/types";
 import type { LoanView } from "@/lib/types/statements";
-import { day, needsFirstDue, problemCount } from "./loans-utils";
+import {
+  addressLines,
+  attachableAssets,
+  day,
+  needsFirstDue,
+  newAssetOf,
+  problemCount,
+} from "./loans-utils";
 
 describe("loans utils", () => {
   it("writes a date the French way without a time zone shift", () => {
@@ -38,5 +46,50 @@ describe("loans utils", () => {
       plan: { rows: [{ ...row, date: "2026-01-15" }], checks: [], summary: null },
     } as unknown as LoanView;
     expect(needsFirstDue(dated)).toBe(false);
+  });
+});
+
+describe("financed asset", () => {
+  const holding = (id: string, kind: string) =>
+    ({ id, kind, name: id }) as unknown as AlternativeAssetHolding;
+
+  it("offers properties, vehicles and other assets, never another liability", () => {
+    const ids = attachableAssets([
+      holding("a", "PROPERTY"),
+      holding("b", "LIABILITY"),
+      holding("c", "vehicle"),
+      holding("d", "COLLECTIBLE"),
+      holding("e", "OTHER"),
+    ]).map((h) => h.id);
+    expect(ids).toEqual(["a", "c", "e"]);
+  });
+
+  it("cuts a stored address into lines", () => {
+    expect(addressLines("190 rue Curie\n60280 Margny")).toEqual(["190 rue Curie", "60280 Margny"]);
+    expect(addressLines(undefined)).toEqual([]);
+  });
+
+  it("builds the new asset only with a name and a number", () => {
+    const form = {
+      kind: "PROPERTY" as const,
+      name: " Maison ",
+      street: "1 rue des Lilas",
+      postalCode: "75011",
+      city: "Paris",
+      value: "210 000,50",
+    };
+    expect(newAssetOf(form)).toEqual({
+      kind: "PROPERTY",
+      name: "Maison",
+      street: "1 rue des Lilas",
+      postalCode: "75011",
+      city: "Paris",
+      value: 210000.5,
+    });
+    expect(newAssetOf({ ...form, name: " " })).toBeNull();
+    expect(newAssetOf({ ...form, value: "abc" })).toBeNull();
+    expect(newAssetOf({ ...form, street: "", city: "", postalCode: "" })).toMatchObject({
+      street: null,
+    });
   });
 });

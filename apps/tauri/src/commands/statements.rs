@@ -287,6 +287,30 @@ pub async fn set_statement_loan_first_due(
 }
 
 #[tauri::command]
+pub async fn link_statement_loan_asset(
+    key: String,
+    link: wealthfolio_core::statements::LoanAssetLink,
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::statements::LoanAssetLinked, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .link_loan_asset(&key, link)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_statement_loan_liabilities(state: ProfileAccess) -> Result<Vec<String>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .sync_loan_liabilities()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_statement_outdated(
     state: ProfileAccess,
 ) -> Result<wealthfolio_core::statements::OutdatedDocuments, String> {

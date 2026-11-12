@@ -127,6 +127,21 @@ fn mode_of(preview: &StatementPreview) -> ImportMode {
     }
 }
 
+/// The account a document that brings no cash operations still belongs to: the contract of a loan or of a life
+/// insurance. Letters, fee summaries and the like belong to an account that already exists.
+fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
+    let kind = preview.document_kind.as_deref().unwrap_or("");
+    match (kind, preview.account_type.as_deref()) {
+        ("loan_offer", _) => Some(account_types::CASH),
+        ("statement", Some("life_insurance")) => Some(account_types::SECURITIES),
+        // an arbitrage letter names the contract it moves money in: the contract exists even before its first statement
+        ("info", Some("life_insurance")) if preview.account_number.is_some() => {
+            Some(account_types::SECURITIES)
+        }
+        _ => None,
+    }
+}
+
 fn suggested_name(preview: &StatementPreview) -> String {
     let institution = preview
         .institution
@@ -471,6 +486,8 @@ pub struct StatementService {
     activity_service: Arc<dyn ActivityServiceTrait>,
     category_assigner: Arc<dyn CategoryAssignerTrait>,
     counterparties: Arc<dyn CounterpartyRecorderTrait>,
+    /// Keeps the liability (Passifs) of every loan rebuilt from the papers; none in the tests that do not need it.
+    loan_liabilities: std::sync::OnceLock<Arc<super::LoanLiabilities>>,
 }
 
 impl StatementService {
@@ -487,7 +504,14 @@ impl StatementService {
             activity_service,
             category_assigner,
             counterparties,
+            loan_liabilities: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Also keep a liability (the Passifs of the holdings) for each loan rebuilt from the papers.
+    /// (Set once, after the assets are built: the statements are created before them.)
+    pub fn attach_loan_liabilities(&self, liabilities: Arc<super::LoanLiabilities>) {
+        let _ = self.loan_liabilities.set(liabilities);
     }
 
     fn check_size(content: &[u8]) -> Result<()> {
@@ -657,6 +681,16 @@ impl StatementService {
     }
 
     async fn create_cash_account(&self, preview: &StatementPreview, name: &str) -> Result<Account> {
+        self.create_account_of(preview, name, account_types::CASH)
+            .await
+    }
+
+    async fn create_account_of(
+        &self,
+        preview: &StatementPreview,
+        name: &str,
+        account_type: &str,
+    ) -> Result<Account> {
         let taken: Vec<String> = self
             .account_service
             .get_all_accounts()?
@@ -673,8 +707,8 @@ impl StatementService {
             .create_account(NewAccount {
                 id: None,
                 name: candidate,
-                account_type: account_types::CASH.to_string(),
-                group: Some(default_group_for_account_type(account_types::CASH).to_string()),
+                account_type: account_type.to_string(),
+                group: Some(default_group_for_account_type(account_type).to_string()),
                 currency: preview.currency.clone(),
                 is_default: false,
                 is_active: true,
@@ -859,6 +893,23 @@ impl StatementService {
 
             match item.mode {
                 ImportMode::DocumentOnly => {
+                    // the contract of a loan, a life insurance: the account it belongs to is created when the person
+                    // chose "new account" (the letters that follow are attached to it once the loan is rebuilt)
+                    let mut created_here = false;
+                    let target = match target {
+                        None if run.create_accounts => match own_account_type(preview) {
+                            Some(account_type) => {
+                                let name = over
+                                    .and_then(|o| clean(&o.new_account_name))
+                                    .unwrap_or_else(|| item.suggested_account_name.clone());
+                                created_here = true;
+                                Some(self.create_account_of(preview, &name, account_type).await?)
+                            }
+                            None => None,
+                        },
+                        other => other,
+                    };
+                    outcome.created_account = created_here;
                     if let Some(account) = target {
                         let existing = self.repository.get_identity(&account.id)?;
                         let identity = merge_identity(
@@ -1237,10 +1288,50 @@ impl StatementService {
         ))
     }
 
+    /// The papers of a loan belong to the account of its contract: a letter or a table that arrived without an
+    /// account is attached to it.
+    async fn attach_loan_papers(&self, views: &[super::LoanView]) -> Result<()> {
+        let documents = self.repository.list_documents()?;
+        for view in views {
+            let owner = view.documents.iter().find_map(|r| {
+                documents
+                    .iter()
+                    .find(|d| d.id == r.document_id)
+                    .and_then(|d| d.account_id.clone())
+            });
+            let Some(owner) = owner else { continue };
+            for r in &view.documents {
+                let unattached = documents
+                    .iter()
+                    .any(|d| d.id == r.document_id && d.account_id.is_none());
+                if unattached {
+                    self.repository
+                        .set_document_account(&r.document_id, Some(owner.clone()))
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Bring the liabilities of the loans up to date with the papers.
+    async fn sync_liabilities(&self, views: &[super::LoanView]) -> Result<Vec<String>> {
+        match self.loan_liabilities.get() {
+            Some(liabilities) => liabilities.sync(views, "EUR").await,
+            None => Ok(Vec::new()),
+        }
+    }
+
     /// A loan paper is validated when the loan rebuilt from all the papers holds together; otherwise it waits for
     /// review with the problems found.
     async fn sync_loan_statuses(&self) -> Result<()> {
         let views = self.build_loans(Utc::now().date_naive())?;
+        if let Err(e) = self.attach_loan_papers(&views).await {
+            warn!("could not attach the loan papers to their account: {e}");
+        }
+        if let Err(e) = self.sync_liabilities(&views).await {
+            warn!("could not keep the liabilities of the loans: {e}");
+        }
         for document in self.repository.list_documents()? {
             if !document
                 .document_kind
@@ -2159,7 +2250,33 @@ impl StatementServiceTrait for StatementService {
     }
 
     fn loans(&self, today: chrono::NaiveDate) -> Result<Vec<super::LoanView>> {
-        self.build_loans(today)
+        let mut views = self.build_loans(today)?;
+        if let Some(liabilities) = self.loan_liabilities.get() {
+            for view in &mut views {
+                if let Some((liability_id, linked)) = liabilities.state_of(&view.key)? {
+                    view.liability_id = Some(liability_id);
+                    view.linked_asset_id = linked;
+                }
+            }
+        }
+        Ok(views)
+    }
+
+    async fn link_loan_asset(
+        &self,
+        loan_key: &str,
+        link: super::LoanAssetLink,
+    ) -> Result<super::LoanAssetLinked> {
+        let Some(liabilities) = self.loan_liabilities.get() else {
+            return Err(invalid("The liabilities are not available here"));
+        };
+        liabilities.link(loan_key, link).await
+    }
+
+    async fn sync_loan_liabilities(&self) -> Result<Vec<String>> {
+        let views = self.build_loans(Utc::now().date_naive())?;
+        self.attach_loan_papers(&views).await?;
+        self.sync_liabilities(&views).await
     }
 
     async fn set_loan_first_due(
@@ -2237,6 +2354,40 @@ fn content_type_of(format: &str, extension: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_contract_papers_make_their_own_account_and_the_other_letters_do_not() {
+        let own = |kind: &str, account_type: Option<&str>, number: Option<&str>| {
+            let mut p = empty_preview();
+            p.document_kind = Some(kind.into());
+            p.account_type = account_type.map(str::to_string);
+            p.account_number = number.map(str::to_string);
+            own_account_type(&p)
+        };
+        assert_eq!(
+            own("loan_offer", Some("mortgage"), None),
+            Some(account_types::CASH)
+        );
+        assert_eq!(
+            own("statement", Some("life_insurance"), Some("123")),
+            Some(account_types::SECURITIES)
+        );
+        assert_eq!(
+            own("info", Some("life_insurance"), Some("123")),
+            Some(account_types::SECURITIES)
+        );
+        // no contract number: nothing ties the letter to a contract, it waits for an account
+        assert_eq!(own("info", Some("life_insurance"), None), None);
+        for kind in [
+            "fees_summary",
+            "deposit_guarantee",
+            "investor_profile",
+            "loan_schedule",
+            "loan_event",
+        ] {
+            assert_eq!(own(kind, None, Some("123")), None, "{kind}");
+        }
+    }
 
     fn preview(transactions: &[(&str, &str, &str)]) -> StatementPreview {
         let mut p = empty_preview();

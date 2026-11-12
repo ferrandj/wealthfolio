@@ -710,7 +710,10 @@
       "interest_rate_must_be_0_or_greater": "金利は 0 以上である必要があります",
       "description_must_be_less_than_200_characters": "説明は 200 文字未満にする必要があります",
       "original_amount_must_be_greater_than_0": "元の金額は 0 より大きくなければなりません"
-    }
+    },
+    "address_street": "Address (street)",
+    "address_postal_code": "Postal code",
+    "address_city": "City"
   },
   "updateValuation": {
     "title": "評価額を更新: {{name}}",
