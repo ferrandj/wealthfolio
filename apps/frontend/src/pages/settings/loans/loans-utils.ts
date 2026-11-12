@@ -63,3 +63,16 @@ export function newAssetOf(form: NewAssetForm): NewLoanAsset | null {
     value,
   };
 }
+
+/**
+ * The accounts the instalments can be debited from, those where a matching debit was found first. Each choice is an
+ * account id and its name.
+ */
+export const accountChoices = (
+  accounts: { id: string; name: string }[],
+  lines: { accountId?: string | null }[],
+): { value: string; label: string }[] => {
+  const seen = new Set(lines.map((l) => l.accountId).filter((id): id is string => !!id));
+  const ranked = [...accounts].sort((a, b) => Number(seen.has(b.id)) - Number(seen.has(a.id)));
+  return ranked.map((a) => ({ value: a.id, label: a.name }));
+};

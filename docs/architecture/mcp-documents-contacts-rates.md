@@ -100,4 +100,16 @@ work the tool environment does not carry), settings, secrets and AI provider
 keys, device sync and Connect, add-ons, backups and restores, and the complete
 profile reset (kept behind its five-press button in the app).
 
-`review_document` (HTTP, Tauri and MCP) also returns, for a loan paper, the whole `loan` (terms, rate, TAEG, plan rows, checks, documents) so the validation screen and an agent see everything the papers say before validating.
+`review_document` (HTTP, Tauri and MCP) also returns, for a loan paper, the
+whole `loan` (terms, rate, TAEG, plan rows, checks, documents) so the validation
+screen and an agent see everything the papers say before validating.
+
+`get_loans` (and the HTTP/Tauri equivalents) now also tell, for each loan, what
+is still missing (`gaps`: each names the papers where the fact can be found and,
+when the person can simply answer, the answer it accepts), where the date of
+instalment n°1 comes from (`firstDueSource`), the answers given (`answers`) and
+each instalment already due followed in the bank accounts (`payments`: found /
+missing / uncovered, the debited account). Two tools complete them:
+`set_loan_answers` (account debited, no early repayment, instalments unchanged)
+and `link_loan_document` (attach a letter without loan number to a loan).
+Validating one paper of a loan validates the loan, with all its papers.

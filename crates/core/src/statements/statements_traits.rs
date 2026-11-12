@@ -46,6 +46,9 @@ pub trait StatementRepositoryTrait: Send + Sync {
     /// loan key -> date of instalment n°1 typed by the person
     fn list_loan_settings(&self) -> Result<Vec<(String, Option<String>)>>;
     async fn set_loan_first_due(&self, loan_key: &str, first_due: Option<String>) -> Result<()>;
+    /// What the person told about each loan.
+    fn list_loan_answers(&self) -> Result<Vec<(String, super::LoanAnswers)>>;
+    async fn set_loan_answers(&self, loan_key: &str, answers: super::LoanAnswers) -> Result<()>;
 }
 
 /// What the statements feature needs from the spending module, which sits next to core and cannot be depended
@@ -140,4 +143,12 @@ pub trait StatementServiceTrait: Send + Sync {
         loan_key: &str,
         first_due: Option<chrono::NaiveDate>,
     ) -> Result<()>;
+
+    /// Attach a letter of the bank (an early repayment notice carries no loan number) to a loan, or detach it
+    /// (`None`: the letter finds its loan by its figures again).
+    async fn link_loan_document(&self, document_id: &str, loan_key: Option<String>) -> Result<()>;
+
+    /// What the person tells about a loan the papers cannot say: the account debited, "no early repayment",
+    /// "instalments never changed".
+    async fn set_loan_answers(&self, loan_key: &str, answers: super::LoanAnswers) -> Result<()>;
 }

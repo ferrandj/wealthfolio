@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::loans_plan::{build_plan, EventData, LoanInput, OfferData, Plan, ScheduleData};
+use super::loans_reconcile::{LoanAnswers, LoanGap, LoanPayments};
 use super::statements_model::StatementDocument;
 
 pub const KIND_OFFER: &str = "loan_offer";
@@ -60,42 +61,18 @@ pub struct LoanView {
     /// The asset (house, car…) this loan finances, if the person attached it.
     #[serde(default)]
     pub linked_asset_id: Option<String>,
-}
-
-/// A debit found in the imported bank statements.
-#[derive(Debug, Clone)]
-pub struct BankDebit {
-    pub date: NaiveDate,
-    pub amount: Decimal,
-    pub label: String,
-}
-
-/// The first instalment of a loan whose papers do not date it, read from the bank statements: the earliest debit
-/// of exactly the instalment, whose label names the loan (its reference) or says it is a loan instalment.
-pub fn first_due_from_debits(view: &LoanView, debits: &[BankDebit]) -> Option<NaiveDate> {
-    let instalment = view
-        .plan
-        .rows
-        .iter()
-        .find(|r| r.kind == "installment")?
-        .total;
-    let key = view.key.trim().to_uppercase();
-    let digits: String = key.chars().filter(char::is_ascii_digit).collect();
-    let names_the_loan = |label: &str| {
-        let label = label.to_uppercase();
-        (key != "?" && !key.is_empty() && label.contains(&key))
-            || (digits.len() >= 6 && label.contains(&digits))
-            || ["PRET", "ECHEANCE", "ÉCHÉANCE", "CREDIT IMMO"]
-                .iter()
-                .any(|w| label.contains(w))
-    };
-    debits
-        .iter()
-        .filter(|d| {
-            (d.amount.abs() - instalment).abs() < Decimal::new(1, 2) && names_the_loan(&d.label)
-        })
-        .map(|d| d.date)
-        .min()
+    /// Where the date of instalment n°1 comes from: papers | statements | typed.
+    #[serde(default)]
+    pub first_due_source: Option<String>,
+    /// What the person told about this loan (the account debited, no early repayment, instalments unchanged).
+    #[serde(default)]
+    pub answers: LoanAnswers,
+    /// What is still missing to rebuild the loan, and in which other papers it can be found.
+    #[serde(default)]
+    pub gaps: Vec<LoanGap>,
+    /// Each instalment already due, followed in the bank accounts.
+    #[serde(default)]
+    pub payments: LoanPayments,
 }
 
 /// The sort key of a loan paper inside its loan.
@@ -179,10 +156,17 @@ pub fn assemble_loans(
         let Some(ev) = EventData::from_json(payload_of(d)) else {
             continue;
         };
-        let key = owner_of_event(&ev, &inputs).unwrap_or_else(|| {
-            inputs.entry("?".to_string()).or_default();
-            "?".to_string()
-        });
+        // a letter the person attached to a loan goes to that loan; otherwise it is found by its figures
+        let linked = d
+            .reference
+            .clone()
+            .filter(|r| inputs.contains_key(r.as_str()));
+        let key = linked
+            .or_else(|| owner_of_event(&ev, &inputs))
+            .unwrap_or_else(|| {
+                inputs.entry("?".to_string()).or_default();
+                "?".to_string()
+            });
         if let Some(input) = inputs.get_mut(&key) {
             input.events.push(ev);
         }
@@ -220,6 +204,10 @@ pub fn assemble_loans(
                 plan,
                 liability_id: None,
                 linked_asset_id: None,
+                first_due_source: None,
+                answers: LoanAnswers::default(),
+                gaps: Vec::new(),
+                payments: LoanPayments::default(),
                 key,
             }
         })

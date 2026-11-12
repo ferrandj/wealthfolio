@@ -2450,6 +2450,39 @@
     "asset_detach": "Détacher",
     "product": "Produit",
     "borrower": "Emprunteur",
-    "dates_from_statements": "Les papiers ne datent pas les échéances : les échéances réellement prélevées seront déterminées à l'import des relevés bancaires. Vous pouvez aussi saisir la date de la 1re échéance à la main."
+    "gaps_title": "Ce qu'il manque pour reconstituer ce prêt",
+    "gap_blocking": "À fournir avant de pouvoir valider.",
+    "found_in": "À trouver dans :",
+    "found_in_kind": {
+      "loan_offer": "l'offre de prêt",
+      "loan_event": "l'arrêté de remboursement anticipé",
+      "loan_schedule": "le tableau d'amortissement daté",
+      "statement": "les relevés du compte prélevé"
+    },
+    "answer_no_early_repayment": "Non, aucun remboursement anticipé",
+    "answer_payments_unchanged": "Non, mes échéances n'ont jamais changé",
+    "debit_account": "Compte prélevé",
+    "debit_account_choose": "Choisir le compte prélevé",
+    "debit_account_unknown": "Inconnu",
+    "debit_account_source": {
+      "answer": "indiqué",
+      "statements": "retrouvé dans les relevés"
+    },
+    "first_due_origin": "Date de la 1re échéance",
+    "first_due_source": {
+      "papers": "lue dans les papiers",
+      "statements": "date du premier prélèvement des relevés",
+      "typed": "saisie"
+    },
+    "payments_found_label": "Prélèvements retrouvés",
+    "payments_found": "{{found}} sur {{expected}} échéances",
+    "col_payment": "Prélèvement",
+    "payment_state": {
+      "missing": "Introuvable",
+      "uncovered": "Relevé absent",
+      "unknown": "—"
+    },
+    "link_loan_choose": "Choisir le prêt",
+    "link_loan_save": "Rattacher"
   }
 }

@@ -1,7 +1,14 @@
 import type { LoanView } from "@/lib/types/statements";
 import { Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { LoanChecks, LoanDocuments, LoanFacts, LoanPlan } from "../../loans/loan-details";
+import { LoanGaps } from "../../loans/loan-gaps";
+import {
+  LoanChecks,
+  LoanDocuments,
+  LoanFacts,
+  LoanFollow,
+  LoanPlan,
+} from "../../loans/loan-details";
 
 export const LOAN_KINDS = ["loan_offer", "loan_schedule", "loan_event"];
 
@@ -10,9 +17,9 @@ export function loanOfDocument(loans: LoanView[] | undefined, documentId: string
   return loans?.find((l) => l.documents.some((d) => d.documentId === documentId));
 }
 
-/** No paper dates the schedule: the instalments really debited, read in the bank statements, will. */
-export const needsDate = (loan: LoanView | undefined): boolean =>
-  !!loan && !loan.firstDue && !loan.inferredFirstDue;
+/** What keeps a loan from being validated: its blocking gaps. */
+export const blockingGaps = (loan: LoanView | undefined) =>
+  (loan?.gaps ?? []).filter((g) => g.blocking);
 
 /** What the person sees before validating a loan paper: everything the papers say, nothing about operations. */
 export function LoanValidationCard({
@@ -35,12 +42,8 @@ export function LoanValidationCard({
       <p className="text-muted-foreground">{t("settings:documents.loan_intro")}</p>
       <div className="font-medium">{loan.label}</div>
       <LoanFacts loan={loan} />
-      {needsDate(loan) && (
-        <p className="text-muted-foreground flex items-start gap-2">
-          <Icons.Info className="mt-0.5 size-4 shrink-0" />
-          <span>{t("settings:loans.dates_from_statements")}</span>
-        </p>
-      )}
+      <LoanGaps loan={loan} />
+      <LoanFollow loan={loan} />
       <LoanChecks loan={loan} />
       <Separator />
       <LoanDocuments loan={loan} />

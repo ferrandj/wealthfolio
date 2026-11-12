@@ -267,6 +267,41 @@ async fn set_loan_first_due(
     ))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LoanDocumentBody {
+    loan_key: Option<String>,
+}
+
+async fn link_loan_document(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<LoanDocumentBody>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::LoanView>>> {
+    state
+        .statement_service
+        .link_loan_document(&id, body.loan_key)
+        .await?;
+    Ok(Json(
+        state
+            .statement_service
+            .loans(chrono::Utc::now().date_naive())?,
+    ))
+}
+
+async fn set_loan_answers(
+    Path(key): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<wealthfolio_core::statements::LoanAnswers>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::LoanView>>> {
+    state.statement_service.set_loan_answers(&key, body).await?;
+    Ok(Json(
+        state
+            .statement_service
+            .loans(chrono::Utc::now().date_naive())?,
+    ))
+}
+
 async fn link_loan_asset(
     Path(key): Path<String>,
     axum::Extension(state): axum::Extension<Arc<AppState>>,
@@ -308,6 +343,8 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/loans/sync", post(sync_loan_liabilities))
         .route("/statements/loans/{key}/asset", put(link_loan_asset))
         .route("/statements/loans/{key}/first-due", put(set_loan_first_due))
+        .route("/statements/loans/{key}/answers", put(set_loan_answers))
+        .route("/statements/documents/{id}/loan", put(link_loan_document))
         .route(
             "/statements/coverage/{account_id}/{month}",
             put(set_month_normal),

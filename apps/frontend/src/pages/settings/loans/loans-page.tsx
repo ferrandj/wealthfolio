@@ -18,8 +18,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { LoanAssetLinkSection } from "./loan-asset-link";
-import { LoanChecks, LoanDocuments, LoanFacts, LoanPlan } from "./loan-details";
-import { needsFirstDue, problemCount } from "./loans-utils";
+import { invalidateLoanCaches } from "./loan-caches";
+import { LoanChecks, LoanDocuments, LoanFacts, LoanFollow, LoanPlan } from "./loan-details";
+import { LoanGaps } from "./loan-gaps";
+import { problemCount } from "./loans-utils";
 
 function FirstDue({ loan, onSave }: { loan: LoanView; onSave: (value: string | null) => void }) {
   const { t } = useTranslation();
@@ -71,14 +73,9 @@ function LoanCard({
       <CardContent className="space-y-4">
         <LoanFacts loan={loan} />
 
-        {needsFirstDue(loan) && (
-          <>
-            <p className="text-muted-foreground text-sm">
-              {t("settings:loans.dates_from_statements")}
-            </p>
-            <FirstDue loan={loan} onSave={onFirstDue} />
-          </>
-        )}
+        <LoanGaps loan={loan} />
+        {loan.firstDue && <FirstDue loan={loan} onSave={onFirstDue} />}
+        <LoanFollow loan={loan} />
 
         <LoanChecks loan={loan} />
 
@@ -112,6 +109,7 @@ export default function LoansPage() {
       queryClient.invalidateQueries({
         queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
       });
+      invalidateLoanCaches(queryClient);
     },
     onError: (e) =>
       toast({

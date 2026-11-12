@@ -5,6 +5,7 @@
 mod loans;
 mod loans_liabilities;
 mod loans_plan;
+mod loans_reconcile;
 mod statements_coverage;
 mod statements_model;
 mod statements_review;
@@ -12,8 +13,7 @@ mod statements_service;
 mod statements_traits;
 
 pub use loans::{
-    assemble_loans, document_problems, first_due_from_debits, is_loan_kind, BankDebit,
-    LoanDocumentData, LoanDocumentRef, LoanView,
+    assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
 };
 pub use loans_liabilities::{
     changes_of, setup_of, LoanAssetLink, LoanAssetLinked, LoanChange, LoanLiabilities,
@@ -22,6 +22,10 @@ pub use loans_liabilities::{
 pub use loans_plan::{
     build_plan, DatedRow, EventData, LoanInput, OfferData, OfferRow, Plan, PlanCheck, PlanRow,
     PlanSummary, Saved, ScheduleData,
+};
+pub use loans_reconcile::{
+    first_due_from_debits, gaps_of, reconcile, BankDebit, LoanAnswers, LoanGap, LoanPayment,
+    LoanPayments, StatementPeriod,
 };
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{

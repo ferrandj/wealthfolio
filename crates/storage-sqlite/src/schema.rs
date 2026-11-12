@@ -977,6 +977,7 @@ diesel::table! {
         loan_key -> Text,
         first_due -> Nullable<Text>,
         updated_at -> Text,
+        answers -> Nullable<Text>,
     }
 }
 

@@ -5,7 +5,7 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use wealthfolio_core::statements::{
-    AccountIdentity, LoanDocumentData, NewStatementDocument, StatementDocument,
+    AccountIdentity, LoanAnswers, LoanDocumentData, NewStatementDocument, StatementDocument,
     StatementRepositoryTrait,
 };
 use wealthfolio_core::Result;
@@ -313,23 +313,68 @@ impl StatementRepositoryTrait for StatementRepository {
         let key = loan_key.to_string();
         self.writer
             .exec(move |conn| -> Result<()> {
-                match first_due {
-                    Some(day) => {
-                        diesel::replace_into(loan_settings::table)
-                            .values((
-                                loan_settings::loan_key.eq(&key),
-                                loan_settings::first_due.eq(Some(day)),
-                                loan_settings::updated_at.eq(chrono::Utc::now().to_rfc3339()),
-                            ))
-                            .execute(conn)
-                            .map_err(StorageError::from)?;
-                    }
-                    None => {
-                        diesel::delete(loan_settings::table.find(&key))
-                            .execute(conn)
-                            .map_err(StorageError::from)?;
-                    }
-                }
+                let now = chrono::Utc::now().to_rfc3339();
+                diesel::insert_into(loan_settings::table)
+                    .values((
+                        loan_settings::loan_key.eq(&key),
+                        loan_settings::first_due.eq(first_due.clone()),
+                        loan_settings::updated_at.eq(&now),
+                    ))
+                    .on_conflict(loan_settings::loan_key)
+                    .do_update()
+                    .set((
+                        loan_settings::first_due.eq(first_due),
+                        loan_settings::updated_at.eq(&now),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn list_loan_answers(&self) -> Result<Vec<(String, LoanAnswers)>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rows = loan_settings::table
+            .select((loan_settings::loan_key, loan_settings::answers))
+            .load::<(String, Option<String>)>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|(key, json)| {
+                let answers: LoanAnswers = serde_json::from_str(&json?).ok()?;
+                Some((key, answers))
+            })
+            .collect())
+    }
+
+    async fn set_loan_answers(&self, loan_key: &str, answers: LoanAnswers) -> Result<()> {
+        let key = loan_key.to_string();
+        let json =
+            if answers.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_string(&answers).map_err(|e| {
+                    wealthfolio_core::Error::Unexpected(format!("loan answers: {e}"))
+                })?)
+            };
+        self.writer
+            .exec(move |conn| -> Result<()> {
+                let now = chrono::Utc::now().to_rfc3339();
+                diesel::insert_into(loan_settings::table)
+                    .values((
+                        loan_settings::loan_key.eq(&key),
+                        loan_settings::answers.eq(json.clone()),
+                        loan_settings::updated_at.eq(&now),
+                    ))
+                    .on_conflict(loan_settings::loan_key)
+                    .do_update()
+                    .set((
+                        loan_settings::answers.eq(json),
+                        loan_settings::updated_at.eq(&now),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 Ok(())
             })
             .await

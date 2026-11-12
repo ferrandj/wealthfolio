@@ -1,11 +1,25 @@
 import type { LoanView } from "@/lib/types/statements";
-import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render as plainRender, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { LoanValidationCard, loanOfDocument, needsDate } from "./loan-validation-card";
+import { LoanValidationCard, blockingGaps, loanOfDocument } from "./loan-validation-card";
 
+vi.mock("@/adapters", () => ({
+  getStatementLoans: vi.fn(),
+  linkStatementLoanDocument: vi.fn(),
+  setStatementLoanAnswers: vi.fn(),
+  setStatementLoanFirstDue: vi.fn(),
+}));
+vi.mock("@/hooks/use-accounts", () => ({
+  useAccounts: () => ({ accounts: [], isLoading: false }),
+}));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+
+const render = (ui: ReactElement) =>
+  plainRender(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 
 const loan = (over: Partial<LoanView> = {}): LoanView =>
   ({
@@ -46,16 +60,25 @@ describe("loan validation card", () => {
     expect(screen.queryByText("settings:documents.loan_unknown")).toBeNull();
   });
 
-  it("tells the bank statements will date the instalments instead of asking for a date", () => {
-    render(<LoanValidationCard loan={loan()} />);
-    expect(screen.getByText("settings:loans.dates_from_statements")).toBeTruthy();
-    expect(document.querySelector('input[type="date"]')).toBeNull();
-  });
-
-  it("knows when no paper dates the schedule", () => {
-    expect(needsDate(loan())).toBe(true);
-    expect(needsDate(loan({ inferredFirstDue: "2020-01-05" }))).toBe(false);
-    expect(needsDate(undefined)).toBe(false);
+  it("lists what is missing with the papers where to find it, and blocks while it is blocking", () => {
+    const missing = loan({
+      gaps: [
+        {
+          code: "first_due",
+          text: "La date de la première échéance est inconnue",
+          foundIn: ["loan_event", "statement"],
+          blocking: true,
+          answer: "first_due",
+        },
+      ],
+    });
+    render(<LoanValidationCard loan={missing} />);
+    expect(screen.getByText("La date de la première échéance est inconnue")).toBeTruthy();
+    expect(screen.getByText("settings:loans.found_in_kind.loan_event")).toBeTruthy();
+    expect(screen.getByText("settings:loans.found_in_kind.statement")).toBeTruthy();
+    expect(blockingGaps(missing)).toHaveLength(1);
+    expect(blockingGaps(loan())).toHaveLength(0);
+    expect(blockingGaps(undefined)).toHaveLength(0);
   });
 
   it("waits while loading and says unknown only once loaded", () => {

@@ -1,6 +1,11 @@
 import { getStatementLoans, reviewStatementDocument, validateStatementDocument } from "@/adapters";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
-import { LOAN_KINDS, LoanValidationCard, loanOfDocument } from "./loan-validation-card";
+import {
+  LOAN_KINDS,
+  LoanValidationCard,
+  blockingGaps,
+  loanOfDocument,
+} from "./loan-validation-card";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { QueryKeys } from "@/lib/query-keys";
@@ -151,9 +156,11 @@ function ReviewBody({
   const { data: loans, isLoading: loansLoading } = useQuery({
     queryKey: [QueryKeys.STATEMENT_LOANS],
     queryFn: getStatementLoans,
-    enabled: isLoan && !review?.loan,
+    enabled: isLoan,
   });
-  const loan = isLoan ? (review?.loan ?? loanOfDocument(loans, id)) : undefined;
+  // the loans are refreshed whenever the person answers; the review carries the loan until they arrive
+  const loan = isLoan ? (loanOfDocument(loans, id) ?? review?.loan) : undefined;
+  const blocked = blockingGaps(loan).length > 0;
 
   const validate = useMutation({
     mutationFn: async () => {
@@ -353,7 +360,7 @@ function ReviewBody({
         <Button variant="outline" onClick={onSkip} disabled={validate.isPending}>
           {t("settings:documents.review_skip")}
         </Button>
-        <Button onClick={() => validate.mutate()} disabled={validate.isPending}>
+        <Button onClick={() => validate.mutate()} disabled={validate.isPending || blocked}>
           <Icons.Check className="mr-1 size-4" />
           {t(
             isLoan

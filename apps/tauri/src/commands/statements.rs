@@ -287,6 +287,40 @@ pub async fn set_statement_loan_first_due(
 }
 
 #[tauri::command]
+pub async fn link_statement_loan_document(
+    document_id: String,
+    loan_key: Option<String>,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::LoanView>, String> {
+    let context = state.context()?;
+    let service = context.statement_service();
+    service
+        .link_loan_document(&document_id, loan_key)
+        .await
+        .map_err(|e| e.to_string())?;
+    service
+        .loans(chrono::Utc::now().date_naive())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_statement_loan_answers(
+    key: String,
+    answers: wealthfolio_core::statements::LoanAnswers,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::LoanView>, String> {
+    let context = state.context()?;
+    let service = context.statement_service();
+    service
+        .set_loan_answers(&key, answers)
+        .await
+        .map_err(|e| e.to_string())?;
+    service
+        .loans(chrono::Utc::now().date_naive())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn link_statement_loan_asset(
     key: String,
     link: wealthfolio_core::statements::LoanAssetLink,

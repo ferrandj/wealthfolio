@@ -1285,8 +1285,9 @@ impl StatementService {
         )
     }
 
-    /// The loans of these papers. A loan the papers do not date gets the date of its first instalment from the
-    /// bank statements already imported: the instalments really debited are the ones that date the schedule.
+    /// The loans of these papers, followed in the bank accounts. A loan the papers do not date gets the date of its
+    /// first instalment from the bank statements already imported: the instalments really debited date the
+    /// schedule. Each instalment already due is looked for among the debits, and what is still missing is listed.
     fn assemble_with_bank(
         &self,
         data: &[super::LoanDocumentData],
@@ -1294,42 +1295,106 @@ impl StatementService {
         today: chrono::NaiveDate,
     ) -> Result<Vec<super::LoanView>> {
         let mut settings = self.repository.list_loan_settings()?;
-        let views = super::assemble_loans(data, documents, &settings, today);
-        if views.iter().all(|v| v.inferred_first_due.is_some()) {
-            return Ok(views);
-        }
-        let debits: Vec<super::BankDebit> = self
-            .activity_service
-            .get_activities()?
-            .into_iter()
+        let answers = self.repository.list_loan_answers()?;
+        let activities = self.activity_service.get_activities()?;
+        let debits: Vec<super::BankDebit> = activities
+            .iter()
             .filter(|a| matches!(a.activity_type.as_str(), "WITHDRAWAL" | "TRANSFER_OUT"))
             .filter_map(|a| {
                 Some(super::BankDebit {
+                    activity_id: a.id.clone(),
+                    account_id: a.account_id.clone(),
                     date: a.activity_date.date_naive(),
                     amount: a.amount?,
                     label: format!(
                         "{} {}",
-                        a.notes.unwrap_or_default(),
-                        a.metadata.map(|m| m.to_string()).unwrap_or_default()
+                        a.notes.clone().unwrap_or_default(),
+                        a.metadata
+                            .as_ref()
+                            .map(|m| m.to_string())
+                            .unwrap_or_default()
                     ),
                 })
             })
             .collect();
-        let mut found = false;
-        for view in views.iter().filter(|v| v.inferred_first_due.is_none()) {
+        let mut periods: Vec<super::StatementPeriod> = documents
+            .iter()
+            .filter_map(|d| {
+                let parse = |s: &Option<String>| {
+                    s.as_deref()
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+                };
+                Some(super::StatementPeriod {
+                    account_id: d.account_id.clone()?,
+                    from: parse(&d.period_start)?,
+                    to: parse(&d.period_end)?,
+                })
+            })
+            .collect();
+        // an account kept by hand has no statements: the days between its first and its last operation are the ones
+        // it covers
+        let with_statements: HashSet<String> =
+            periods.iter().map(|p| p.account_id.clone()).collect();
+        let mut by_hand: HashMap<String, (chrono::NaiveDate, chrono::NaiveDate)> = HashMap::new();
+        for a in activities
+            .iter()
+            .filter(|a| !with_statements.contains(&a.account_id))
+        {
+            let day = a.activity_date.date_naive();
+            let range = by_hand.entry(a.account_id.clone()).or_insert((day, day));
+            range.0 = range.0.min(day);
+            range.1 = range.1.max(day);
+        }
+        periods.extend(by_hand.into_iter().map(|(account_id, (from, to))| {
+            super::StatementPeriod {
+                account_id,
+                from,
+                to,
+            }
+        }));
+        let answers_of = |key: &str| {
+            answers
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, a)| a.clone())
+                .unwrap_or_default()
+        };
+
+        let mut views = super::assemble_loans(data, documents, &settings, today);
+        let mut bank_dated: HashSet<String> = HashSet::new();
+        for view in views.iter_mut() {
+            view.answers = answers_of(&view.key);
+            if view.inferred_first_due.is_some() {
+                continue;
+            }
             if let Some(date) = super::first_due_from_debits(view, &debits) {
                 let value = Some(date.format("%Y-%m-%d").to_string());
                 match settings.iter_mut().find(|(k, _)| k == &view.key) {
                     Some(entry) => entry.1 = value,
                     None => settings.push((view.key.clone(), value)),
                 }
-                found = true;
+                bank_dated.insert(view.key.clone());
             }
         }
-        if !found {
-            return Ok(views);
+        if !bank_dated.is_empty() {
+            views = super::assemble_loans(data, documents, &settings, today);
         }
-        Ok(super::assemble_loans(data, documents, &settings, today))
+        for view in views.iter_mut() {
+            view.answers = answers_of(&view.key);
+            view.first_due_source = if bank_dated.contains(&view.key) {
+                view.first_due = None;
+                Some("statements".to_string())
+            } else if view.first_due.is_some() {
+                Some("typed".to_string())
+            } else if view.inferred_first_due.is_some() {
+                Some("papers".to_string())
+            } else {
+                None
+            };
+            view.payments = super::reconcile(view, &debits, &periods, today);
+            view.gaps = super::gaps_of(view);
+        }
+        Ok(views)
     }
 
     /// Deleting a document takes back what its import added, the account included when the import created it and
@@ -2169,6 +2234,21 @@ impl StatementServiceTrait for StatementService {
             if view.map(|v| v.key.as_str()).unwrap_or("?") == "?" {
                 return Err(invalid("This paper does not name the loan it belongs to"));
             }
+            let blocking: Vec<&str> = view
+                .map(|v| {
+                    v.gaps
+                        .iter()
+                        .filter(|g| g.blocking)
+                        .map(|g| g.text.as_str())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !blocking.is_empty() {
+                return Err(invalid(format!(
+                    "Information is missing to validate this loan: {}",
+                    blocking.join(" ")
+                )));
+            }
         }
         let review = self.review_document(id).await?;
         let chosen: HashMap<&str, &ReviewDecision> = decisions
@@ -2252,7 +2332,24 @@ impl StatementServiceTrait for StatementService {
         apply_reason(&mut document, &ReviewReason::default());
         let saved = self.repository.update_document(document).await?;
         if loan_paper {
-            // the liability of the loan is made from the papers the person validated
+            // the person validates the loan, as the dialog shows it with all its papers: the others are validated
+            // with it, and the liability is made from them
+            let views = self.build_loans(Utc::now().date_naive())?;
+            let siblings: Vec<String> = views
+                .iter()
+                .filter(|v| v.documents.iter().any(|d| d.document_id == id))
+                .flat_map(|v| v.documents.iter().map(|d| d.document_id.clone()))
+                .filter(|other| other != id)
+                .collect();
+            for other in siblings {
+                let Some(mut sibling) = self.repository.get_document(&other)? else {
+                    continue;
+                };
+                if sibling.status != DOCUMENT_STATUS_VALIDATED {
+                    apply_reason(&mut sibling, &ReviewReason::default());
+                    self.repository.update_document(sibling).await?;
+                }
+            }
             self.sync_loan_statuses().await?;
             return Ok(self.repository.get_document(id)?.unwrap_or(saved));
         }
@@ -2453,6 +2550,40 @@ impl StatementServiceTrait for StatementService {
                 first_due.map(|d| d.format("%Y-%m-%d").to_string()),
             )
             .await?;
+        self.sync_loan_statuses().await
+    }
+
+    async fn link_loan_document(&self, document_id: &str, loan_key: Option<String>) -> Result<()> {
+        let mut data = self
+            .repository
+            .list_loan_documents()?
+            .into_iter()
+            .find(|d| d.document_id == document_id)
+            .ok_or_else(|| invalid("This document is not a loan paper"))?;
+        if data.kind != super::loans::KIND_EVENT {
+            return Err(invalid(
+                "Only a letter without loan number (early repayment notice) can be attached by hand: the offer and the table name their loan",
+            ));
+        }
+        if let Some(key) = &loan_key {
+            let known = self
+                .build_loans(Utc::now().date_naive())?
+                .iter()
+                .any(|v| &v.key == key && v.key != "?");
+            if !known {
+                return Err(invalid("Unknown loan"));
+            }
+        }
+        data.reference = loan_key;
+        self.repository.save_loan_document(data).await?;
+        self.sync_loan_statuses().await
+    }
+
+    async fn set_loan_answers(&self, loan_key: &str, answers: super::LoanAnswers) -> Result<()> {
+        if let Some(account) = answers.debit_account_id.as_deref() {
+            self.account_service.get_account(account)?;
+        }
+        self.repository.set_loan_answers(loan_key, answers).await?;
         self.sync_loan_statuses().await
     }
 

@@ -394,6 +394,49 @@ export interface LoanDocumentRef {
   status: string;
 }
 
+/** What the person told about a loan, when the papers could not. */
+export interface LoanAnswers {
+  debitAccountId?: string | null;
+  noEarlyRepayment?: boolean;
+  paymentsUnchanged?: boolean;
+}
+
+/** Something the loan still lacks, and the papers where it can be found. */
+export interface LoanGap {
+  code: string;
+  text: string;
+  /** loan_offer | loan_event | loan_schedule | statement */
+  foundIn: string[];
+  blocking: boolean;
+  /** first_due | debit_account | no_early_repayment | payments_unchanged */
+  answer?: string | null;
+}
+
+/** One instalment (or early repayment) already due, and the debit that pays it. */
+export interface LoanPayment {
+  row: number;
+  number?: number | null;
+  date: string;
+  kind: string;
+  expected: number | string;
+  /** found | missing | uncovered | unknown */
+  state: "found" | "missing" | "uncovered" | "unknown";
+  activityId?: string | null;
+  accountId?: string | null;
+  paidOn?: string | null;
+  amount?: number | string | null;
+}
+
+export interface LoanPayments {
+  accountId?: string | null;
+  accountSource?: "answer" | "statements" | null;
+  expected: number;
+  found: number;
+  missing: number;
+  uncovered: number;
+  lines: LoanPayment[];
+}
+
 export interface LoanView {
   key: string;
   label: string;
@@ -411,6 +454,13 @@ export interface LoanView {
   liabilityId?: string | null;
   /** The asset (house, car…) this loan finances. */
   linkedAssetId?: string | null;
+  /** Where instalment n°1 comes from: papers | statements | typed. */
+  firstDueSource?: "papers" | "statements" | "typed" | null;
+  answers?: LoanAnswers;
+  /** What is still missing, with the papers where it can be found. */
+  gaps?: LoanGap[];
+  /** Each instalment already due, followed in the bank accounts. */
+  payments?: LoanPayments;
 }
 
 /** An asset created with the link: a property, a vehicle or another asset. */

@@ -397,6 +397,8 @@ pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(SetStatementMonthNormal),
         Arc::new(GetLoans),
         Arc::new(SetLoanFirstDue),
+        Arc::new(SetLoanAnswers),
+        Arc::new(LinkLoanDocument),
         Arc::new(SyncLoanLiabilities),
         Arc::new(LinkLoanToAsset),
         Arc::new(ListContacts),

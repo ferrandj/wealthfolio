@@ -9,6 +9,7 @@ import {
   revalidateStatementDocument,
 } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
+import { invalidateLoanCaches } from "../../loans/loan-caches";
 import { QueryKeys } from "@/lib/query-keys";
 import type { StatementDocument } from "@/lib/types/statements";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
@@ -72,6 +73,7 @@ export function DocumentsLibrary() {
 
   const refresh = () =>
     Promise.all([
+      invalidateLoanCaches(queryClient),
       queryClient.invalidateQueries({
         queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
       }),

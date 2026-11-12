@@ -2367,6 +2367,39 @@
     "asset_detach": "Detach",
     "product": "Product",
     "borrower": "Borrower",
-    "dates_from_statements": "The papers do not date the instalments: the instalments actually debited will be determined when the bank statements are imported. You can also type the date of the first instalment by hand."
+    "gaps_title": "What is missing to rebuild this loan",
+    "gap_blocking": "Needed before it can be validated.",
+    "found_in": "Can be found in:",
+    "found_in_kind": {
+      "loan_offer": "the loan offer",
+      "loan_event": "the early repayment notice",
+      "loan_schedule": "the dated amortization table",
+      "statement": "the statements of the debited account"
+    },
+    "answer_no_early_repayment": "No, no early repayment",
+    "answer_payments_unchanged": "No, my instalments never changed",
+    "debit_account": "Debited account",
+    "debit_account_choose": "Choose the debited account",
+    "debit_account_unknown": "Unknown",
+    "debit_account_source": {
+      "answer": "told by you",
+      "statements": "found in the statements"
+    },
+    "first_due_origin": "Date of the first instalment",
+    "first_due_source": {
+      "papers": "read in the papers",
+      "statements": "date of the first debit in the statements",
+      "typed": "typed"
+    },
+    "payments_found_label": "Debits found",
+    "payments_found": "{{found}} of {{expected}} instalments",
+    "col_payment": "Debit",
+    "payment_state": {
+      "missing": "Not found",
+      "uncovered": "Statement missing",
+      "unknown": "—"
+    },
+    "link_loan_choose": "Choose the loan",
+    "link_loan_save": "Attach"
   }
 }

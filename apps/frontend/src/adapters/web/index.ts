@@ -300,6 +300,8 @@ export {
   getStatementCoverage,
   getStatementLoans,
   setStatementLoanFirstDue,
+  setStatementLoanAnswers,
+  linkStatementLoanDocument,
   linkStatementLoanAsset,
   syncStatementLoanLiabilities,
   getStatementOutdated,

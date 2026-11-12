@@ -70,6 +70,34 @@ fn has_stale_events(stored: &Value, view: &LoanView) -> bool {
     })
 }
 
+/// Whether the terms stored in the liability are no longer those of the papers: the first instalment moved (a
+/// paper dated the loan better than the bank statements did), or the instalment, the rate changed.
+fn has_stale_terms(stored: &Value, setup: &LoanSetup) -> bool {
+    let projection = match stored.get("loan_projection") {
+        Some(Value::String(text)) => serde_json::from_str::<Value>(text).ok(),
+        Some(other) => Some(other.clone()),
+        None => None,
+    };
+    let Some(projection) = projection else {
+        return false;
+    };
+    let Some(schedule) = setup.schedule.as_ref() else {
+        return false;
+    };
+    let first = projection.get("firstPaymentDate").and_then(Value::as_str);
+    if first.is_some()
+        && first
+            != schedule
+                .first_payment_date
+                .map(|d| d.to_string())
+                .as_deref()
+    {
+        return true;
+    }
+    let payment = projection.get("paymentAmount").and_then(Value::as_f64);
+    matches!((payment, schedule.payment_amount), (Some(a), Some(b)) if (a - b).abs() > 0.005)
+}
+
 /// A dated change the papers state after the contract.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoanChange {
@@ -415,7 +443,9 @@ impl LoanLiabilities {
             let found = match self.find(&view.key)? {
                 // events the papers no longer state (a letter that was deleted) cannot be taken back one by one:
                 // the liability is built again from the papers that remain, and keeps its asset
-                Some((asset_id, stored)) if has_stale_events(&stored, view) => {
+                Some((asset_id, stored))
+                    if has_stale_events(&stored, view) || has_stale_terms(&stored, &setup) =>
+                {
                     let linked = self.state_of(&view.key)?.and_then(|(_, linked)| linked);
                     self.assets.delete_alternative_asset(&asset_id).await?;
                     relink = linked;

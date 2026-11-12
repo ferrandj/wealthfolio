@@ -1,4 +1,5 @@
 import { analyzeStatement, importStatement, logger } from "@/adapters";
+import { invalidateLoanCaches } from "../loans/loan-caches";
 import { useAccounts } from "@/hooks/use-accounts";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { QueryKeys } from "@/lib/query-keys";
@@ -114,6 +115,7 @@ export default function DocumentsPage() {
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] }),
           queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] }),
+          invalidateLoanCaches(queryClient),
         ]);
         invalidatePerformanceCaches(queryClient);
         invalidateSpendingCaches(queryClient);

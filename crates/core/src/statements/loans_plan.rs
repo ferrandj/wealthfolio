@@ -1115,6 +1115,10 @@ mod tests {
             plan,
             liability_id: None,
             linked_asset_id: None,
+            first_due_source: None,
+            answers: Default::default(),
+            gaps: Vec::new(),
+            payments: Default::default(),
         }
     }
 
@@ -1132,6 +1136,140 @@ mod tests {
         assert_eq!(schedule.escrow_amount, Some(25.83));
     }
 
+    fn doc(kind: &str) -> crate::statements::LoanDocumentRef {
+        crate::statements::LoanDocumentRef {
+            document_id: kind.into(),
+            kind: kind.into(),
+            file_name: format!("{kind}.pdf"),
+            status: "VALIDATED".into(),
+        }
+    }
+
+    #[test]
+    fn each_instalment_already_due_is_followed_in_the_bank_accounts() {
+        use crate::statements::{reconcile, BankDebit, StatementPeriod};
+        let today = day(2026, 11, 10);
+        let view = view_of(today);
+        let due: Vec<_> = view
+            .plan
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.kind == "installment" && r.status == "paid")
+            .collect();
+        assert!(due.len() >= 15, "the instalments of the contract are due");
+        // every instalment is debited two days late from one account, except the fourth
+        let debits: Vec<BankDebit> = due
+            .iter()
+            .enumerate()
+            .filter(|(n, _)| *n != 3)
+            .map(|(n, (_, r))| BankDebit {
+                activity_id: format!("a{n}"),
+                account_id: "current".into(),
+                date: r.date.unwrap() + chrono::Duration::days(2),
+                amount: r.total,
+                label: "PRLV ECHEANCE PRET FT14103062".into(),
+            })
+            .collect();
+        // the statements cover everything but the last two months
+        let periods = vec![StatementPeriod {
+            account_id: "current".into(),
+            from: day(2025, 1, 1),
+            to: day(2026, 3, 31),
+        }];
+        let payments = reconcile(&view, &debits, &periods, today);
+        assert_eq!(payments.account_id.as_deref(), Some("current"));
+        assert_eq!(payments.account_source.as_deref(), Some("statements"));
+        assert_eq!(payments.lines[0].state, "found");
+        assert_eq!(payments.lines[0].paid_on, Some(day(2025, 3, 17)));
+        // the fourth instalment is not debited although the statements cover its day
+        assert_eq!(payments.lines[3].state, "missing");
+        // the day of the last ones is not covered by any statement
+        assert!(payments.uncovered > 0);
+        assert!(
+            payments.found >= 10
+                && payments.found + payments.missing + payments.uncovered == payments.expected
+        );
+    }
+
+    #[test]
+    fn the_account_told_by_the_person_wins_over_the_debits() {
+        use crate::statements::{reconcile, BankDebit, LoanAnswers};
+        let today = day(2026, 11, 10);
+        let mut view = view_of(today);
+        let first = view
+            .plan
+            .rows
+            .iter()
+            .find(|r| r.kind == "installment")
+            .unwrap()
+            .clone();
+        let debit = |account: &str| BankDebit {
+            activity_id: account.into(),
+            account_id: account.into(),
+            date: first.date.unwrap(),
+            amount: first.total,
+            label: "VIR SALAIRE".into(),
+        };
+        view.answers = LoanAnswers {
+            debit_account_id: Some("joint".into()),
+            ..Default::default()
+        };
+        let payments = reconcile(&view, &[debit("current"), debit("joint")], &[], today);
+        assert_eq!(payments.account_id.as_deref(), Some("joint"));
+        assert_eq!(payments.account_source.as_deref(), Some("answer"));
+        assert_eq!(payments.lines[0].activity_id.as_deref(), Some("joint"));
+    }
+
+    #[test]
+    fn what_is_missing_says_where_to_find_it() {
+        use crate::statements::{gaps_of, LoanAnswers};
+        let today = day(2026, 11, 10);
+        // the contract alone: not dated, nothing says when the instalments fall
+        let input = LoanInput {
+            offer: Some(contract()),
+            ..Default::default()
+        };
+        let mut view = view_of(today);
+        view.plan = build_plan(&input, today);
+        view.inferred_first_due = input.infer_first_due();
+        view.documents = vec![doc("loan_offer")];
+        let gaps = gaps_of(&view);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].code, "first_due");
+        assert!(gaps[0].blocking);
+        assert_eq!(gaps[0].answer.as_deref(), Some("first_due"));
+        assert!(gaps[0].found_in.contains(&"loan_event".to_string()));
+        assert!(gaps[0].found_in.contains(&"statement".to_string()));
+
+        // the repayment letter dates the contract; what remains is asked, nothing blocks
+        let mut view = view_of(today);
+        view.documents = vec![doc("loan_offer"), doc("loan_event")];
+        let gaps = gaps_of(&view);
+        let codes: Vec<&str> = gaps.iter().map(|g| g.code.as_str()).collect();
+        assert_eq!(codes, vec!["debit_account", "payments_changed"]);
+        assert!(gaps.iter().all(|g| !g.blocking));
+
+        // answered
+        view.answers = LoanAnswers {
+            debit_account_id: Some("current".into()),
+            no_early_repayment: false,
+            payments_unchanged: true,
+        };
+        view.payments.account_id = Some("current".into());
+        assert!(gaps_of(&view).is_empty());
+
+        // no contract and no table: the terms are missing
+        let mut view = view_of(today);
+        view.principal = None;
+        view.rate = None;
+        view.plan = Plan::default();
+        let gaps = gaps_of(&view);
+        assert_eq!(gaps[0].code, "terms");
+        assert!(gaps[0].blocking);
+        assert!(gaps[0].found_in.contains(&"loan_offer".to_string()));
+    }
+
     #[test]
     fn the_first_instalment_is_read_in_the_bank_statements() {
         use crate::statements::{first_due_from_debits, BankDebit};
@@ -1144,6 +1282,8 @@ mod tests {
             .unwrap()
             .total;
         let debit = |date, amount, label: &str| BankDebit {
+            activity_id: "a".into(),
+            account_id: "current".into(),
             date,
             amount,
             label: label.into(),

@@ -478,6 +478,63 @@ service_tool!(
 );
 
 service_tool!(
+    LinkLoanDocument, "link_loan_document", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Attach a bank letter that carries no loan number (an early repayment notice, kind loan_event) to a loan (documentId from list_documents, loanKey from get_loans), or detach it with a null loanKey so that it finds its loan by its figures again. Returns the loans.",
+    schema = object(json!({
+        "documentId": {"type": "string"},
+        "loanKey": {"type": ["string", "null"], "description": "The loan's key, or null to detach."}
+    }), &["documentId", "loanKey"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            document_id: String,
+            #[serde(deserialize_with = "required_nullable")]
+            loan_key: Option<String>,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        service.link_loan_document(&args.document_id, args.loan_key).await.map_err(fail)?;
+        reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
+    }
+);
+
+service_tool!(
+    SetLoanAnswers, "set_loan_answers", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Tell what a loan's papers cannot say (loanKey from get_loans; each gap of the loan names the answer it accepts): the account the instalments are debited from (debitAccountId, an account id from get_accounts), noEarlyRepayment (true when no early repayment was ever made), paymentsUnchanged (true when the instalments never changed since the start). Replaces the previous answers. Returns the loans.",
+    schema = object(json!({
+        "loanKey": {"type": "string"},
+        "debitAccountId": {"type": ["string", "null"], "description": "The account the instalments are debited from, or null."},
+        "noEarlyRepayment": {"type": "boolean"},
+        "paymentsUnchanged": {"type": "boolean"}
+    }), &["loanKey"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            loan_key: String,
+            #[serde(default)]
+            debit_account_id: Option<String>,
+            #[serde(default)]
+            no_early_repayment: bool,
+            #[serde(default)]
+            payments_unchanged: bool,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        let answers = wealthfolio_core::statements::LoanAnswers {
+            debit_account_id: args.debit_account_id,
+            no_early_repayment: args.no_early_repayment,
+            payments_unchanged: args.payments_unchanged,
+        };
+        service.set_loan_answers(&args.loan_key, answers).await.map_err(fail)?;
+        reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
+    }
+);
+
+service_tool!(
     SetLoanFirstDue, "set_loan_first_due", Write, additive = false,
     scopes = [DocumentsWrite],
     description = "Set the date of a loan's first instalment when the document does not say it (loanKey from get_loans), or clear it with null. Returns the loans.",

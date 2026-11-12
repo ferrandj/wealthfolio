@@ -1,8 +1,9 @@
-import type { LoanPlanCheck, LoanView } from "@/lib/types/statements";
+import type { LoanPayment, LoanPlanCheck, LoanView } from "@/lib/types/statements";
 import { Badge, Icons, Separator } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@wealthfolio/ui";
+import { useAccounts } from "@/hooks/use-accounts";
 import { day, euros, percent } from "./loans-utils";
 
 export function Fact({ label, value }: { label: string; value: string }) {
@@ -90,6 +91,46 @@ export function LoanFacts({ loan }: { loan: LoanView }) {
   );
 }
 
+/** How the loan is followed in the bank accounts: the date of instalment n°1, the account debited, what was found. */
+export function LoanFollow({ loan }: { loan: LoanView }) {
+  const { t } = useTranslation();
+  const { accounts } = useAccounts({ filterActive: false });
+  const payments = loan.payments;
+  const account = accounts.find((a) => a.id === payments?.accountId);
+  const source = loan.firstDueSource;
+  if (!payments && !source) return null;
+  return (
+    <>
+      <Separator />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="loan-follow">
+        {source && (
+          <Fact
+            label={t("settings:loans.first_due_origin")}
+            value={t(`settings:loans.first_due_source.${source}`)}
+          />
+        )}
+        <Fact
+          label={t("settings:loans.debit_account")}
+          value={
+            account
+              ? `${account.name} (${t(`settings:loans.debit_account_source.${payments?.accountSource ?? "statements"}`)})`
+              : t("settings:loans.debit_account_unknown")
+          }
+        />
+        {payments && payments.expected > 0 && (
+          <Fact
+            label={t("settings:loans.payments_found_label")}
+            value={t("settings:loans.payments_found", {
+              found: payments.found,
+              expected: payments.expected,
+            })}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
 export function LoanChecks({ loan }: { loan: LoanView }) {
   if (loan.plan.checks.length === 0) return null;
   return (
@@ -123,10 +164,30 @@ export function LoanDocuments({ loan }: { loan: LoanView }) {
   );
 }
 
+function PaymentCell({ line, account }: { line?: LoanPayment; account?: string }) {
+  const { t } = useTranslation();
+  if (!line) return null;
+  if (line.state === "found") {
+    return (
+      <span className="inline-flex items-center gap-1 text-green-600">
+        <Icons.CheckCircle className="size-3.5 shrink-0" />
+        <span className="text-foreground">
+          {day(line.paidOn)} · {euros(line.amount)}
+          {account ? ` · ${account}` : ""}
+        </span>
+      </span>
+    );
+  }
+  const tone = line.state === "missing" ? "text-destructive" : "text-muted-foreground";
+  return <span className={tone}>{t(`settings:loans.payment_state.${line.state}`)}</span>;
+}
+
 /** The full schedule, row by row; `defaultOpen` shows it without a click. */
 export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaultOpen?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
+  const { accounts } = useAccounts({ filterActive: false });
+  const payments = new Map((loan.payments?.lines ?? []).map((l) => [l.row, l]));
   return (
     <>
       <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
@@ -143,7 +204,8 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
                 <th className="pr-3 text-right">{t("settings:loans.col_insurance")}</th>
                 <th className="pr-3 text-right">{t("settings:loans.col_total")}</th>
                 <th className="pr-3 text-right">{t("settings:loans.col_remaining")}</th>
-                <th>{t("settings:loans.col_source")}</th>
+                <th className="pr-3">{t("settings:loans.col_source")}</th>
+                <th>{t("settings:loans.col_payment")}</th>
               </tr>
             </thead>
             <tbody>
@@ -167,7 +229,15 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
                   <td className="pr-3 text-right">{euros(r.insurance)}</td>
                   <td className="pr-3 text-right">{euros(r.total)}</td>
                   <td className="pr-3 text-right">{euros(r.remaining)}</td>
-                  <td>{r.kind === "prepayment" ? t("settings:loans.prepayment") : r.source}</td>
+                  <td className="pr-3">
+                    {r.kind === "prepayment" ? t("settings:loans.prepayment") : r.source}
+                  </td>
+                  <td>
+                    <PaymentCell
+                      line={payments.get(i)}
+                      account={accounts.find((a) => a.id === payments.get(i)?.accountId)?.name}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
