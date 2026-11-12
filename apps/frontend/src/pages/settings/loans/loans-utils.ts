@@ -1,7 +1,14 @@
 import type { AlternativeAssetHolding } from "@/lib/types";
-import type { LoanPlanCheck, LoanView, NewLoanAsset } from "@/lib/types/statements";
+import type {
+  LoanPlanCheck,
+  LoanView,
+  NewLoanAsset,
+} from "@/lib/types/statements";
 
-const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
+const money = new Intl.NumberFormat("fr-FR", {
+  style: "currency",
+  currency: "EUR",
+});
 
 export const euros = (v: number | string | null | undefined): string =>
   v === null || v === undefined || v === "" ? "—" : money.format(Number(v));
@@ -14,7 +21,9 @@ export const day = (iso: string | null | undefined): string => {
 };
 
 export const percent = (v: number | string | null | undefined): string =>
-  v === null || v === undefined ? "—" : `${Number(v).toLocaleString("fr-FR")} %`;
+  v === null || v === undefined
+    ? "—"
+    : `${Number(v).toLocaleString("fr-FR")} %`;
 
 export const problemCount = (checks: LoanPlanCheck[]): number =>
   checks.filter((c) => c.status === "warn").length;
@@ -24,8 +33,12 @@ export const needsFirstDue = (loan: LoanView): boolean =>
   loan.plan.rows.some((r) => r.date === null);
 
 /** The assets a loan can finance: a property, a vehicle or another asset (never another liability). */
-export const attachableAssets = (holdings: AlternativeAssetHolding[]): AlternativeAssetHolding[] =>
-  holdings.filter((h) => ["PROPERTY", "VEHICLE", "OTHER"].includes(h.kind.toUpperCase()));
+export const attachableAssets = (
+  holdings: AlternativeAssetHolding[],
+): AlternativeAssetHolding[] =>
+  holdings.filter((h) =>
+    ["PROPERTY", "VEHICLE", "OTHER"].includes(h.kind.toUpperCase()),
+  );
 
 /** The lines of a stored address ("street\npostal code city"). */
 export const addressLines = (address: unknown): string[] =>
@@ -49,7 +62,8 @@ export interface NewAssetForm {
 export function newAssetOf(form: NewAssetForm): NewLoanAsset | null {
   const name = form.name.trim();
   const value = Number(form.value.replace(/\s/g, "").replace(",", "."));
-  if (!name || form.value.trim() === "" || !Number.isFinite(value) || value < 0) return null;
+  if (!name || form.value.trim() === "" || !Number.isFinite(value) || value < 0)
+    return null;
   const text = (v: string) => (v.trim() === "" ? null : v.trim());
   return {
     kind: form.kind,

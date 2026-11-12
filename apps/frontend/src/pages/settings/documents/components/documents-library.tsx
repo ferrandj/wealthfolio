@@ -50,7 +50,10 @@ const NO_ACCOUNT = "none";
 export function DocumentsLibrary() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { accounts } = useAccounts({ filterActive: false, includeArchived: true });
+  const { accounts } = useAccounts({
+    filterActive: false,
+    includeArchived: true,
+  });
   const [toDelete, setToDelete] = useState<StatementDocument | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [confirmInvalidate, setConfirmInvalidate] = useState(false);
@@ -69,14 +72,22 @@ export function DocumentsLibrary() {
 
   const refresh = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_COVERAGE] }),
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_OUTDATED] }),
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.STATEMENT_COVERAGE],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.STATEMENT_OUTDATED],
+      }),
     ]);
 
   const refreshOperations = async () => {
     await refresh();
-    await queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
+    await queryClient.invalidateQueries({
+      queryKey: [QueryKeys.ACTIVITY_DATA],
+    });
     await queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
     invalidatePerformanceCaches(queryClient);
     invalidateSpendingCaches(queryClient);
@@ -87,7 +98,10 @@ export function DocumentsLibrary() {
     queryKey: [QueryKeys.STATEMENT_OUTDATED],
     queryFn: getStatementOutdated,
   });
-  const outdatedIds = useMemo(() => new Set(outdated?.documentIds ?? []), [outdated]);
+  const outdatedIds = useMemo(
+    () => new Set(outdated?.documentIds ?? []),
+    [outdated],
+  );
 
   const ordered = useMemo(
     () =>
@@ -139,7 +153,9 @@ export function DocumentsLibrary() {
       setConfirmInvalidate(false);
       await Promise.all([
         refresh(),
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE] }),
+        queryClient.invalidateQueries({
+          queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE],
+        }),
       ]);
       toast({
         title: t("settings:documents.invalidate_all_done"),
@@ -169,13 +185,22 @@ export function DocumentsLibrary() {
   });
 
   const remove = useMutation({
-    mutationFn: ({ id, removeOperations }: { id: string; removeOperations: boolean }) =>
-      deleteStatementDocument(id, removeOperations),
+    mutationFn: ({
+      id,
+      removeOperations,
+    }: {
+      id: string;
+      removeOperations: boolean;
+    }) => deleteStatementDocument(id, removeOperations),
     onSuccess: async (_d, vars) => {
       await refresh();
       if (vars.removeOperations) {
-        await queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
-        await queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
+        await queryClient.invalidateQueries({
+          queryKey: [QueryKeys.ACTIVITY_DATA],
+        });
+        await queryClient.invalidateQueries({
+          queryKey: [QueryKeys.ACTIVITIES],
+        });
         invalidatePerformanceCaches(queryClient);
       }
       setToDelete(null);
@@ -192,8 +217,11 @@ export function DocumentsLibrary() {
   const download = (doc: StatementDocument) => downloadDocument(doc.id);
 
   // A validated document was checked by a person: reading it again takes three clicks in a row.
-  const [armed, setArmed] = useState<{ id: string; count: number } | null>(null);
-  const clicksNeeded = (doc: StatementDocument) => (doc.status === "VALIDATED" ? 3 : 1);
+  const [armed, setArmed] = useState<{ id: string; count: number } | null>(
+    null,
+  );
+  const clicksNeeded = (doc: StatementDocument) =>
+    doc.status === "VALIDATED" ? 3 : 1;
   const onRevalidateClick = (doc: StatementDocument) => {
     const needed = clicksNeeded(doc);
     const count = armed?.id === doc.id ? armed.count + 1 : 1;
@@ -235,15 +263,21 @@ export function DocumentsLibrary() {
                 </span>
               )}
               {doc.status === "STORED" ? (
-                <Badge variant="outline">{t("settings:documents.kept_only")}</Badge>
+                <Badge variant="outline">
+                  {t("settings:documents.kept_only")}
+                </Badge>
               ) : (
                 <>
                   <Badge variant="secondary">
-                    {t("settings:documents.operations_added", { count: doc.importedCount })}
+                    {t("settings:documents.operations_added", {
+                      count: doc.importedCount,
+                    })}
                   </Badge>
                   <StatusBadge doc={doc} />
                   {outdatedIds.has(doc.id) && (
-                    <Badge variant="outline">{t("settings:documents.reader_outdated")}</Badge>
+                    <Badge variant="outline">
+                      {t("settings:documents.reader_outdated")}
+                    </Badge>
                   )}
                 </>
               )}
@@ -287,7 +321,11 @@ export function DocumentsLibrary() {
           </div>
           <div className="flex gap-1">
             {doc.status === "PENDING" && (
-              <Button type="button" size="sm" onClick={() => setReviewing(doc.id)}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setReviewing(doc.id)}
+              >
                 {t("settings:documents.review_one")}
               </Button>
             )}
@@ -331,8 +369,13 @@ export function DocumentsLibrary() {
   // institution → account → kind → year
   const renderTree = () => {
     const accountName = (id: string | null | undefined) =>
-      id ? (accounts.find((a) => a.id === id)?.name ?? id) : t("settings:documents.no_account");
-    const tree = new Map<string, Map<string, Map<string, StatementDocument[]>>>();
+      id
+        ? (accounts.find((a) => a.id === id)?.name ?? id)
+        : t("settings:documents.no_account");
+    const tree = new Map<
+      string,
+      Map<string, Map<string, StatementDocument[]>>
+    >();
     for (const d of ordered) {
       const inst = d.institution ?? "—";
       const acc = accountName(d.accountId);
@@ -366,7 +409,11 @@ export function DocumentsLibrary() {
   if (isLoading) return <Skeleton className="h-24" />;
 
   if (!documents || documents.length === 0) {
-    return <p className="text-muted-foreground text-sm">{t("settings:documents.library_empty")}</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t("settings:documents.library_empty")}
+      </p>
+    );
   }
 
   const holderItems = [
@@ -398,7 +445,10 @@ export function DocumentsLibrary() {
           value={holderFilter}
           onValueChange={(v) => v && setHolderFilter(v as HolderFilter)}
         >
-          <SelectTrigger className="w-44" aria-label={t("settings:documents.holder_filter")}>
+          <SelectTrigger
+            className="w-44"
+            aria-label={t("settings:documents.holder_filter")}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -425,7 +475,10 @@ export function DocumentsLibrary() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={invalidateAll.isPending || !documents.some((d) => d.status === "VALIDATED")}
+          disabled={
+            invalidateAll.isPending ||
+            !documents.some((d) => d.status === "VALIDATED")
+          }
           onClick={() => setConfirmInvalidate(true)}
         >
           <Icons.AlertTriangle className="mr-1 size-4" />
@@ -444,23 +497,34 @@ export function DocumentsLibrary() {
           {revalidateAll.isPending
             ? t("settings:documents.revalidate_all_running")
             : outdatedIds.size > 0
-              ? t("settings:documents.update_reader", { count: outdatedIds.size })
+              ? t("settings:documents.update_reader", {
+                  count: outdatedIds.size,
+                })
               : t("settings:documents.revalidate_all")}
         </Button>
       </div>
-      <div className="space-y-2">{viewMode === "list" ? ordered.map(renderDoc) : renderTree()}</div>
+      <div className="space-y-2">
+        {viewMode === "list" ? ordered.map(renderDoc) : renderTree()}
+      </div>
 
       <AlertDialog open={confirmInvalidate} onOpenChange={setConfirmInvalidate}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings:documents.invalidate_all_title")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settings:documents.invalidate_all_title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("settings:documents.invalidate_all_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
-            <Button disabled={invalidateAll.isPending} onClick={() => invalidateAll.mutate()}>
+            <AlertDialogCancel>
+              {t("settings:documents.cancel")}
+            </AlertDialogCancel>
+            <Button
+              disabled={invalidateAll.isPending}
+              onClick={() => invalidateAll.mutate()}
+            >
               {t("settings:documents.invalidate_all_confirm")}
             </Button>
           </AlertDialogFooter>
@@ -470,14 +534,21 @@ export function DocumentsLibrary() {
       <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings:documents.revalidate_all_title")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settings:documents.revalidate_all_title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("settings:documents.revalidate_all_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
-            <Button disabled={revalidateAll.isPending} onClick={() => revalidateAll.mutate()}>
+            <AlertDialogCancel>
+              {t("settings:documents.cancel")}
+            </AlertDialogCancel>
+            <Button
+              disabled={revalidateAll.isPending}
+              onClick={() => revalidateAll.mutate()}
+            >
               {t("settings:documents.revalidate_all_confirm")}
             </Button>
           </AlertDialogFooter>
@@ -495,21 +566,31 @@ export function DocumentsLibrary() {
         />
       )}
 
-      <AlertDialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
+      <AlertDialog
+        open={!!toDelete}
+        onOpenChange={(open) => !open && setToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings:documents.delete_title")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settings:documents.delete_title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("settings:documents.delete_description", { name: toDelete?.storedName ?? "" })}
+              {t("settings:documents.delete_description", {
+                name: toDelete?.storedName ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>
+              {t("settings:documents.cancel")}
+            </AlertDialogCancel>
             <Button
               variant="outline"
               disabled={remove.isPending}
               onClick={() =>
-                toDelete && remove.mutate({ id: toDelete.id, removeOperations: false })
+                toDelete &&
+                remove.mutate({ id: toDelete.id, removeOperations: false })
               }
             >
               {t("settings:documents.delete_keep_operations")}
@@ -517,7 +598,9 @@ export function DocumentsLibrary() {
             {toDelete && toDelete.importedCount > 0 && (
               <AlertDialogAction
                 disabled={remove.isPending}
-                onClick={() => remove.mutate({ id: toDelete.id, removeOperations: true })}
+                onClick={() =>
+                  remove.mutate({ id: toDelete.id, removeOperations: true })
+                }
               >
                 {t("settings:documents.delete_with_operations")}
               </AlertDialogAction>
@@ -545,11 +628,18 @@ function StatusBadge({ doc }: { doc: StatementDocument }) {
     parts.push(t("settings:documents.reason_gap", { gap: reason.balanceGap }));
   }
   if (doc.toReviewCount > 0) {
-    parts.push(t("settings:documents.reason_doubts", { count: doc.toReviewCount }));
+    parts.push(
+      t("settings:documents.reason_doubts", { count: doc.toReviewCount }),
+    );
   }
-  if (reason && reason.warnings > 0) parts.push(t("settings:documents.reason_warnings"));
+  if (reason && reason.warnings > 0)
+    parts.push(t("settings:documents.reason_warnings"));
   return (
-    <Badge variant="outline" className="border-amber-500 text-amber-700" title={parts.join(" · ")}>
+    <Badge
+      variant="outline"
+      className="border-amber-500 text-amber-700"
+      title={parts.join(" · ")}
+    >
       {t("settings:documents.status_pending")}
       {parts.length > 0 ? ` · ${parts.join(" · ")}` : ""}
     </Badge>

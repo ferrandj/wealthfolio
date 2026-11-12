@@ -2180,7 +2180,8 @@
     "review_validate_loan": "Valider ce prêt",
     "loan": "Prêt",
     "loan_in_liabilities": "Dans Passifs",
-    "loan_waiting": "À valider : pas encore dans Passifs"
+    "loan_waiting": "À valider : pas encore dans Passifs",
+    "loan_check_first": "Certains points sont à vérifier avant de valider : consultez les contrôles ci-dessus."
   },
   "identity": {
     "title": "Coordonnées du compte",
@@ -2447,6 +2448,8 @@
     "asset_save": "Rattacher",
     "asset_cancel": "Annuler",
     "asset_change": "Changer",
-    "asset_detach": "Détacher"
+    "asset_detach": "Détacher",
+    "product": "Produit",
+    "borrower": "Emprunteur"
   }
 }

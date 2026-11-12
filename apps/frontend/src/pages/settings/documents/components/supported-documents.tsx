@@ -24,7 +24,10 @@ export function SupportedDocuments() {
             <div className="mb-1 font-medium">{institution.institution}</div>
             <ul className="space-y-1">
               {institution.adapters.map((adapter) => (
-                <li key={adapter.id} className="flex flex-wrap items-center gap-2">
+                <li
+                  key={adapter.id}
+                  className="flex flex-wrap items-center gap-2"
+                >
                   <span>{adapter.label}</span>
                   {adapter.formats.map((f) => (
                     <Badge key={f} variant="outline" className="uppercase">

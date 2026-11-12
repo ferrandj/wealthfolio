@@ -283,6 +283,8 @@ export interface DocumentReview {
   statements: StatementReview[];
   earlierPending: string[];
   warnings: string[];
+  /** For a loan paper: the whole loan (terms, plan, checks). */
+  loan?: LoanView;
 }
 
 export interface ReviewDecision {

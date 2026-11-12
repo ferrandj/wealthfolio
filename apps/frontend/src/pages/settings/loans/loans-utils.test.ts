@@ -40,10 +40,16 @@ describe("loans utils", () => {
       status: "future",
       note: "",
     } as const;
-    const loan = { plan: { rows: [row], checks: [], summary: null } } as unknown as LoanView;
+    const loan = {
+      plan: { rows: [row], checks: [], summary: null },
+    } as unknown as LoanView;
     expect(needsFirstDue(loan)).toBe(true);
     const dated = {
-      plan: { rows: [{ ...row, date: "2026-01-15" }], checks: [], summary: null },
+      plan: {
+        rows: [{ ...row, date: "2026-01-15" }],
+        checks: [],
+        summary: null,
+      },
     } as unknown as LoanView;
     expect(needsFirstDue(dated)).toBe(false);
   });
@@ -65,7 +71,10 @@ describe("financed asset", () => {
   });
 
   it("cuts a stored address into lines", () => {
-    expect(addressLines("190 rue Curie\n60280 Margny")).toEqual(["190 rue Curie", "60280 Margny"]);
+    expect(addressLines("190 rue Curie\n60280 Margny")).toEqual([
+      "190 rue Curie",
+      "60280 Margny",
+    ]);
     expect(addressLines(undefined)).toEqual([]);
   });
 
@@ -88,7 +97,9 @@ describe("financed asset", () => {
     });
     expect(newAssetOf({ ...form, name: " " })).toBeNull();
     expect(newAssetOf({ ...form, value: "abc" })).toBeNull();
-    expect(newAssetOf({ ...form, street: "", city: "", postalCode: "" })).toMatchObject({
+    expect(
+      newAssetOf({ ...form, street: "", city: "", postalCode: "" }),
+    ).toMatchObject({
       street: null,
     });
   });

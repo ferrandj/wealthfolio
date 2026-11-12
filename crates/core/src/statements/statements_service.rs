@@ -2086,11 +2086,19 @@ impl StatementServiceTrait for StatementService {
             })
             .collect();
         earlier.sort_by(logical_order);
+        let loan = match document.document_kind.as_deref() {
+            Some(kind) if super::is_loan_kind(kind) => self
+                .loans(Utc::now().date_naive())?
+                .into_iter()
+                .find(|l| l.documents.iter().any(|d| d.document_id == document.id)),
+            _ => None,
+        };
         Ok(DocumentReview {
             document,
             statements,
             earlier_pending: earlier.into_iter().map(|d| d.id).collect(),
             warnings,
+            loan,
         })
     }
 

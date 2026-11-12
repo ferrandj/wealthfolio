@@ -335,6 +335,10 @@ pub struct DocumentReview {
     pub earlier_pending: Vec<String>,
     /// The reader's own warnings.
     pub warnings: Vec<String>,
+    /// For a loan paper: the whole loan it belongs to (terms, plan, checks), so the person validates it
+    /// knowing everything the papers say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loan: Option<super::LoanView>,
 }
 
 fn default_remember() -> bool {

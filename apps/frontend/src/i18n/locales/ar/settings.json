@@ -2348,7 +2348,8 @@
     "review_validate_loan": "Validate this loan",
     "loan": "Loan",
     "loan_in_liabilities": "In Liabilities",
-    "loan_waiting": "To validate: not in Liabilities yet"
+    "loan_waiting": "To validate: not in Liabilities yet",
+    "loan_check_first": "Some points need checking before you validate: see the checks above."
   },
   "identity": {
     "title": "Account details",
@@ -2615,6 +2616,8 @@
     "asset_save": "Attach",
     "asset_cancel": "Cancel",
     "asset_change": "Change",
-    "asset_detach": "Detach"
+    "asset_detach": "Detach",
+    "product": "Product",
+    "borrower": "Borrower"
   }
 }

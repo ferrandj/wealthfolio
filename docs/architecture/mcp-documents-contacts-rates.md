@@ -99,3 +99,5 @@ Retirement plan saving and contribution limit writes (they also drive host-side
 work the tool environment does not carry), settings, secrets and AI provider
 keys, device sync and Connect, add-ons, backups and restores, and the complete
 profile reset (kept behind its five-press button in the app).
+
+`review_document` (HTTP, Tauri and MCP) also returns, for a loan paper, the whole `loan` (terms, rate, TAEG, plan rows, checks, documents) so the validation screen and an agent see everything the papers say before validating.
