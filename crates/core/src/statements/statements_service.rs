@@ -1178,6 +1178,25 @@ impl StatementService {
                 && (o.imported > 0 || o.duplicates > 0 || o.opening_balance_added)
         });
         if has_operations {
+            // a statement that does not follow the previous one of its account (missing days, overlap, an opening
+            // balance that is not the previous closing balance) waits for the person
+            let others: Vec<StatementDocument> = self
+                .repository
+                .list_documents()?
+                .into_iter()
+                .filter(|d| {
+                    run.reimport_of
+                        .as_ref()
+                        .map(|p| p.id != d.id)
+                        .unwrap_or(true)
+                })
+                .collect();
+            if super::statements_review::continuity(&document, &others)
+                .map(|c| c.breaks())
+                .unwrap_or(false)
+            {
+                reason.chain = true;
+            }
             apply_reason(&mut document, &reason);
         }
         if tracked_any {
@@ -1203,6 +1222,7 @@ impl StatementService {
             updated.closing_balance = document.closing_balance.clone();
             let stored = self.repository.update_document(updated).await?;
             self.record_loan(&stored, head.map(|p| &p.extra)).await;
+            self.reopen_neighbours(&stored).await;
             return Ok(StatementImportResult {
                 document: Some(stored),
                 already_imported: false,
@@ -1227,6 +1247,7 @@ impl StatementService {
         };
         if let Some(stored) = &stored {
             self.record_loan(stored, head.map(|p| &p.extra)).await;
+            self.reopen_neighbours(stored).await;
         }
         let stored = match stored {
             Some(d) => self.repository.get_document(&d.id)?.or(Some(d)),
@@ -1471,6 +1492,65 @@ impl StatementService {
         Ok(())
     }
 
+    /// Put back to check the validated statements a new statement changes (see `neighbours_to_reopen`), and the loan
+    /// account a new paper of a validated loan belongs to.
+    async fn reopen_neighbours(&self, document: &StatementDocument) {
+        let all = match self.repository.list_documents() {
+            Ok(all) => all,
+            Err(e) => {
+                warn!("could not look for the statements next to a new one: {e}");
+                return;
+            }
+        };
+        let mut ids = super::statements_review::neighbours_to_reopen(document, &all);
+        let loan_paper = document
+            .document_kind
+            .as_deref()
+            .map(super::is_loan_kind)
+            .unwrap_or(false);
+        if loan_paper {
+            if let Ok(views) = self.build_loans(Utc::now().date_naive()) {
+                if let Some(view) = views.iter().find(|v| {
+                    v.key != "?" && v.documents.iter().any(|d| d.document_id == document.id)
+                }) {
+                    ids.extend(
+                        view.documents
+                            .iter()
+                            .filter(|d| d.document_id != document.id)
+                            .map(|d| d.document_id.clone()),
+                    );
+                }
+            }
+        }
+        self.reopen(&ids).await;
+        if loan_paper {
+            if let Err(e) = self.sync_loan_statuses().await {
+                warn!("could not update the loan documents: {e}");
+            }
+        }
+    }
+
+    async fn reopen(&self, ids: &[String]) {
+        for id in ids {
+            let Ok(Some(mut document)) = self.repository.get_document(id) else {
+                continue;
+            };
+            if document.status != DOCUMENT_STATUS_VALIDATED {
+                continue;
+            }
+            apply_reason(
+                &mut document,
+                &ReviewReason {
+                    reopened: true,
+                    ..ReviewReason::default()
+                },
+            );
+            if let Err(e) = self.repository.update_document(document).await {
+                warn!("could not put a statement back to check: {e}");
+            }
+        }
+    }
+
     /// Bring the liabilities of the loans up to date with the papers.
     async fn sync_liabilities(
         &self,
@@ -1528,6 +1608,7 @@ impl StatementService {
                 balance_gap: None,
                 warnings: (document.warnings.len() + problems.len()) as u32,
                 confirm: document.status != DOCUMENT_STATUS_VALIDATED,
+                ..ReviewReason::default()
             };
             let mut updated = document.clone();
             apply_reason(&mut updated, &reason);
@@ -2147,7 +2228,12 @@ impl StatementServiceTrait for StatementService {
                 }
             }
         }
+        let reopen = super::statements_review::neighbours_to_reopen(
+            &document,
+            &self.repository.list_documents()?,
+        );
         self.repository.delete_document(id).await?;
+        self.reopen(&reopen).await;
         if remove_operations {
             if let Err(e) = self.remove_account_made_by(&document).await {
                 warn!("could not remove the account this document had created: {e}");
@@ -2207,7 +2293,10 @@ impl StatementServiceTrait for StatementService {
                 .find(|l| l.documents.iter().any(|d| d.document_id == document.id)),
             _ => None,
         };
+        let continuity =
+            super::statements_review::continuity(&document, &self.repository.list_documents()?);
         Ok(DocumentReview {
+            continuity,
             document,
             statements,
             earlier_pending: earlier.into_iter().map(|d| d.id).collect(),
@@ -2425,7 +2514,7 @@ impl StatementServiceTrait for StatementService {
                             doubts: 0,
                             balance_gap: None,
                             warnings: 1,
-                            confirm: false,
+                            ..ReviewReason::default()
                         },
                     );
                     let saved = self

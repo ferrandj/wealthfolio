@@ -335,6 +335,9 @@ pub struct DocumentReview {
     pub earlier_pending: Vec<String>,
     /// The reader's own warnings.
     pub warnings: Vec<String>,
+    /// How the statement follows the previous one of its account and leads to the next one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuity: Option<super::statements_review::Continuity>,
     /// For a loan paper: the whole loan it belongs to (terms, plan, checks), so the person validates it
     /// knowing everything the papers say.
     #[serde(default, skip_serializing_if = "Option::is_none")]

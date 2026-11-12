@@ -1,8 +1,5 @@
-import { setStatementLoanAnswers, setStatementLoanFirstDue } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
-import { QueryKeys } from "@/lib/query-keys";
-import type { LoanAnswers, LoanGap, LoanView } from "@/lib/types/statements";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { LoanGap, LoanView } from "@/lib/types/statements";
 import {
   Badge,
   Button,
@@ -14,42 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoanAccountDialog } from "./loan-account-dialog";
-import { invalidateLoanCaches } from "./loan-caches";
+import { useLoanMutations, withConfirmed, answersWith } from "./loan-answers";
 import { accountChoices } from "./loans-utils";
-
-/** The answer a gap accepts, merged with what the person already told. */
-export function answersWith(loan: LoanView, patch: Partial<LoanAnswers>): LoanAnswers {
-  return { ...(loan.answers ?? {}), ...patch };
-}
-
-function useLoanMutations(loan: LoanView) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const done = (loans: LoanView[]) => {
-    queryClient.setQueryData([QueryKeys.STATEMENT_LOANS], loans);
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] });
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW] });
-    queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE] });
-    invalidateLoanCaches(queryClient);
-  };
-  const onError = (e: unknown) =>
-    toast({ title: t("settings:loans.error"), description: String(e), variant: "destructive" });
-  const answer = useMutation({
-    mutationFn: (answers: LoanAnswers) => setStatementLoanAnswers(loan.key, answers),
-    onSuccess: done,
-    onError,
-  });
-  const firstDue = useMutation({
-    mutationFn: (value: string | null) => setStatementLoanFirstDue(loan.key, value),
-    onSuccess: done,
-    onError,
-  });
-  return { answer, firstDue };
-}
 
 function FoundIn({ gap }: { gap: LoanGap }) {
   const { t } = useTranslation();
@@ -134,6 +100,21 @@ function GapAnswer({ loan, gap }: { loan: LoanView; gap: LoanGap }) {
           <LoanAccountDialog documentId={attaching} onClose={() => setAttaching(null)} />
         </>
       );
+    case "confirm_payments": {
+      const proposed = (loan.payments?.lines ?? []).filter(
+        (l) => l.state === "proposed" && l.activityId,
+      );
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || proposed.length === 0}
+          onClick={() => answer.mutate(withConfirmed(loan, proposed))}
+        >
+          {t("settings:loans.answer_confirm_payments", { count: proposed.length })}
+        </Button>
+      );
+    }
     case "no_early_repayment":
       return (
         <Button

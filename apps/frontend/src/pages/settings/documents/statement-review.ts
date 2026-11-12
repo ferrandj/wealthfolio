@@ -46,6 +46,8 @@ export function parseReviewReason(value: string | null | undefined): StatementRe
       doubts: Number(parsed.doubts ?? 0),
       balanceGap: parsed.balanceGap ?? null,
       warnings: Number(parsed.warnings ?? 0),
+      chain: !!parsed.chain,
+      reopened: !!parsed.reopened,
     };
   } catch {
     return null;

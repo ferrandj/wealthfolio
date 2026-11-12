@@ -19,6 +19,7 @@ import { getCategoryLabel } from "@/lib/taxonomy-labels";
 import type {
   ReviewDecision,
   ReviewedOperation,
+  StatementContinuity,
   StatementDocument,
   StatementReview,
 } from "@/lib/types/statements";
@@ -88,6 +89,96 @@ interface ReviewDialogProps {
   startId: string | null;
   queue: StatementDocument[];
   onClose: () => void;
+}
+
+const frDay = (value?: string | null) => (value ? value.slice(0, 10) : "?");
+
+/**
+ * How the statement sits among the others of its account: the first one, or how it follows the previous one (its
+ * days, and its opening balance that must take up the previous closing balance), and how the next one follows it.
+ */
+function ContinuityPanel({
+  continuity: c,
+  onGoTo,
+}: {
+  continuity: StatementContinuity;
+  onGoTo: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const previousId = c.previous?.id;
+  const lines: { ok: boolean | null; text: string }[] = [];
+  if (c.state === "first") {
+    lines.push({ ok: null, text: t("settings:documents.chain_first") });
+  } else if (c.previous) {
+    const previous = {
+      name: c.previous.fileName,
+      end: frDay(c.previous.periodEnd),
+    };
+    if (c.state === "follows")
+      lines.push({ ok: true, text: t("settings:documents.chain_follows", previous) });
+    if (c.state === "gap")
+      lines.push({
+        ok: false,
+        text: t("settings:documents.chain_gap", {
+          ...previous,
+          from: frDay(c.missingFrom),
+          to: frDay(c.missingTo),
+        }),
+      });
+    if (c.state === "overlap")
+      lines.push({ ok: false, text: t("settings:documents.chain_overlap", previous) });
+    if (c.balanceFollows === true)
+      lines.push({
+        ok: true,
+        text: t("settings:documents.chain_balance_ok", { balance: c.previous.closingBalance }),
+      });
+    if (c.balanceFollows === false)
+      lines.push({
+        ok: false,
+        text: t("settings:documents.chain_balance_off", {
+          balance: c.previous.closingBalance,
+          difference: c.balanceDifference,
+        }),
+      });
+    if (c.previous.status !== "VALIDATED")
+      lines.push({ ok: false, text: t("settings:documents.chain_previous_pending") });
+  }
+  if (c.earlierPending > 0)
+    lines.push({
+      ok: false,
+      text: t("settings:documents.chain_earlier_pending", { count: c.earlierPending }),
+    });
+  if (c.next && c.nextState && c.nextState !== "follows")
+    lines.push({
+      ok: false,
+      text: t(`settings:documents.chain_next_${c.nextState}`, { name: c.next.fileName }),
+    });
+  if (c.next && c.nextBalanceFollows === false)
+    lines.push({
+      ok: false,
+      text: t("settings:documents.chain_next_balance_off", { name: c.next.fileName }),
+    });
+  return (
+    <div className="space-y-1.5 rounded-md border p-3 text-sm" data-testid="statement-continuity">
+      {lines.map((line) => (
+        <div key={line.text} className="flex items-start gap-2">
+          {line.ok === true ? (
+            <Icons.CheckCircle className="mt-0.5 size-4 shrink-0 text-green-600" />
+          ) : line.ok === false ? (
+            <Icons.AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          ) : (
+            <Icons.Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+          )}
+          <span>{line.text}</span>
+        </div>
+      ))}
+      {previousId && c.previous?.status !== "VALIDATED" && (
+        <Button size="sm" variant="outline" onClick={() => onGoTo(previousId)}>
+          {t("settings:documents.chain_go_previous")}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogProps) {
@@ -293,6 +384,8 @@ function ReviewBody({
           </Badge>
         )}
       </div>
+
+      {review.continuity && <ContinuityPanel continuity={review.continuity} onGoTo={onGoTo} />}
 
       {review.earlierPending.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

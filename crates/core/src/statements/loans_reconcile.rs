@@ -23,6 +23,17 @@ pub struct LoanAnswers {
     /// "The instalments (dates, amounts) never changed since the start."
     #[serde(default)]
     pub payments_unchanged: bool,
+    /// Debits the person confirmed for an instalment although their amount differs (a first instalment pro rata).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub confirmed_payments: Vec<ConfirmedPayment>,
+}
+
+/// A debit the person confirmed for the instalment due on `date`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmedPayment {
+    pub date: NaiveDate,
+    pub activity_id: String,
 }
 
 impl LoanAnswers {
@@ -60,9 +71,12 @@ pub struct LoanPayment {
     /// installment | prepayment
     pub kind: String,
     pub expected: Decimal,
-    /// found | missing (statements cover the day, no debit) | uncovered (no statement of the account covers the
-    /// day) | unknown (no account to look at yet)
+    /// found | proposed (a debit of another amount looks like it: to confirm) | missing (statements cover the day,
+    /// no debit) | uncovered (no statement of the account covers the day) | unknown (no account to look at yet)
     pub state: String,
+    /// The person confirmed this debit (its amount differs from the instalment).
+    #[serde(default)]
+    pub confirmed: bool,
     pub activity_id: Option<String>,
     pub account_id: Option<String>,
     pub paid_on: Option<NaiveDate>,
@@ -80,6 +94,8 @@ pub struct LoanPayments {
     pub found: usize,
     pub missing: usize,
     pub uncovered: usize,
+    #[serde(default)]
+    pub proposed: usize,
     pub lines: Vec<LoanPayment>,
 }
 
@@ -94,7 +110,7 @@ pub struct LoanGap {
     pub found_in: Vec<String>,
     /// A blocking gap keeps the loan from being validated.
     pub blocking: bool,
-    /// The answer the person can give instead: first_due | debit_account | no_early_repayment | payments_unchanged | attach_account.
+    /// The answer the person can give instead: first_due | debit_account | no_early_repayment | payments_unchanged | attach_account | confirm_payments.
     pub answer: Option<String>,
 }
 
@@ -160,24 +176,38 @@ pub fn reconcile(
         } else {
             (3, 7)
         };
-        let best = debits
+        let confirmed = view
+            .answers
+            .confirmed_payments
             .iter()
-            .enumerate()
-            .filter(|(j, d)| {
-                !used[*j]
-                    && same_amount(d.amount, r.total)
-                    && d.date >= date - Duration::days(before)
-                    && d.date <= date + Duration::days(after)
-                    && match &fixed {
-                        Some(a) => &d.account_id == a,
-                        None => {
-                            names_the_loan(&view.key, &d.label)
-                                || d.label.to_uppercase().contains("REMBOURSEMENT")
+            .find(|c| c.date == date)
+            .and_then(|c| {
+                debits
+                    .iter()
+                    .enumerate()
+                    .find(|(j, d)| !used[*j] && d.activity_id == c.activity_id)
+            });
+        let best = confirmed.or_else(|| {
+            debits
+                .iter()
+                .enumerate()
+                .filter(|(j, d)| {
+                    !used[*j]
+                        && same_amount(d.amount, r.total)
+                        && d.date >= date - Duration::days(before)
+                        && d.date <= date + Duration::days(after)
+                        && match &fixed {
+                            Some(a) => &d.account_id == a,
+                            None => {
+                                names_the_loan(&view.key, &d.label)
+                                    || d.label.to_uppercase().contains("REMBOURSEMENT")
+                            }
                         }
-                    }
-            })
-            .min_by_key(|(_, d)| (d.date - date).num_days().abs());
+                })
+                .min_by_key(|(_, d)| (d.date - date).num_days().abs())
+        });
         let mut line = LoanPayment {
+            confirmed: confirmed.is_some(),
             row: i,
             number: r.number,
             date,
@@ -200,11 +230,49 @@ pub fn reconcile(
         lines.push(line);
     }
 
+    // an instalment with no debit of its amount: the debit that most looks like it (a first instalment pro rata,
+    // an instalment that changed) is proposed, for the person to confirm
+    for line in lines.iter_mut().filter(|l| l.state == "unknown") {
+        let (before, after) = if line.kind == "installment" {
+            (4, 8)
+        } else {
+            (3, 7)
+        };
+        let candidate = debits
+            .iter()
+            .enumerate()
+            .filter(|(j, d)| {
+                !used[*j]
+                    && d.amount.abs() > Decimal::ZERO
+                    && d.date >= line.date - Duration::days(before)
+                    && d.date <= line.date + Duration::days(after)
+                    && names_the_loan(&view.key, &d.label)
+                    && fixed.as_ref().map(|a| &d.account_id == a).unwrap_or(true)
+            })
+            .min_by_key(|(_, d)| {
+                (
+                    (d.date - line.date).num_days().abs(),
+                    (d.amount.abs() - line.expected).abs(),
+                )
+            });
+        if let Some((j, d)) = candidate {
+            used[j] = true;
+            line.state = "proposed".into();
+            line.activity_id = Some(d.activity_id.clone());
+            line.account_id = Some(d.account_id.clone());
+            line.paid_on = Some(d.date);
+            line.amount = Some(d.amount.abs());
+        }
+    }
+
     let (account_id, account_source) = match fixed {
         Some(a) => (Some(a), Some("answer".to_string())),
         None => {
             let mut counts: Vec<(String, usize)> = Vec::new();
-            for l in lines.iter().filter(|l| l.state == "found") {
+            for l in lines
+                .iter()
+                .filter(|l| l.state == "found" || l.state == "proposed")
+            {
                 let a = l.account_id.clone().unwrap_or_default();
                 match counts.iter_mut().find(|(k, _)| *k == a) {
                     Some(c) => c.1 += 1,
@@ -220,7 +288,10 @@ pub fn reconcile(
     };
     let account_source = account_id.as_ref().and(account_source);
     if let Some(account) = &account_id {
-        for l in lines.iter_mut().filter(|l| l.state != "found") {
+        for l in lines
+            .iter_mut()
+            .filter(|l| l.state != "found" && l.state != "proposed")
+        {
             let covered = periods
                 .iter()
                 .any(|p| &p.account_id == account && p.from <= l.date && l.date <= p.to);
@@ -235,6 +306,7 @@ pub fn reconcile(
         found: count("found"),
         missing: count("missing"),
         uncovered: count("uncovered"),
+        proposed: count("proposed"),
         lines,
     }
 }
@@ -366,6 +438,36 @@ pub fn gaps_of(view: &LoanView) -> Vec<LoanGap> {
                 None,
             ));
         }
+    }
+    if view.payments.proposed > 0 {
+        let examples: Vec<String> = view
+            .payments
+            .lines
+            .iter()
+            .filter(|l| l.state == "proposed")
+            .take(3)
+            .map(|l| {
+                format!(
+                    "{} : {} € prélevés le {} au lieu de {} €",
+                    fr(l.date),
+                    l.amount.unwrap_or_default(),
+                    l.paid_on.map(fr).unwrap_or_default(),
+                    l.expected
+                )
+            })
+            .collect();
+        gaps.push(gap(
+            "payment_proposed",
+            format!(
+                "{} prélèvement(s) d'un autre montant semblent payer une échéance ({}) : une première échéance au \
+                 prorata ou une échéance modifiée. Confirmez-les s'ils correspondent.",
+                view.payments.proposed,
+                examples.join(" ; ")
+            ),
+            &["statement"],
+            false,
+            Some("confirm_payments"),
+        ));
     }
     if view.payments.missing > 0 {
         let days: Vec<String> = view

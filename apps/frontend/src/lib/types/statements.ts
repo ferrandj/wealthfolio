@@ -74,6 +74,10 @@ export interface StatementReviewReason {
   /** Closing balance minus (opening balance + operations), when it is not zero. */
   balanceGap?: string | null;
   warnings: number;
+  /** It does not follow the previous statement of its account (missing days, overlap, balance). */
+  chain?: boolean;
+  /** A statement next to it came or went after it was validated: to check again. */
+  reopened?: boolean;
 }
 
 export interface StatementDocumentContent {
@@ -285,6 +289,33 @@ export interface DocumentReview {
   warnings: string[];
   /** For a loan paper: the whole loan (terms, plan, checks). */
   loan?: LoanView;
+  /** How the statement follows the previous one of its account and leads to the next one. */
+  continuity?: StatementContinuity | null;
+}
+
+/** A statement next to another one of the same account. */
+export interface StatementNeighbour {
+  id: string;
+  fileName: string;
+  status: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  openingBalance?: string | null;
+  closingBalance?: string | null;
+}
+
+export interface StatementContinuity {
+  previous?: StatementNeighbour | null;
+  next?: StatementNeighbour | null;
+  /** first | follows | gap | overlap */
+  state: "first" | "follows" | "gap" | "overlap";
+  missingFrom?: string | null;
+  missingTo?: string | null;
+  balanceFollows?: boolean | null;
+  balanceDifference?: string | null;
+  nextState?: "follows" | "gap" | "overlap" | null;
+  nextBalanceFollows?: boolean | null;
+  earlierPending: number;
 }
 
 export interface ReviewDecision {
@@ -405,6 +436,8 @@ export interface LoanAnswers {
   debitAccountId?: string | null;
   noEarlyRepayment?: boolean;
   paymentsUnchanged?: boolean;
+  /** Debits confirmed for an instalment although their amount differs (a first instalment pro rata). */
+  confirmedPayments?: { date: string; activityId: string }[];
 }
 
 /** Something the loan still lacks, and the papers where it can be found. */
@@ -425,8 +458,10 @@ export interface LoanPayment {
   date: string;
   kind: string;
   expected: number | string;
-  /** found | missing | uncovered | unknown */
-  state: "found" | "missing" | "uncovered" | "unknown";
+  /** found | proposed | missing | uncovered | unknown */
+  state: "found" | "proposed" | "missing" | "uncovered" | "unknown";
+  /** The person confirmed this debit although its amount differs. */
+  confirmed?: boolean;
   activityId?: string | null;
   accountId?: string | null;
   paidOn?: string | null;
@@ -440,6 +475,7 @@ export interface LoanPayments {
   found: number;
   missing: number;
   uncovered: number;
+  proposed?: number;
   lines: LoanPayment[];
 }
 

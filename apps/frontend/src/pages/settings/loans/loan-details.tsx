@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@wealthfolio/ui";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useLoanMutations, withConfirmed } from "./loan-answers";
 import { day, euros, percent } from "./loans-utils";
 
 export function Fact({ label, value }: { label: string; value: string }) {
@@ -164,9 +165,38 @@ export function LoanDocuments({ loan }: { loan: LoanView }) {
   );
 }
 
-function PaymentCell({ line, account }: { line?: LoanPayment; account?: string }) {
+function PaymentCell({
+  line,
+  account,
+  onConfirm,
+  confirming,
+}: {
+  line?: LoanPayment;
+  account?: string;
+  onConfirm?: () => void;
+  confirming?: boolean;
+}) {
   const { t } = useTranslation();
   if (!line) return null;
+  if (line.state === "proposed") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5 text-amber-600">
+        <Icons.AlertTriangle className="size-3.5 shrink-0" />
+        <span>
+          {t("settings:loans.payment_proposed", {
+            date: day(line.paidOn),
+            amount: euros(line.amount),
+          })}
+          {account ? ` · ${account}` : ""}
+        </span>
+        {onConfirm && (
+          <Button size="sm" variant="outline" disabled={confirming} onClick={onConfirm}>
+            {t("settings:loans.payment_confirm")}
+          </Button>
+        )}
+      </span>
+    );
+  }
   if (line.state === "found") {
     return (
       <span className="inline-flex items-center gap-1 text-green-600">
@@ -188,6 +218,7 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
   const [open, setOpen] = useState(defaultOpen);
   const { accounts } = useAccounts({ filterActive: false });
   const payments = new Map((loan.payments?.lines ?? []).map((l) => [l.row, l]));
+  const { answer } = useLoanMutations(loan);
   return (
     <>
       <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
@@ -234,6 +265,11 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
                   </td>
                   <td>
                     <PaymentCell
+                      confirming={answer.isPending}
+                      onConfirm={() => {
+                        const line = payments.get(i);
+                        if (line) answer.mutate(withConfirmed(loan, [line]));
+                      }}
                       line={payments.get(i)}
                       account={accounts.find((a) => a.id === payments.get(i)?.accountId)?.name}
                     />

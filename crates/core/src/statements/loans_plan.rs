@@ -1224,6 +1224,47 @@ mod tests {
     }
 
     #[test]
+    fn a_first_instalment_pro_rata_is_proposed_then_confirmed() {
+        use crate::statements::{reconcile, BankDebit, ConfirmedPayment, LoanAnswers};
+        let today = day(2026, 11, 10);
+        let mut view = view_of(today);
+        let first = view
+            .plan
+            .rows
+            .iter()
+            .find(|r| r.kind == "installment")
+            .unwrap()
+            .clone();
+        let date = first.date.unwrap();
+        let debits = vec![BankDebit {
+            activity_id: "prorata".into(),
+            account_id: "current".into(),
+            date: date + chrono::Duration::days(1),
+            amount: Decimal::new(41230, 2),
+            label: "PRLV ECHEANCE PRET FT14103062".into(),
+        }];
+        let payments = reconcile(&view, &debits, &[], today);
+        assert_eq!(payments.lines[0].state, "proposed");
+        assert_eq!(payments.lines[0].amount, Some(Decimal::new(41230, 2)));
+        assert_eq!(payments.proposed, 1);
+        view.payments = payments;
+        assert!(crate::statements::gaps_of(&view).iter().any(
+            |g| g.code == "payment_proposed" && g.answer.as_deref() == Some("confirm_payments")
+        ));
+
+        view.answers = LoanAnswers {
+            confirmed_payments: vec![ConfirmedPayment {
+                date,
+                activity_id: "prorata".into(),
+            }],
+            ..Default::default()
+        };
+        let payments = reconcile(&view, &debits, &[], today);
+        assert_eq!(payments.lines[0].state, "found");
+        assert!(payments.lines[0].confirmed);
+    }
+
+    #[test]
     fn what_is_missing_says_where_to_find_it() {
         use crate::statements::{gaps_of, LoanAnswers};
         let today = day(2026, 11, 10);
@@ -1257,6 +1298,7 @@ mod tests {
             debit_account_id: Some("current".into()),
             no_early_repayment: false,
             payments_unchanged: true,
+            ..Default::default()
         };
         view.payments.account_id = Some("current".into());
         assert!(gaps_of(&view).is_empty());

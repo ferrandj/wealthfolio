@@ -123,3 +123,15 @@ are validated in order (contract, dated tables, letters) and the liability is
 filled from them. Invalidating empties it again; deleting its last paper removes
 an account made at import, never one the person already had.
 `link_loan_document` is replaced by `attach_loan_document`.
+
+Statement continuity: `review_document` returns `continuity` for a statement
+(the previous and next statements of its account, missing days, overlap, whether
+the opening balance takes up the previous closing balance, older statements not
+validated). A statement that does not follow the previous one waits for review
+(`reviewReason.chain`). Importing a statement puts back to check the validated
+statement right after it and those over the same days (`reviewReason.reopened`);
+deleting one does the same for the next one; a new paper of a validated loan
+puts the whole loan account back to pending. Loan payments: an instalment with
+no debit of its amount gets the debit that most looks like it
+(`state: proposed`, a first instalment pro rata), which the person (or
+`set_loan_answers` with `confirmedPayments`) confirms.

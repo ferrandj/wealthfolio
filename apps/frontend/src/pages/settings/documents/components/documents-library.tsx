@@ -591,6 +591,8 @@ function StatusBadge({ doc }: { doc: StatementDocument }) {
     parts.push(t("settings:documents.reason_doubts", { count: doc.toReviewCount }));
   }
   if (reason && reason.warnings > 0) parts.push(t("settings:documents.reason_warnings"));
+  if (reason?.chain) parts.push(t("settings:documents.reason_chain"));
+  if (reason?.reopened) parts.push(t("settings:documents.reason_reopened"));
   return (
     <Badge variant="outline" className="border-amber-500 text-amber-700" title={parts.join(" · ")}>
       {t("settings:documents.status_pending")}

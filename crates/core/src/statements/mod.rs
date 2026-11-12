@@ -24,8 +24,8 @@ pub use loans_plan::{
     PlanSummary, Saved, ScheduleData,
 };
 pub use loans_reconcile::{
-    first_due_from_debits, gaps_of, reconcile, BankDebit, LoanAnswers, LoanGap, LoanPayment,
-    LoanPayments, StatementPeriod,
+    first_due_from_debits, gaps_of, reconcile, BankDebit, ConfirmedPayment, LoanAnswers, LoanGap,
+    LoanPayment, LoanPayments, StatementPeriod,
 };
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{

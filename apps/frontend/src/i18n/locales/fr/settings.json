@@ -2180,7 +2180,23 @@
     "loan": "Prêt",
     "loan_in_liabilities": "Dans Passifs",
     "loan_waiting": "À valider : pas encore dans Passifs",
-    "loan_check_first": "Certains points sont à vérifier avant de valider : consultez les contrôles ci-dessus."
+    "loan_check_first": "Certains points sont à vérifier avant de valider : consultez les contrôles ci-dessus.",
+    "reason_chain": "ne suit pas le relevé précédent",
+    "reason_reopened": "remis à vérifier (un relevé voisin a changé)",
+    "chain_first": "Premier relevé de ce compte : aucun relevé avant celui-ci, le solde d'ouverture est pris tel quel. S'il existe des relevés plus anciens, importez-les : ils passeront avant.",
+    "chain_follows": "Suit le relevé précédent ({{name}}, jusqu'au {{end}}) sans jour manquant.",
+    "chain_gap": "Des jours manquent depuis le relevé précédent ({{name}}, jusqu'au {{end}}) : rien ne couvre du {{from}} au {{to}}. Importez le relevé manquant.",
+    "chain_overlap": "Ce relevé chevauche le relevé précédent ({{name}}, jusqu'au {{end}}) : des opérations peuvent être en double.",
+    "chain_balance_ok": "Le solde d'ouverture reprend la clôture du relevé précédent ({{balance}}).",
+    "chain_balance_off": "Le solde d'ouverture ne reprend pas la clôture du relevé précédent ({{balance}}) : écart de {{difference}}.",
+    "chain_previous_pending": "Le relevé précédent n'est pas encore validé : il passe avant.",
+    "chain_earlier_pending_one": "{{count}} relevé plus ancien de ce compte n'est pas validé.",
+    "chain_earlier_pending_other": "{{count}} relevés plus anciens de ce compte ne sont pas validés.",
+    "chain_next_gap": "Des jours manquent entre ce relevé et le suivant ({{name}}).",
+    "chain_next_overlap": "Le relevé suivant ({{name}}) chevauche celui-ci.",
+    "chain_next_balance_off": "Le solde d'ouverture du relevé suivant ({{name}}) ne reprend pas la clôture de celui-ci.",
+    "chain_go_previous": "Voir le relevé précédent",
+    "chain_earlier_pending_many": "{{count}} relevés plus anciens de ce compte ne sont pas validés."
   },
   "identity": {
     "title": "Coordonnées du compte",
@@ -2504,6 +2520,11 @@
     "account_validate": "Valider le compte",
     "account_validate_blocked": "Des informations manquent ou les papiers ne concordent pas",
     "account_validated_toast": "Compte d'emprunt validé avec tous ses papiers",
-    "account_pending_holding": "Compte d'emprunt non validé : il se remplira à la validation de ses papiers"
+    "account_pending_holding": "Compte d'emprunt non validé : il se remplira à la validation de ses papiers",
+    "answer_confirm_payments_one": "Confirmer le prélèvement proposé",
+    "answer_confirm_payments_other": "Confirmer les {{count}} prélèvements proposés",
+    "payment_proposed": "≈ {{date}} · {{amount}}",
+    "payment_confirm": "Confirmer",
+    "answer_confirm_payments_many": "Confirmer les {{count}} prélèvements proposés"
   }
 }

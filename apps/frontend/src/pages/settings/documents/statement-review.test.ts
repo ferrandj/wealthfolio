@@ -46,6 +46,12 @@ describe("statement review", () => {
       doubts: 2,
       balanceGap: "100.58",
       warnings: 0,
+      chain: false,
+      reopened: false,
+    });
+    expect(parseReviewReason('{"chain":true,"reopened":true}')).toMatchObject({
+      chain: true,
+      reopened: true,
     });
     expect(parseReviewReason("not json")).toBeNull();
     expect(parseReviewReason(null)).toBeNull();

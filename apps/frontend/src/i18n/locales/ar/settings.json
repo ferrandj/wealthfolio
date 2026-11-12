@@ -2348,7 +2348,26 @@
     "loan": "Loan",
     "loan_in_liabilities": "In Liabilities",
     "loan_waiting": "To validate: not in Liabilities yet",
-    "loan_check_first": "Some points need checking before you validate: see the checks above."
+    "loan_check_first": "Some points need checking before you validate: see the checks above.",
+    "reason_chain": "does not follow the previous statement",
+    "reason_reopened": "to check again (a neighbouring statement changed)",
+    "chain_first": "First statement of this account: none before it, its opening balance is taken as it is. If there are older statements, import them: they come first.",
+    "chain_follows": "Follows the previous statement ({{name}}, until {{end}}) with no missing day.",
+    "chain_gap": "Days are missing since the previous statement ({{name}}, until {{end}}): nothing covers {{from}} to {{to}}. Import the missing statement.",
+    "chain_overlap": "This statement overlaps the previous one ({{name}}, until {{end}}): operations may be duplicated.",
+    "chain_balance_ok": "The opening balance takes up the previous closing balance ({{balance}}).",
+    "chain_balance_off": "The opening balance does not take up the previous closing balance ({{balance}}): difference of {{difference}}.",
+    "chain_previous_pending": "The previous statement is not validated yet: it comes first.",
+    "chain_earlier_pending_one": "{{count}} older statement of this account is not validated.",
+    "chain_earlier_pending_other": "{{count}} older statements of this account are not validated.",
+    "chain_next_gap": "Days are missing between this statement and the next one ({{name}}).",
+    "chain_next_overlap": "The next statement ({{name}}) overlaps this one.",
+    "chain_next_balance_off": "The next statement's opening balance ({{name}}) does not take up this closing balance.",
+    "chain_go_previous": "See the previous statement",
+    "chain_earlier_pending_few": "{{count}} older statements of this account are not validated.",
+    "chain_earlier_pending_many": "{{count}} older statements of this account are not validated.",
+    "chain_earlier_pending_two": "{{count}} older statements of this account are not validated.",
+    "chain_earlier_pending_zero": "{{count}} older statements of this account are not validated."
   },
   "identity": {
     "title": "Account details",
@@ -2672,6 +2691,14 @@
     "account_validate": "Validate the account",
     "account_validate_blocked": "Information is missing or the papers do not agree",
     "account_validated_toast": "Loan account validated with all its papers",
-    "account_pending_holding": "Loan account not validated: it will be filled when its papers are validated"
+    "account_pending_holding": "Loan account not validated: it will be filled when its papers are validated",
+    "answer_confirm_payments_one": "Confirm the proposed debit",
+    "answer_confirm_payments_other": "Confirm the {{count}} proposed debits",
+    "payment_proposed": "≈ {{date}} · {{amount}}",
+    "payment_confirm": "Confirm",
+    "answer_confirm_payments_few": "Confirm the {{count}} proposed debits",
+    "answer_confirm_payments_many": "Confirm the {{count}} proposed debits",
+    "answer_confirm_payments_two": "Confirm the {{count}} proposed debits",
+    "answer_confirm_payments_zero": "Confirm the {{count}} proposed debits"
   }
 }

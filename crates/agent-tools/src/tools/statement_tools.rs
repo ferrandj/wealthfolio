@@ -525,12 +525,13 @@ service_tool!(
 service_tool!(
     SetLoanAnswers, "set_loan_answers", Write, additive = false,
     scopes = [DocumentsWrite],
-    description = "Tell what a loan's papers cannot say (loanKey from get_loans; each gap of the loan names the answer it accepts): the account the instalments are debited from (debitAccountId, an account id from get_accounts), noEarlyRepayment (true when no early repayment was ever made), paymentsUnchanged (true when the instalments never changed since the start). Replaces the previous answers. Returns the loans.",
+    description = "Tell what a loan's papers cannot say (loanKey from get_loans; each gap of the loan names the answer it accepts): the account the instalments are debited from (debitAccountId, an account id from get_accounts), noEarlyRepayment (true when no early repayment was ever made), paymentsUnchanged (true when the instalments never changed since the start), confirmedPayments (the proposed debits of another amount that do pay an instalment). Replaces the previous answers. Returns the loans.",
     schema = object(json!({
         "loanKey": {"type": "string"},
         "debitAccountId": {"type": ["string", "null"], "description": "The account the instalments are debited from, or null."},
         "noEarlyRepayment": {"type": "boolean"},
-        "paymentsUnchanged": {"type": "boolean"}
+        "paymentsUnchanged": {"type": "boolean"},
+        "confirmedPayments": {"type": "array", "description": "Debits confirmed for an instalment although their amount differs (a first instalment pro rata): the proposed lines of get_loans payments.", "items": {"type": "object", "properties": {"date": {"type": "string", "description": "The instalment's due date, YYYY-MM-DD."}, "activityId": {"type": "string"}}, "required": ["date", "activityId"]}}
     }), &["loanKey"]),
     |env, args| {
         #[derive(Deserialize)]
@@ -543,6 +544,8 @@ service_tool!(
             no_early_repayment: bool,
             #[serde(default)]
             payments_unchanged: bool,
+            #[serde(default)]
+            confirmed_payments: Vec<wealthfolio_core::statements::ConfirmedPayment>,
         }
         let args: Args = serde_json::from_value(args)?;
         let service = need(env.statement_service(), "Statements")?;
@@ -550,6 +553,7 @@ service_tool!(
             debit_account_id: args.debit_account_id,
             no_early_repayment: args.no_early_repayment,
             payments_unchanged: args.payments_unchanged,
+            confirmed_payments: args.confirmed_payments,
         };
         service.set_loan_answers(&args.loan_key, answers).await.map_err(fail)?;
         reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
