@@ -964,7 +964,8 @@
     "term_elapsed_years_one": "{{count}}년 기간 중 {{elapsed}} 경과.",
     "term_elapsed_years_other": "{{count}}년 기간 중 {{elapsed}} 경과.",
     "term_elapsed_months_one": "{{count}}개월 기간 중 {{elapsed}} 경과.",
-    "term_elapsed_months_other": "{{count}}개월 기간 중 {{elapsed}} 경과."
+    "term_elapsed_months_other": "{{count}}개월 기간 중 {{elapsed}} 경과.",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanEvents": {
     "balance_date_occupied": "이 날짜에 잔액이 이미 있습니다. 다른 날짜를 선택하거나 해당 잔액을 수정하세요.",

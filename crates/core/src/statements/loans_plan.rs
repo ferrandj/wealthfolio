@@ -1224,6 +1224,40 @@ mod tests {
     }
 
     #[test]
+    fn a_first_instalment_of_eighteen_days_is_recognised() {
+        use crate::statements::{pro_rata_days, reconcile, BankDebit};
+        // the real March 2025 debit: 582,79 € instead of 726,06 €, the interest of 18 days on 122 432 € at 3,44 %
+        let today = day(2026, 11, 10);
+        let view = view_of(today);
+        let first = view
+            .plan
+            .rows
+            .iter()
+            .position(|r| r.kind == "installment")
+            .unwrap();
+        assert_eq!(
+            pro_rata_days(&view, first, Decimal::new(58279, 2)),
+            Some(18)
+        );
+        assert_eq!(pro_rata_days(&view, first, Decimal::new(41230, 2)), None);
+        let date = view.plan.rows[first].date.unwrap();
+        let debits = vec![BankDebit {
+            activity_id: "march".into(),
+            account_id: "current".into(),
+            date: date - chrono::Duration::days(1),
+            amount: Decimal::new(58279, 2),
+            label: "ECH PRET 0267FT14103062".into(),
+        }];
+        let payments = reconcile(&view, &debits, &[], today);
+        assert_eq!(payments.lines[0].state, "found");
+        assert!(payments.lines[0]
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("18 jours"));
+    }
+
+    #[test]
     fn a_first_instalment_pro_rata_is_proposed_then_confirmed() {
         use crate::statements::{reconcile, BankDebit, ConfirmedPayment, LoanAnswers};
         let today = day(2026, 11, 10);

@@ -978,7 +978,8 @@
     "term_elapsed_years_other": "{{elapsed}} de um prazo de {{count}} anos.",
     "term_elapsed_months_one": "{{elapsed}} de um prazo de {{count}} mês.",
     "term_elapsed_months_many": "{{elapsed}} de um prazo de {{count}} meses.",
-    "term_elapsed_months_other": "{{elapsed}} de um prazo de {{count}} meses."
+    "term_elapsed_months_other": "{{elapsed}} de um prazo de {{count}} meses.",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanEvents": {
     "balance_date_occupied": "Já existe um saldo nesta data. Escolha outra data ou edite esse saldo.",

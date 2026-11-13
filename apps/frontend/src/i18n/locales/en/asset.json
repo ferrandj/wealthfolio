@@ -964,7 +964,8 @@
     "term_elapsed_years_one": "{{elapsed}} into a {{count}}-year term.",
     "term_elapsed_years_other": "{{elapsed}} into a {{count}}-year term.",
     "term_elapsed_months_one": "{{elapsed}} into a {{count}}-month term.",
-    "term_elapsed_months_other": "{{elapsed}} into a {{count}}-month term."
+    "term_elapsed_months_other": "{{elapsed}} into a {{count}}-month term.",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanEvents": {
     "balance_date_occupied": "A balance already exists on this date. Choose another date or edit that balance.",

@@ -964,7 +964,8 @@
     "term_elapsed_years_one": "{{count}} 年期限已過 {{elapsed}}。",
     "term_elapsed_years_other": "{{count}} 年期限已過 {{elapsed}}。",
     "term_elapsed_months_one": "{{count}} 個月期限已過 {{elapsed}}。",
-    "term_elapsed_months_other": "{{count}} 個月期限已過 {{elapsed}}。"
+    "term_elapsed_months_other": "{{count}} 個月期限已過 {{elapsed}}。",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanEvents": {
     "balance_date_occupied": "該日期已有餘額。請選擇其他日期或編輯該餘額。",

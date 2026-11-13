@@ -43,7 +43,18 @@ export function LoanSummaryStrip({
   const termStart =
     currentRenewal?.effectiveDate ??
     (typeof metadata.origination_date === "string" ? metadata.origination_date : undefined);
-  const termEnd = milestones.maturity ?? milestones.horizon;
+  // a loan read from the bank's papers ends when the bank says, that is when the balance reaches zero: an early
+  // repayment that shortened it moves its end (the contract's first horizon no longer applies)
+  const fromPapers = typeof metadata.statement_loan_key === "string";
+  const payoff = calculation?.payoffDate ?? undefined;
+  const termEnd =
+    milestones.maturity ??
+    (fromPapers && payoff && (!milestones.horizon || payoff < milestones.horizon)
+      ? payoff
+      : milestones.horizon);
+  // the instalment the bank debits includes the borrower insurance (kept apart from the loan itself)
+  const insurance = Number(metadata.escrow_amount);
+  const withInsurance = Number.isFinite(insurance) && insurance > 0 ? insurance : 0;
   const annualRate = calculation?.annualRate ?? Number(metadata.interest_rate ?? Number.NaN);
   const next = calculation?.rows.find(
     (row) => row.date > today && row.scheduledPayment && row.payment > 0,
@@ -129,12 +140,20 @@ export function LoanSummaryStrip({
                 : t("asset:loanOverview.regular_payment")}
             </p>
             <p className="mt-1 font-semibold tabular-nums">
-              {money(next?.payment ?? calculation.paymentAmount)}
+              {money((next?.payment ?? calculation.paymentAmount) + withInsurance)}
               <span className="text-muted-foreground text-xs font-normal">
                 {" "}
                 · {t(`asset:loanActions.${calculation.frequency}`)}
               </span>
             </p>
+            {withInsurance > 0 && (
+              <p className="text-muted-foreground text-xs" data-testid="loan-payment-insurance">
+                {t("asset:loanOverview.with_insurance", {
+                  loan: moneyText(next?.payment ?? calculation.paymentAmount),
+                  insurance: moneyText(withInsurance),
+                })}
+              </p>
+            )}
             {next && (
               <PaymentSplit
                 principal={next.principal}

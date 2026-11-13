@@ -978,7 +978,8 @@
     "term_elapsed_years_other": "{{elapsed}} d’un terme de {{count}} ans.",
     "term_elapsed_months_one": "{{elapsed}} d’un terme de {{count}} mois.",
     "term_elapsed_months_many": "{{elapsed}} d’un terme de {{count}} mois.",
-    "term_elapsed_months_other": "{{elapsed}} d’un terme de {{count}} mois."
+    "term_elapsed_months_other": "{{elapsed}} d’un terme de {{count}} mois.",
+    "with_insurance": "dont {{loan}} de prêt et {{insurance}} d'assurance"
   },
   "loanEvents": {
     "balance_date_occupied": "Un solde existe déjà à cette date. Choisissez une autre date ou modifiez ce solde.",

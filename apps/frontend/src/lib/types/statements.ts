@@ -480,6 +480,8 @@ export interface LoanPayment {
   state: "found" | "proposed" | "missing" | "uncovered" | "unknown";
   /** The person confirmed this debit although its amount differs. */
   confirmed?: boolean;
+  /** Why a debit of another amount is the instalment (a first instalment pro rata). */
+  note?: string | null;
   activityId?: string | null;
   accountId?: string | null;
   paidOn?: string | null;

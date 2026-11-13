@@ -646,7 +646,8 @@
     "this_term": "هذه المدة",
     "timeline": "الجدول الزمني للرصيد",
     "today": "اليوم",
-    "unavailable": "غير متاح"
+    "unavailable": "غير متاح",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanPayments": {
     "account": "الحساب",

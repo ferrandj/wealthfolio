@@ -964,7 +964,8 @@
     "term_elapsed_years_one": "{{elapsed}} einer Laufzeit von {{count}} Jahr.",
     "term_elapsed_years_other": "{{elapsed}} einer Laufzeit von {{count}} Jahren.",
     "term_elapsed_months_one": "{{elapsed}} einer Laufzeit von {{count}} Monat.",
-    "term_elapsed_months_other": "{{elapsed}} einer Laufzeit von {{count}} Monaten."
+    "term_elapsed_months_other": "{{elapsed}} einer Laufzeit von {{count}} Monaten.",
+    "with_insurance": "of which {{loan}} loan and {{insurance}} insurance"
   },
   "loanEvents": {
     "balance_date_occupied": "Für dieses Datum besteht bereits ein Saldo. Wählen Sie ein anderes Datum oder bearbeiten Sie diesen Saldo.",

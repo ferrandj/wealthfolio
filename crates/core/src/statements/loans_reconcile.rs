@@ -80,6 +80,9 @@ pub struct LoanPayment {
     /// The person confirmed this debit (its amount differs from the instalment).
     #[serde(default)]
     pub confirmed: bool,
+    /// Why a debit of another amount is the instalment, when it is explained (a first instalment pro rata).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
     pub activity_id: Option<String>,
     pub account_id: Option<String>,
     pub paid_on: Option<NaiveDate>,
@@ -177,6 +180,35 @@ pub fn first_due_from_debits(view: &LoanView, debits: &[BankDebit]) -> Option<Na
         .min()
 }
 
+/// The number of days of interest a debit pays, when it is the first instalment of the loan with the interest of a
+/// period shorter or longer than a month: the instalment's capital and insurance, plus the daily interest of the
+/// capital (rate / 365) times a whole number of days.
+pub fn pro_rata_days(view: &LoanView, row: usize, amount: Decimal) -> Option<i64> {
+    let first = view
+        .plan
+        .rows
+        .iter()
+        .position(|r| r.kind == "installment")?;
+    if row != first {
+        return None;
+    }
+    let r = &view.plan.rows[row];
+    let rate = view.rate?;
+    let capital_before = r.remaining + r.capital;
+    let daily = capital_before * rate / Decimal::from(100) / Decimal::from(365);
+    if daily <= Decimal::ZERO {
+        return None;
+    }
+    let interest = amount - r.capital - r.insurance;
+    if interest <= Decimal::ZERO {
+        return None;
+    }
+    let days = (interest / daily).round();
+    let n: i64 = days.try_into().ok()?;
+    let off = (days * daily - interest).abs();
+    ((1..=45).contains(&n) && off < Decimal::new(2, 2)).then_some(n)
+}
+
 /// Follow each instalment already due in the bank accounts.
 pub fn reconcile(
     view: &LoanView,
@@ -235,6 +267,7 @@ pub fn reconcile(
         });
         let mut line = LoanPayment {
             confirmed: confirmed.is_some(),
+            note: None,
             row: i,
             number: r.number,
             date,
@@ -284,7 +317,17 @@ pub fn reconcile(
             });
         if let Some((j, d)) = candidate {
             used[j] = true;
-            line.state = "proposed".into();
+            line.state = match pro_rata_days(view, line.row, d.amount.abs()) {
+                // the first instalment counts the interest of the days since the funds were released: the same
+                // capital and insurance, the interest of a number of whole days
+                Some(days) => {
+                    line.note = Some(format!(
+                        "première échéance au prorata : intérêts de {days} jours au lieu d'un mois"
+                    ));
+                    "found".into()
+                }
+                None => "proposed".into(),
+            };
             line.activity_id = Some(d.activity_id.clone());
             line.account_id = Some(d.account_id.clone());
             line.paid_on = Some(d.date);

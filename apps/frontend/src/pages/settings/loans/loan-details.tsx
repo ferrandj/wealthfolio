@@ -204,6 +204,7 @@ function PaymentCell({
         <span className="text-foreground">
           {day(line.paidOn)} · {euros(line.amount)}
           {account ? ` · ${account}` : ""}
+          {line.note && <span className="text-muted-foreground block text-xs">{line.note}</span>}
         </span>
       </span>
     );
