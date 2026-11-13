@@ -746,7 +746,18 @@
       "cat_taxes_property": "Taxe foncière / habitation",
       "cat_taxes_fines": "Amendes",
       "cat_housing_loan": "Remboursement de prêt immobilier",
-      "cat_bills_insurance": "Autres assurances"
+      "cat_bills_insurance": "Autres assurances",
+      "cat_investments": "Épargne et investissements",
+      "cat_investments_pea": "PEA / PEA-PME",
+      "cat_investments_life": "Assurance-vie",
+      "cat_investments_broker": "Compte-titres (CTO)",
+      "cat_investments_retirement": "Plan d'épargne retraite (PER)",
+      "cat_investments_livret": "Livret A / LDDS",
+      "cat_investments_lep": "LEP",
+      "cat_investments_pel": "PEL",
+      "cat_investments_cel": "CEL",
+      "cat_investments_crypto": "Crypto",
+      "cat_investments_other": "Autres placements"
     },
     "savings_categories": {
       "cat_savings_emergency": "Fonds d'urgence",

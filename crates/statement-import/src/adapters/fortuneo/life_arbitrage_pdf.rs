@@ -29,18 +29,18 @@ const MONTH: &str =
     r"(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)";
 const ISIN: &str = r"[A-Z]{2}[A-Z0-9]{9}\d";
 
-fn line_re() -> String {
+pub(super) fn line_re() -> String {
     // fund, ISIN (the euro fund has none), valuation date, unit value, units, amount
     format!(
         r"^(?P<name>\S.*?)\s+(?:(?P<isin>{ISIN})\s+)?(?P<day>\d{{2}}/\d{{2}}/\d{{4}})\s+(?P<price>\d[\d ]*,\d+)\s+(?P<units>\d[\d ]*,\d+)\s+(?P<amount>\d[\d ]*,\d{{2}})$"
     )
 }
 
-fn squash(text: &str) -> String {
+pub(super) fn squash(text: &str) -> String {
     sub(r"[^a-z0-9,]", "", &norm(text).replace(' ', ""))
 }
 
-fn iso(day: &str) -> String {
+pub(super) fn iso(day: &str) -> String {
     let p: Vec<&str> = day.split('/').collect();
     format!("{}-{}-{}", p[2], p[1], p[0])
 }

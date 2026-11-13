@@ -2378,7 +2378,8 @@
     "missing_unnamed": "Compte sans nom",
     "missing_line": "{{count}} opération(s), {{out}} sortis, {{in}} entrés",
     "missing_create": "Créer le compte",
-    "missing_import": "Importer un relevé"
+    "missing_import": "Importer un relevé",
+    "wizard_step_account_hint_no_iban": "Vérifiez ce qui a été lu sur les documents. Ce compte n'est pas un compte courant : il n'a ni IBAN ni BIC, seuls la banque et le nom comptent."
   },
   "rates": {
     "title": "Taux et fiscalité",

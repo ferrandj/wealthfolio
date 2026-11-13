@@ -209,6 +209,35 @@ pub fn pro_rata_days(view: &LoanView, row: usize, amount: Decimal) -> Option<i64
     ((1..=45).contains(&n) && off < Decimal::new(2, 2)).then_some(n)
 }
 
+/// The interest an early repayment is debited with: the repaid capital bore interest from the last instalment before
+/// it to the day of the repayment (rate / 365 a day). Returns that instalment's day, the number of days and the
+/// interest, when the debit is the capital plus that interest (to a few cents).
+pub fn prepayment_interest(
+    view: &LoanView,
+    row: usize,
+    amount: Decimal,
+) -> Option<(NaiveDate, i64, Decimal)> {
+    let r = view.plan.rows.get(row)?;
+    if r.kind != "prepayment" {
+        return None;
+    }
+    let day = r.date?;
+    let rate = view.rate?;
+    let since = view
+        .plan
+        .rows
+        .iter()
+        .filter(|p| p.kind == "installment")
+        .filter_map(|p| p.date)
+        .filter(|d| *d < day)
+        .max()?;
+    let days = (day - since).num_days();
+    let interest = (r.total * rate / Decimal::from(100) / Decimal::from(365) * Decimal::from(days))
+        .round_dp(2);
+    ((amount - r.total - interest).abs() <= Decimal::new(2, 2) && interest > Decimal::ZERO)
+        .then_some((since, days, interest))
+}
+
 /// Follow each instalment already due in the bank accounts.
 pub fn reconcile(
     view: &LoanView,
@@ -317,16 +346,27 @@ pub fn reconcile(
             });
         if let Some((j, d)) = candidate {
             used[j] = true;
-            line.state = match pro_rata_days(view, line.row, d.amount.abs()) {
+            line.state = if let Some(days) = pro_rata_days(view, line.row, d.amount.abs()) {
                 // the first instalment counts the interest of the days since the funds were released: the same
                 // capital and insurance, the interest of a number of whole days
-                Some(days) => {
-                    line.note = Some(format!(
-                        "première échéance au prorata : intérêts de {days} jours au lieu d'un mois"
-                    ));
-                    "found".into()
-                }
-                None => "proposed".into(),
+                line.note = Some(format!(
+                    "première échéance au prorata : intérêts de {days} jours au lieu d'un mois"
+                ));
+                "found".into()
+            } else if let Some((since, days, interest)) =
+                prepayment_interest(view, line.row, d.amount.abs())
+            {
+                // an early repayment is debited with the interest the repaid capital bore since the last
+                // instalment
+                line.note = Some(format!(
+                    "remboursement anticipé : {} € de capital + {} € d'intérêts courus depuis le {} ({days} jours)",
+                    line.expected,
+                    interest,
+                    fr(since)
+                ));
+                "found".into()
+            } else {
+                "proposed".into()
             };
             line.activity_id = Some(d.activity_id.clone());
             line.account_id = Some(d.account_id.clone());
@@ -494,14 +534,22 @@ pub fn gaps_of(view: &LoanView) -> Vec<LoanGap> {
             .map(|l| l.date)
             .collect();
         if let (Some(first), Some(last)) = (days.iter().min(), days.iter().max()) {
-            gaps.push(gap(
-                "statements_missing",
+            let which = if first == last {
+                format!("l'échéance du {}", fr(*first))
+            } else {
                 format!(
-                    "Les relevés du compte prélevé ne couvrent pas {} échéance(s), du {} au {} : importez-les pour \
-                     retrouver chaque prélèvement.",
+                    "{} échéances, du {} au {},",
                     days.len(),
                     fr(*first),
                     fr(*last)
+                )
+            };
+            gaps.push(gap(
+                "statements_missing",
+                format!(
+                    "Aucun relevé importé du compte prélevé ne couvre {which} : le prélèvement ne peut pas encore \
+                     être vérifié. Importez le relevé de ce mois-là (s'il n'est pas encore paru, il suffira de \
+                     l'importer plus tard)."
                 ),
                 &["statement"],
                 false,
@@ -529,8 +577,8 @@ pub fn gaps_of(view: &LoanView) -> Vec<LoanGap> {
         gaps.push(gap(
             "payment_proposed",
             format!(
-                "{} prélèvement(s) d'un autre montant semblent payer une échéance ({}) : une première échéance au \
-                 prorata ou une échéance modifiée. Confirmez-les s'ils correspondent.",
+                "{} prélèvement(s) d'un autre montant semblent payer une échéance ({}) : une échéance modifiée, \
+                 ou des frais ou intérêts ajoutés par la banque. Confirmez-les s'ils correspondent.",
                 view.payments.proposed,
                 examples.join(" ; ")
             ),

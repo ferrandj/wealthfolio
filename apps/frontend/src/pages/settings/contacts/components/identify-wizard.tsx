@@ -76,6 +76,8 @@ interface AccountFields {
 export type IdentifyItemData = UnresolvedCounterparty & {
   /** Holders of the account when it is joint: each one gets an equal share. */
   holderCount?: number;
+  /** A current account (alone or joint): it has an IBAN and a BIC. False for a life insurance, a PEA… */
+  bankAccount?: boolean;
 };
 
 interface WizardProps {
@@ -482,28 +484,34 @@ function IdentifyItem({
           <div>
             <h3 className="text-sm font-semibold">{t("settings:contacts.wizard_step_account")}</h3>
             <p className="text-muted-foreground text-xs">
-              {t("settings:contacts.wizard_step_account_hint")}
+              {item.bankAccount === false
+                ? t("settings:contacts.wizard_step_account_hint_no_iban")
+                : t("settings:contacts.wizard_step_account_hint")}
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor="wizard-iban">{t("settings:contacts.wizard_field_iban")}</Label>
-              <Input
-                id="wizard-iban"
-                className="font-mono"
-                value={fields.iban}
-                onChange={(e) => setField("iban", e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="wizard-bic">{t("settings:contacts.wizard_field_bic")}</Label>
-              <Input
-                id="wizard-bic"
-                className="font-mono"
-                value={fields.bic}
-                onChange={(e) => setField("bic", e.target.value)}
-              />
-            </div>
+            {item.bankAccount !== false && (
+              <>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="wizard-iban">{t("settings:contacts.wizard_field_iban")}</Label>
+                  <Input
+                    id="wizard-iban"
+                    className="font-mono"
+                    value={fields.iban}
+                    onChange={(e) => setField("iban", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wizard-bic">{t("settings:contacts.wizard_field_bic")}</Label>
+                  <Input
+                    id="wizard-bic"
+                    className="font-mono"
+                    value={fields.bic}
+                    onChange={(e) => setField("bic", e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             <div className="grid gap-1.5">
               <Label htmlFor="wizard-institution">
                 {t("settings:contacts.wizard_field_institution")}

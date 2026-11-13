@@ -1224,6 +1224,40 @@ mod tests {
     }
 
     #[test]
+    fn an_early_repayment_debited_with_its_accrued_interest_is_recognised() {
+        use crate::statements::{prepayment_interest, reconcile, BankDebit};
+        // the real debit: 12 300,00 € on 08/06/2026 for 12 274,54 € repaid on 06/06/2026, the interest of the
+        // 22 days since the instalment of 15/05/2026
+        let today = day(2026, 11, 10);
+        let view = view_of(today);
+        let row = view
+            .plan
+            .rows
+            .iter()
+            .position(|r| r.kind == "prepayment")
+            .unwrap();
+        let (since, days, interest) =
+            prepayment_interest(&view, row, Decimal::new(1230000, 2)).unwrap();
+        assert_eq!((since, days), (day(2026, 5, 15), 22));
+        assert!((interest - Decimal::new(2546, 2)).abs() <= Decimal::new(2, 2));
+        let debits = vec![BankDebit {
+            activity_id: "prepayment".into(),
+            account_id: "current".into(),
+            date: day(2026, 6, 8),
+            amount: Decimal::new(1230000, 2),
+            label: "REMBOURSEMENT ANTICIPE PRET".into(),
+        }];
+        let payments = reconcile(&view, &debits, &[], today);
+        let line = payments
+            .lines
+            .iter()
+            .find(|l| l.kind == "prepayment")
+            .unwrap();
+        assert_eq!(line.state, "found");
+        assert!(line.note.as_deref().unwrap().contains("22 jours"));
+    }
+
+    #[test]
     fn a_first_instalment_of_eighteen_days_is_recognised() {
         use crate::statements::{pro_rata_days, reconcile, BankDebit};
         // the real March 2025 debit: 582,79 € instead of 726,06 €, the interest of 18 days on 122 432 € at 3,44 %

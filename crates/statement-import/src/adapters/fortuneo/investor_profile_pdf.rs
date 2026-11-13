@@ -70,6 +70,17 @@ impl Adapter for FortuneoInvestorProfilePdf {
                 0.1,
                 "« Votre horizon de placement »",
             ),
+            // the older form (2024): "VOTRE PROFIL INVESTISSEUR … VOUS AVEZ UN PROFIL : DYNAMIQUE"
+            (
+                c.contains("votreprofilinvestisseur") || c.contains("votreprofildinvestisseur"),
+                0.3,
+                "« Votre profil investisseur »",
+            ),
+            (
+                c.contains("vousavezunprofil"),
+                0.1,
+                "« Vous avez un profil »",
+            ),
             (c.contains("suravenir"), 0.1, "mentionne Suravenir"),
         ]);
         if !c.contains("fortuneo") {
@@ -107,7 +118,16 @@ impl Adapter for FortuneoInvestorProfilePdf {
         };
         let project = after("votre projet");
         let horizon = after("votre horizon de placement");
-        let investor = after("vous avez un profil investisseur");
+        // "VOUS AVEZ UN PROFIL INVESTISSEUR : X", or in the older form "VOUS AVEZ UN PROFIL : X"
+        let investor = after("vous avez un profil investisseur").or_else(|| {
+            texts.iter().find_map(|t| {
+                let n = norm(t);
+                (n.starts_with("vous avez un profil") && !n.contains("extra"))
+                    .then(|| t.split_once(':').map(|(_, v)| py::strip(v).to_string()))
+                    .flatten()
+                    .filter(|v| !v.is_empty())
+            })
+        });
         let extra_financial = after("vous avez un profil extra-financier");
         let established: Option<NaiveDate> = texts.iter().find_map(|t| {
             let n = norm(t);

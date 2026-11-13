@@ -148,9 +148,20 @@ export default function DocumentsPage() {
       !f.analysis.statements.some((s) => needsOverlapDecision(s, f.choices[s.preview.index])),
   );
 
+  // while documents are read or imported, nothing is asked: the questions come once everything is in, one after
+  // the other (the new accounts first, then the loan accounts)
+  const [importingAll, setImportingAll] = useState(false);
+  const busy =
+    importingAll || files.some((f) => f.status === "importing" || f.status === "analyzing");
+
   const importAll = async () => {
     // One after the other: the writes go through a single database connection anyway.
-    for (const file of importable) await importOne(file);
+    setImportingAll(true);
+    try {
+      for (const file of importable) await importOne(file);
+    } finally {
+      setImportingAll(false);
+    }
   };
 
   const setChoice = (file: PendingFile, index: number, patch: Partial<StatementChoice>) => {
@@ -262,10 +273,10 @@ export default function DocumentsPage() {
         <DocumentsLibrary />
       </div>
       <LoanAccountDialog
-        documentId={files.some((f) => f.status === "importing") ? null : (attachQueue[0] ?? null)}
+        documentId={busy || newAccounts.length > 0 ? null : (attachQueue[0] ?? null)}
         onClose={() => setAttachQueue((list) => list.slice(1))}
       />
-      {newAccounts.length > 0 && !files.some((f) => f.status === "importing") ? (
+      {newAccounts.length > 0 && !busy ? (
         <AccountOwnerPrompt accountIds={newAccounts} onClose={() => setNewAccounts([])} />
       ) : null}
     </div>

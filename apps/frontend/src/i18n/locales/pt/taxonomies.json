@@ -746,7 +746,18 @@
       "cat_taxes_property": "Property Tax",
       "cat_taxes_fines": "Fines",
       "cat_housing_loan": "Home Loan Repayment",
-      "cat_bills_insurance": "Other Insurance"
+      "cat_bills_insurance": "Other Insurance",
+      "cat_investments": "Savings & Investments",
+      "cat_investments_pea": "PEA",
+      "cat_investments_life": "Life Insurance",
+      "cat_investments_broker": "Brokerage Account",
+      "cat_investments_retirement": "Retirement Plan",
+      "cat_investments_livret": "Regulated Savings Account",
+      "cat_investments_lep": "LEP",
+      "cat_investments_pel": "Home Savings Plan",
+      "cat_investments_cel": "Home Savings Account",
+      "cat_investments_crypto": "Crypto",
+      "cat_investments_other": "Other Investments"
     },
     "savings_categories": {
       "cat_savings_emergency": "Fundo de emergência",

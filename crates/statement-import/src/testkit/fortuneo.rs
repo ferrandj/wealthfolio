@@ -998,3 +998,80 @@ pub fn fortuneo_life_operations_csv() -> Vec<u8> {
         .as_bytes()
         .to_vec()
 }
+
+/// Fortuneo Vie: the confirmation of a deposit. Each amount sits alone on the row above its label, as in the
+/// letters; the deposit is spread over two funds, then the whole contract is listed.
+pub fn fortuneo_deposit_pdf(net: &str) -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    pdf.text(300.0, 60.0, "Références :");
+    pdf.text(300.0, 72.0, "Contrat : FORTUNEO VIE");
+    pdf.text(300.0, 84.0, "N°: 000123 45678901 23 45");
+    pdf.text(300.0, 110.0, "Objet : Confirmation de versement");
+    pdf.text(40.0, 130.0, "FORTUNEO");
+    pdf.text(300.0, 150.0, "Le 9 octobre 2024");
+    pdf.text(40.0, 190.0, "Monsieur,");
+    pdf.text(60.0, 220.0, "Date du versement : 04/10/2024");
+    pdf.text(400.0, 232.0, "100,00 €");
+    pdf.text(60.0, 244.0, "Montant brut (frais inclus) :");
+    pdf.text(400.0, 256.0, "0,00 €");
+    pdf.text(60.0, 268.0, "Frais sur versement :");
+    pdf.text(400.0, 280.0, &format!("{net} €"));
+    pdf.text(60.0, 292.0, "Montant net :");
+    pdf.text(40.0, 316.0, "l Répartition du versement :");
+    pdf.text(40.0, 330.0, "SURAVENIR");
+    pdf.text(
+        40.0,
+        342.0,
+        "FDS EUROS EXEMPLE RENDEMENT 05/10/2024 1,00 40,0000 40,00",
+    );
+    pdf.text(
+        40.0,
+        354.0,
+        "FONDS ACTIONS EXEMPLE A FR0000000001 07/10/2024 400,00 0,1500 60,00",
+    );
+    pdf.text(400.0, 366.0, "Total 100,00");
+    pdf.text(
+        40.0,
+        390.0,
+        "l Répartition des unités de compte après le versement (*)",
+    );
+    pdf.text(
+        40.0,
+        402.0,
+        "FDS EUROS EXEMPLE RENDEMENT 09/10/2024 1,00 172,1400 172,14",
+    );
+    pdf.text(
+        60.0,
+        740.0,
+        "FORTUNEO VIE est un contrat collectif d'assurance-vie géré par Suravenir.",
+    );
+    pdf.bytes()
+}
+
+/// The older investor profile (2024): "VOTRE PROFIL INVESTISSEUR" and "VOUS AVEZ UN PROFIL : X".
+pub fn fortuneo_investor_profile_2024_pdf(profile: &str) -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    pdf.text(28.0, 60.0, "Nom de naissance : MARTIN");
+    pdf.text(28.0, 72.0, "Prénom(s) : PAUL");
+    pdf.text(
+        28.0,
+        96.0,
+        "Dans le cadre de l'investissement financier que vous réalisez, nous avons déterminé votre profil d'investisseur.",
+    );
+    pdf.text(28.0, 120.0, "QUESTIONNAIRE");
+    pdf.text(
+        60.0,
+        740.0,
+        "FORTUNEO VIE est un contrat collectif d'assurance-vie géré par Suravenir.",
+    );
+    pdf.add_page();
+    pdf.text(28.0, 60.0, "VOTRE PROFIL INVESTISSEUR");
+    pdf.text(28.0, 80.0, "VOTRE HORIZON DE PLACEMENT : plus de 8 ans");
+    pdf.text(28.0, 96.0, &format!("VOUS AVEZ UN PROFIL : {profile}"));
+    pdf.text(
+        28.0,
+        112.0,
+        "Ce profil a été établi par vos soins le 29 août 2024",
+    );
+    pdf.bytes()
+}

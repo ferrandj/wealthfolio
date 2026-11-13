@@ -56,6 +56,14 @@ describe("liability card model", () => {
     expect(model.paidShare).toBeCloseTo(0.2414, 4);
   });
 
+  it("shows the instalment the bank debits, insurance included", () => {
+    const model = liabilityCardModel(
+      holding(mortgage, { sub_type: "mortgage", escrow_amount: 25.83 }),
+      today,
+    );
+    expect(model.payment).toBeCloseTo(1615.32, 2);
+  });
+
   it("flags renewals before and after maturity", () => {
     const soon = { ...mortgage, renewalMaturity: "2026-11-15" };
     const passed = { ...mortgage, renewalMaturity: "2026-06-15" };

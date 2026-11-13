@@ -2294,7 +2294,8 @@
     "missing_unnamed": "Unnamed account",
     "missing_line": "{{count}} operation(s), {{out}} out, {{in}} in",
     "missing_create": "Create the account",
-    "missing_import": "Import a statement"
+    "missing_import": "Import a statement",
+    "wizard_step_account_hint_no_iban": "Check what was read on the documents. This is not a current account: it has no IBAN or BIC, only the bank and the name matter."
   },
   "rates": {
     "title": "Rates and taxes",

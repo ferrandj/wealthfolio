@@ -2064,6 +2064,8 @@ impl StatementService {
         if let Some(error) = &analyzed.analysis.error {
             return Err(invalid(error.clone()));
         }
+        // the payees the person already filed: their other operations are recognised, not doubtful any more
+        let learned = self.remembered_categories().await.unwrap_or_default();
         let mut reviews = Vec::new();
         let mut warnings = Vec::new();
         for item in analyzed
@@ -2145,6 +2147,16 @@ impl StatementService {
                         .as_ref()
                         .and_then(|id| current.iter().find(|c| &c.activity_id == id));
                     let guessed = assignment.map(|a| a.source == "import").unwrap_or(true);
+                    // the same payee was filed by the person on another operation: that category, recognised
+                    let recognised = guessed
+                        .then(|| equivalence_key(&t.label))
+                        .flatten()
+                        .and_then(|key| learned.get(&key))
+                        .filter(|(taxonomy, _)| {
+                            t.category_taxonomy_id
+                                .as_deref()
+                                .is_none_or(|guess| guess == taxonomy)
+                        });
                     let outdated = assignment.is_some_and(|a| {
                         suggestion_replaces_kept(
                             &a.category_id,
@@ -2176,14 +2188,38 @@ impl StatementService {
                         currency: t.currency.clone(),
                         kind: t.kind.clone(),
                         counterparty: t.counterparty.clone(),
-                        taxonomy_id: assignment.map(|a| a.taxonomy_id.clone()),
-                        category_id: assignment.map(|a| a.category_id.clone()),
-                        category_source: assignment.map(|a| a.source.clone()),
-                        suggested_taxonomy_id: t.category_taxonomy_id.clone(),
-                        suggested_category_id: t.category_id.clone(),
-                        confidence: t.category_confidence.clone(),
-                        reason: t.category_reason.clone(),
-                        needs_review: (guessed && t.category_confidence == "low") || outdated,
+                        taxonomy_id: recognised
+                            .map(|(taxonomy, _)| taxonomy.clone())
+                            .or(assignment.map(|a| a.taxonomy_id.clone())),
+                        category_id: recognised
+                            .map(|(_, category)| category.clone())
+                            .or(assignment.map(|a| a.category_id.clone())),
+                        category_source: if recognised.is_some() {
+                            Some("rule".to_string())
+                        } else {
+                            assignment.map(|a| a.source.clone())
+                        },
+                        suggested_taxonomy_id: recognised
+                            .map(|(taxonomy, _)| taxonomy.clone())
+                            .or(t.category_taxonomy_id.clone()),
+                        suggested_category_id: recognised
+                            .map(|(_, category)| category.clone())
+                            .or(t.category_id.clone()),
+                        confidence: if recognised.is_some() {
+                            "high".to_string()
+                        } else {
+                            t.category_confidence.clone()
+                        },
+                        reason: if recognised.is_some() {
+                            Some(
+                                "Reconnu : même bénéficiaire qu'une opération que vous avez déjà catégorisée"
+                                    .into(),
+                            )
+                        } else {
+                            t.category_reason.clone()
+                        },
+                        needs_review: recognised.is_none()
+                            && ((guessed && t.category_confidence == "low") || outdated),
                         outdated,
                         other_account_unknown,
                         loan_key: None,

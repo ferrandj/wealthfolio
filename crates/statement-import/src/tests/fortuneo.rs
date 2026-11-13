@@ -901,3 +901,42 @@ fn test_arbitrage_letter_that_lost_its_spaces_names_its_contract_properly() {
 }
 
 // -------------------------------------------------------------------------- the lines of a life-insurance contract
+
+#[test]
+fn test_life_insurance_deposit_is_recognised_and_tied_to_its_contract() {
+    let (found, parsed) = parse(fortuneo_deposit_pdf("100,00"));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(
+        found.chosen.as_ref().unwrap().adapter.id(),
+        "fortuneo.life_deposit_pdf"
+    );
+    let st = &parsed[0];
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+    assert_eq!(
+        (st.account_number.clone(), st.account_type.clone()),
+        (s("000123456789012345"), s("life_insurance"))
+    );
+    assert_eq!(st.balance_date, Some(ymd(2024, 10, 4)));
+    assert_eq!(
+        (extra(st, "gross"), extra(st, "fees"), extra(st, "net")),
+        (&json!("100.00"), &json!("0.00"), &json!("100.00"))
+    );
+    assert_eq!(extra(st, "allocation").as_array().unwrap().len(), 2);
+    assert_eq!(extra(st, "portfolio_after").as_array().unwrap().len(), 1);
+
+    // the funds must add up to the net amount
+    let (_, parsed) = parse(fortuneo_deposit_pdf("90,00"));
+    assert!(!parsed[0].warnings.is_empty());
+}
+
+#[test]
+fn test_the_older_investor_profile_is_recognised() {
+    let (found, parsed) = parse(fortuneo_investor_profile_2024_pdf("DYNAMIQUE"));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(
+        found.chosen.as_ref().unwrap().adapter.id(),
+        "fortuneo.investor_profile_pdf"
+    );
+    assert_eq!(extra(&parsed[0], "investor_profile"), &json!("Dynamique"));
+    assert_eq!(parsed[0].balance_date, Some(ymd(2024, 8, 29)));
+}

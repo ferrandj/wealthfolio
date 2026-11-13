@@ -1,41 +1,15 @@
-import { listAccountIdentities, listContacts } from "@/adapters";
+import { listContacts } from "@/adapters";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
-import type { AccountIdentity } from "@/lib/types/statements";
 import { useAccounts } from "@/hooks/use-accounts";
 import { Button, Icons } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toNumber } from "../contacts-utils";
 import { ContactDialog } from "./contact-dialog";
-import { IdentifyWizard, type IdentifyItemData } from "./identify-wizard";
-
-/**
- * What the wizard needs to ask for the owners of an account that Wealthfolio already has: one entry per holder
- * the documents name (several for a joint account), or one blank entry when no document names anyone.
- */
-function ownerItems(accountId: string, identity?: AccountIdentity): IdentifyItemData[] {
-  const names = identity?.holders?.length
-    ? identity.holders
-    : identity?.holderName
-      ? [identity.holderName]
-      : [null];
-  return names.map((name, index) => ({
-    kind: "name",
-    key: `own:${accountId}:${index}`,
-    name,
-    iban: identity?.iban ?? null,
-    count: 0,
-    totalIn: 0,
-    totalOut: 0,
-    lastDate: "",
-    accountIds: [accountId],
-    ownAccountId: accountId,
-    holderCount: names.length,
-  }));
-}
+import { AccountHoldersDialog } from "./account-holders-dialog";
 
 /**
  * Who owns an account of Wealthfolio, wherever the account is shown. The owner is a contact like any other
@@ -46,15 +20,10 @@ export function AccountOwners({ accountId }: { accountId: string }) {
   const { t } = useTranslation();
   const { isBalanceHidden: hidden } = useBalancePrivacy();
   const contacts = useQuery({ queryKey: [QueryKeys.CONTACTS], queryFn: listContacts });
-  const identities = useQuery({
-    queryKey: [QueryKeys.ACCOUNT_IDENTITIES],
-    queryFn: listAccountIdentities,
-  });
-  const [wizard, setWizard] = useState<IdentifyItemData[] | null>(null);
+  const [wizard, setWizard] = useState(false);
   const [openContact, setOpenContact] = useState<string | null>(null);
 
   const owners = (contacts.data ?? []).filter((c) => c.linkedAccountIds.includes(accountId));
-  const identity = identities.data?.find((i) => i.accountId === accountId);
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -82,13 +51,15 @@ export function AccountOwners({ accountId }: { accountId: string }) {
       <button
         type="button"
         className="text-primary hover:underline"
-        onClick={() => setWizard(ownerItems(accountId, identity))}
+        onClick={() => setWizard(true)}
       >
         {owners.length === 0
           ? t("settings:contacts.owner_define")
           : t("settings:contacts.owner_add")}
       </button>
-      {wizard ? <IdentifyWizard items={wizard} onClose={() => setWizard(null)} /> : null}
+      {wizard ? (
+        <AccountHoldersDialog accountIds={[accountId]} onClose={() => setWizard(false)} />
+      ) : null}
       {openContact ? (
         <ContactDialog
           open
@@ -112,45 +83,17 @@ export function AccountOwnerPrompt({
   onClose: () => void;
 }) {
   const contacts = useQuery({ queryKey: [QueryKeys.CONTACTS], queryFn: listContacts });
-  const identities = useQuery({
-    queryKey: [QueryKeys.ACCOUNT_IDENTITIES],
-    queryFn: listAccountIdentities,
-  });
-  if (!contacts.data || !identities.data) return null;
-  return (
-    <PromptReady
-      accountIds={accountIds.filter(
-        (id) => !contacts.data.some((c) => c.linkedAccountIds.includes(id)),
-      )}
-      identities={identities.data}
-      onClose={onClose}
-    />
-  );
-}
-
-function PromptReady({
-  accountIds,
-  identities,
-  onClose,
-}: {
-  accountIds: string[];
-  identities: AccountIdentity[];
-  onClose: () => void;
-}) {
-  // frozen when it opens: the list must not move while the owners are being set
-  const [items] = useState(() =>
-    accountIds.flatMap((id) =>
-      ownerItems(
-        id,
-        identities.find((i) => i.accountId === id),
-      ),
-    ),
-  );
-  if (items.length === 0) {
+  // frozen when it opens: the list must not move while the holders are being set
+  const [ids, setIds] = useState<string[] | null>(null);
+  if (!contacts.data) return null;
+  const pending =
+    ids ?? accountIds.filter((id) => !contacts.data.some((c) => c.linkedAccountIds.includes(id)));
+  if (ids === null) setIds(pending);
+  if (pending.length === 0) {
     onClose();
     return null;
   }
-  return <IdentifyWizard items={items} onClose={onClose} />;
+  return <AccountHoldersDialog accountIds={pending} onClose={onClose} />;
 }
 
 /** A reminder on the documents page: accounts that nobody owns yet. */

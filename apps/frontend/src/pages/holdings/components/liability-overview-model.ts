@@ -69,11 +69,19 @@ export function liabilityCardModel(
         : null,
     scheduled,
     rate: loan?.annualRate ?? null,
-    payment: scheduled ? (loan?.paymentAmount ?? null) : null,
+    // what the bank debits: the instalment plus the insurance (or escrow) kept apart from the loan itself
+    payment:
+      scheduled && loan?.paymentAmount != null ? loan.paymentAmount + escrowOf(holding) : null,
     frequency: scheduled ? (loan?.frequency ?? null) : null,
     payoffDate: loan?.payoffDate ?? null,
     status,
   };
+}
+
+/** The insurance (or escrow) debited with each instalment, 0 when none. */
+function escrowOf(holding: { metadata?: Record<string, unknown> | null }): number {
+  const value = Number(holding.metadata?.escrow_amount);
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 export interface LiabilitySummary {
