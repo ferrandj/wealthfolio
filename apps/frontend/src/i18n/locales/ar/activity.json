@@ -1738,5 +1738,33 @@
     "external": "تحويل خارجي",
     "direction": "اتجاه التحويل",
     "mode": "وضع التحويل"
+  },
+  "operations_review": {
+    "button": "Review",
+    "title": "Operations review",
+    "description": "The operations of the imported statements to look at again: a doubtful category, one to categorize later, a loan instalment to attach or a debit proposed for an instalment.",
+    "all": "All ({{count}})",
+    "kind": {
+      "doubt": "Doubts ({{count}})",
+      "to_categorize": "To categorize ({{count}})",
+      "loan_to_attach": "Loan to attach ({{count}})",
+      "loan_proposed": "Loan to confirm ({{count}})"
+    },
+    "why": {
+      "doubt": "Doubt",
+      "to_categorize": "To categorize later",
+      "loan_to_attach": "Loan to attach",
+      "loan_proposed": "Loan to confirm"
+    },
+    "empty": "Nothing to review.",
+    "close": "Close",
+    "save_one": "Save {{count}} category",
+    "save_other": "Save {{count}} categories",
+    "saved": "Categories saved",
+    "error": "Could not save",
+    "save_few": "Save {{count}} categories",
+    "save_many": "Save {{count}} categories",
+    "save_two": "Save {{count}} categories",
+    "save_zero": "Save {{count}} categories"
   }
 }

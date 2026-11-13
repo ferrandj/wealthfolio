@@ -8,6 +8,7 @@ import type {
   AccountIdentity,
   AccountIdentityInput,
   LoanAccountChoice,
+  OperationToReview,
   LoanAnswers,
   DocumentReview,
   RevalidationResult,
@@ -136,6 +137,24 @@ export const setStatementLoanFirstDue = async (
   firstDue: string | null,
 ): Promise<LoanView[]> => {
   return invoke<LoanView[]>("set_statement_loan_first_due", { key, firstDue });
+};
+
+/** The operations of the imported statements to look at again (doubt, to categorize, loan payment to attach). */
+export const getOperationsToReview = async (): Promise<OperationToReview[]> => {
+  return invoke<OperationToReview[]>("get_operations_to_review");
+};
+
+/** Give categories to operations of any statement, outside the review of a document. */
+export const categorizeStatementOperations = async (decisions: ReviewDecision[]): Promise<void> => {
+  await invoke("categorize_statement_operations", { decisions });
+};
+
+/** Say which loan a debit pays (`null`: none of them). */
+export const attachStatementLoanPayment = async (
+  activityId: string,
+  loanKey: string | null,
+): Promise<LoanView[]> => {
+  return invoke<LoanView[]>("attach_statement_loan_payment", { activityId, loanKey });
 };
 
 /** Attach an imported loan paper to its loan account: an existing one, or a new one made empty and pending. */

@@ -283,6 +283,45 @@ async fn attach_loan_document(
     ))
 }
 
+async fn operations_to_review(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::OperationToReview>>> {
+    Ok(Json(state.statement_service.operations_to_review().await?))
+}
+
+async fn categorize_operations(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(decisions): Json<Vec<wealthfolio_core::statements::ReviewDecision>>,
+) -> ApiResult<Json<serde_json::Value>> {
+    state
+        .statement_service
+        .categorize_operations(decisions)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LoanPaymentBody {
+    loan_key: Option<String>,
+}
+
+async fn attach_loan_payment(
+    Path(id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<LoanPaymentBody>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::LoanView>>> {
+    state
+        .statement_service
+        .attach_loan_payment(&id, body.loan_key)
+        .await?;
+    Ok(Json(
+        state
+            .statement_service
+            .loans(chrono::Utc::now().date_naive())?,
+    ))
+}
+
 async fn validate_loan(
     Path(key): Path<String>,
     axum::Extension(state): axum::Extension<Arc<AppState>>,
@@ -352,6 +391,12 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/loans/{key}/answers", put(set_loan_answers))
         .route("/statements/documents/{id}/loan", put(attach_loan_document))
         .route("/statements/loans/{key}/validate", post(validate_loan))
+        .route("/statements/operations/review", get(operations_to_review))
+        .route(
+            "/statements/operations/categorize",
+            post(categorize_operations),
+        )
+        .route("/statements/operations/{id}/loan", put(attach_loan_payment))
         .route(
             "/statements/coverage/{account_id}/{month}",
             put(set_month_normal),

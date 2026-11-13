@@ -1492,6 +1492,58 @@ impl StatementService {
         Ok(())
     }
 
+    /// The loan each debit pays, as the loans' payments say: activity id → (loan key, loan label, matched | proposed).
+    fn loan_payments_by_activity(&self) -> Result<HashMap<String, (String, String, String)>> {
+        let mut map = HashMap::new();
+        for view in self.loans(Utc::now().date_naive())? {
+            if view.key == "?" {
+                continue;
+            }
+            let label = view
+                .liability_name
+                .clone()
+                .unwrap_or_else(|| view.label.clone());
+            for line in &view.payments.lines {
+                let Some(activity) = &line.activity_id else {
+                    continue;
+                };
+                let state = match line.state.as_str() {
+                    "found" => "matched",
+                    "proposed" => "proposed",
+                    _ => continue,
+                };
+                map.insert(
+                    activity.clone(),
+                    (view.key.clone(), label.clone(), state.to_string()),
+                );
+            }
+        }
+        Ok(map)
+    }
+
+    /// Say on each operation that pays a loan which loan it pays, or that it is still to attach to one.
+    fn annotate_loan_payments(
+        statements: &mut [super::StatementReview],
+        map: &HashMap<String, (String, String, String)>,
+    ) {
+        for op in statements.iter_mut().flat_map(|s| s.operations.iter_mut()) {
+            let found = op.activity_id.as_ref().and_then(|id| map.get(id));
+            if let Some((key, label, state)) = found {
+                op.loan_key = Some(key.clone());
+                op.loan_label = Some(label.clone());
+                op.loan_state = Some(state.clone());
+            } else if super::looks_like_loan_payment(
+                op.category_id
+                    .as_deref()
+                    .or(op.suggested_category_id.as_deref()),
+                &op.label,
+                op.amount.trim_start().starts_with('-'),
+            ) {
+                op.loan_state = Some("to_attach".into());
+            }
+        }
+    }
+
     /// Put back to check the validated statements a new statement changes (see `neighbours_to_reopen`), and the loan
     /// account a new paper of a validated loan belongs to.
     async fn reopen_neighbours(&self, document: &StatementDocument) {
@@ -2134,6 +2186,9 @@ impl StatementService {
                         needs_review: (guessed && t.category_confidence == "low") || outdated,
                         outdated,
                         other_account_unknown,
+                        loan_key: None,
+                        loan_label: None,
+                        loan_state: None,
                     }
                 })
                 .collect();
@@ -2272,7 +2327,8 @@ impl StatementServiceTrait for StatementService {
             .repository
             .get_document_content(id)?
             .ok_or_else(|| invalid("Document not found"))?;
-        let (statements, warnings) = self.review_statements(&document, content).await?;
+        let (mut statements, warnings) = self.review_statements(&document, content).await?;
+        Self::annotate_loan_payments(&mut statements, &self.loan_payments_by_activity()?);
         let mut earlier: Vec<StatementDocument> = self
             .repository
             .list_documents()?
@@ -2754,6 +2810,152 @@ impl StatementServiceTrait for StatementService {
         }
         self.sync_loan_statuses().await?;
         Ok(validated)
+    }
+
+    async fn operations_to_review(&self) -> Result<Vec<super::OperationToReview>> {
+        let map = self.loan_payments_by_activity()?;
+        let later = ["cat_to_categorize", "cat_income_to_categorize"];
+        let mut out = Vec::new();
+        for document in self.repository.list_documents()? {
+            if !matches!(document.document_kind.as_deref(), None | Some("statement"))
+                || document.import_run_id.is_none()
+            {
+                continue;
+            }
+            let Some((document, content)) = self.repository.get_document_content(&document.id)?
+            else {
+                continue;
+            };
+            let Ok((mut statements, _)) = self.review_statements(&document, content).await else {
+                continue;
+            };
+            Self::annotate_loan_payments(&mut statements, &map);
+            for statement in statements {
+                for op in statement.operations {
+                    if op.activity_id.is_none() {
+                        continue;
+                    }
+                    let mut why = Vec::new();
+                    if op.needs_review {
+                        why.push("doubt".to_string());
+                    }
+                    if op
+                        .category_id
+                        .as_deref()
+                        .or(op.suggested_category_id.as_deref())
+                        .is_some_and(|c| later.contains(&c))
+                    {
+                        why.push("to_categorize".to_string());
+                    }
+                    match op.loan_state.as_deref() {
+                        Some("proposed") => why.push("loan_proposed".to_string()),
+                        Some("to_attach") => why.push("loan_to_attach".to_string()),
+                        _ => {}
+                    }
+                    if !why.is_empty() {
+                        out.push(super::OperationToReview {
+                            document_id: document.id.clone(),
+                            file_name: document.file_name.clone(),
+                            account_name: statement.account_name.clone(),
+                            currency: statement.currency.clone(),
+                            why,
+                            operation: op,
+                        });
+                    }
+                }
+            }
+        }
+        out.sort_by(|a, b| b.operation.date.cmp(&a.operation.date));
+        Ok(out)
+    }
+
+    async fn categorize_operations(&self, decisions: Vec<ReviewDecision>) -> Result<()> {
+        if decisions.is_empty() {
+            return Ok(());
+        }
+        let known: HashSet<String> = self
+            .activity_service
+            .get_activities()?
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+        if let Some(d) = decisions.iter().find(|d| !known.contains(&d.activity_id)) {
+            return Err(invalid(format!("Unknown operation {}", d.activity_id)));
+        }
+        let seen: HashSet<String> = decisions.iter().map(|d| d.activity_id.clone()).collect();
+        let items: Vec<CategoryAssignment> = decisions
+            .iter()
+            .map(|d| CategoryAssignment {
+                activity_id: d.activity_id.clone(),
+                taxonomy_id: d.taxonomy_id.clone(),
+                category_id: d.category_id.clone(),
+                source: "manual".to_string(),
+            })
+            .collect();
+        let remembered = self.equivalent_assignments(&decisions, &seen).await?;
+        for batch in [items, remembered] {
+            if !batch.is_empty() {
+                let assigned = batch.clone();
+                self.category_assigner.assign(batch).await?;
+                self.mark_own_transfers(&assigned).await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn attach_loan_payment(&self, activity_id: &str, loan_key: Option<String>) -> Result<()> {
+        let activity = self
+            .activity_service
+            .get_activities()?
+            .into_iter()
+            .find(|a| a.id == activity_id)
+            .ok_or_else(|| invalid("Unknown operation"))?;
+        let day = activity.activity_date.date_naive();
+        let views = self.loans(Utc::now().date_naive())?;
+        if let Some(key) = &loan_key {
+            if !views.iter().any(|v| &v.key == key && v.key != "?") {
+                return Err(invalid("Unknown loan"));
+            }
+        }
+        for view in views.iter().filter(|v| v.key != "?") {
+            let mut answers = view.answers.clone();
+            let before = answers.clone();
+            answers
+                .confirmed_payments
+                .retain(|c| c.activity_id != activity_id);
+            if loan_key.as_deref() == Some(view.key.as_str()) {
+                answers.detached_activities.retain(|a| a != activity_id);
+                // the instalment it pays: the one due nearest to the debit
+                let row = view
+                    .plan
+                    .rows
+                    .iter()
+                    .filter(|r| r.kind == "installment" || r.kind == "prepayment")
+                    .filter_map(|r| r.date)
+                    .filter(|d| (*d - day).num_days().abs() <= 45)
+                    .min_by_key(|d| (*d - day).num_days().abs())
+                    .ok_or_else(|| {
+                        invalid("No instalment of this loan falls near the day of this operation")
+                    })?;
+                answers.confirmed_payments.retain(|c| c.date != row);
+                answers.confirmed_payments.push(super::ConfirmedPayment {
+                    date: row,
+                    activity_id: activity_id.to_string(),
+                });
+            } else if view
+                .payments
+                .lines
+                .iter()
+                .any(|l| l.activity_id.as_deref() == Some(activity_id))
+                && !answers.detached_activities.iter().any(|a| a == activity_id)
+            {
+                answers.detached_activities.push(activity_id.to_string());
+            }
+            if answers != before {
+                self.repository.set_loan_answers(&view.key, answers).await?;
+            }
+        }
+        self.sync_loan_statuses().await
     }
 
     async fn set_loan_answers(&self, loan_key: &str, answers: super::LoanAnswers) -> Result<()> {

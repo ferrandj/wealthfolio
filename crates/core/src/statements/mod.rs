@@ -24,17 +24,17 @@ pub use loans_plan::{
     PlanSummary, Saved, ScheduleData,
 };
 pub use loans_reconcile::{
-    first_due_from_debits, gaps_of, reconcile, BankDebit, ConfirmedPayment, LoanAnswers, LoanGap,
-    LoanPayment, LoanPayments, StatementPeriod,
+    first_due_from_debits, gaps_of, looks_like_loan_payment, reconcile, BankDebit,
+    ConfirmedPayment, LoanAnswers, LoanGap, LoanPayment, LoanPayments, StatementPeriod,
 };
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    ImportMode, MatchedAccount, NewStatementDocument, OutdatedDocuments, RevalidationOutcome,
-    RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
-    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverlap,
-    StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
-    DOCUMENT_STATUS_VALIDATED,
+    ImportMode, MatchedAccount, NewStatementDocument, OperationToReview, OutdatedDocuments,
+    RevalidationOutcome, RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis,
+    StatementDocument, StatementImportOutcome, StatementImportRequest, StatementImportResult,
+    StatementOverlap, StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING,
+    DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };
 pub use statements_review::{
     balance_gap, is_generic_category, is_own_transfer_category, logical_order,

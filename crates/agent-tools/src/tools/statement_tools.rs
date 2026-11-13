@@ -505,6 +505,64 @@ service_tool!(
 );
 
 service_tool!(
+    GetOperationsToReview, "get_operations_to_review", Read, additive = true,
+    scopes = [DocumentsRead],
+    description = "The operations of the imported statements to look at again, newest first: a doubtful category (why: doubt), one to categorize later (to_categorize), a loan payment of another amount proposed for an instalment (loan_proposed) or a payment that looks like a loan instalment but is not attached to a loan (loan_to_attach). Each gives its document, the operation (activityId, date, label, amount, category, suggested category, loanKey/loanLabel/loanState).",
+    schema = object(json!({}), &[]),
+    |env, _args| {
+        let service = need(env.statement_service(), "Statements")?;
+        reply(&service.operations_to_review().await.map_err(fail)?)
+    }
+);
+
+service_tool!(
+    CategorizeOperations, "categorize_operations", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Give categories to operations of any statement, outside the review of a document: decisions [{activityId, taxonomyId, categoryId, remember?}] (remember, on by default, gives the same category to the other operations of the same payee unless chosen by hand).",
+    schema = object(json!({
+        "decisions": {"type": "array", "items": {"type": "object", "properties": {
+            "activityId": {"type": "string"},
+            "taxonomyId": {"type": "string"},
+            "categoryId": {"type": "string"},
+            "remember": {"type": "boolean"}
+        }, "required": ["activityId", "taxonomyId", "categoryId"]}}
+    }), &["decisions"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        struct Args {
+            decisions: Vec<wealthfolio_core::statements::ReviewDecision>,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        service.categorize_operations(args.decisions).await.map_err(fail)?;
+        reply(&json!({"ok": true}))
+    }
+);
+
+service_tool!(
+    AttachLoanPayment, "attach_loan_payment", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Say which loan a debit pays (activityId of an operation, loanKey from get_loans): it becomes the payment of the instalment due nearest to it, even when its amount differs. A null loanKey detaches it from the loans it was matched to (never matched to them again). Returns the loans.",
+    schema = object(json!({
+        "activityId": {"type": "string"},
+        "loanKey": {"type": ["string", "null"]}
+    }), &["activityId", "loanKey"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            activity_id: String,
+            #[serde(default)]
+            loan_key: Option<String>,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        service.attach_loan_payment(&args.activity_id, args.loan_key).await.map_err(fail)?;
+        reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
+    }
+);
+
+service_tool!(
     ValidateLoan, "validate_loan", Write, additive = false,
     scopes = [DocumentsWrite, HoldingsWrite],
     description = "Validate a loan account as a whole (loanKey from get_loans): all its papers are validated in order (contract, dated tables, letters) and the liability is filled from them. Refused while a blocking gap remains or the papers disagree. Returns the loans.",
@@ -554,6 +612,14 @@ service_tool!(
             no_early_repayment: args.no_early_repayment,
             payments_unchanged: args.payments_unchanged,
             confirmed_payments: args.confirmed_payments,
+            // the debits detached from the loan stay detached (attach_loan_payment changes them)
+            detached_activities: service
+                .loans(chrono::Utc::now().date_naive())
+                .map_err(fail)?
+                .into_iter()
+                .find(|l| l.key == args.loan_key)
+                .map(|l| l.answers.detached_activities)
+                .unwrap_or_default(),
         };
         service.set_loan_answers(&args.loan_key, answers).await.map_err(fail)?;
         reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)

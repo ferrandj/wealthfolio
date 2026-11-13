@@ -35,6 +35,7 @@ import ActivityTable from "./components/activity-table/activity-table";
 import ActivityTableMobile from "./components/activity-table/activity-table-mobile";
 import { ActivityViewControls, type ActivityViewMode } from "./components/activity-view-controls";
 import { NeedsReviewBanner } from "./components/needs-review-banner";
+import { OperationsReviewDialog } from "./components/operations-review-dialog";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
 import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "./components/transfer-match-dialog";
@@ -101,6 +102,7 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
     mode: "link" | "unlink";
     activity: ActivityDetails | null;
   }>({ open: false, mode: "link", activity: null });
+  const [operationsReview, setOperationsReview] = useState(false);
   const [showActionPalette, setShowActionPalette] = useState(false);
   const [showSpendingActionPalette, setShowSpendingActionPalette] = useState(false);
   const isMobileViewport = useIsMobileViewport();
@@ -637,6 +639,15 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
 
   const investmentActions = (
     <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="operations-review-button"
+        onClick={() => setOperationsReview(true)}
+      >
+        <Icons.ListChecks className="me-2 h-4 w-4" />
+        {t("activity:operations_review.button")}
+      </Button>
       <SyncButton />
       {/* Desktop action palette */}
       <div className="hidden sm:flex">
@@ -693,6 +704,15 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
 
   const spendingActions = (
     <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="operations-review-button"
+        onClick={() => setOperationsReview(true)}
+      >
+        <Icons.ListChecks className="me-2 h-4 w-4" />
+        {t("activity:operations_review.button")}
+      </Button>
       <SyncButton />
       {/* Ask AI to categorize uncategorized transactions */}
       <Link
@@ -883,6 +903,9 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
 
   const sharedModals = (
     <>
+      {operationsReview && (
+        <OperationsReviewDialog open onClose={() => setOperationsReview(false)} />
+      )}
       {isMobileViewport ? (
         <MobileActivityForm
           key={selectedActivity?.id ?? "new"}

@@ -306,6 +306,28 @@ pub struct ReviewedOperation {
     /// The operation is money moved between own accounts, but the other account is not one Wealthfolio knows.
     #[serde(default)]
     pub other_account_unknown: bool,
+    /// A loan instalment (or early repayment): the loan it pays, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loan_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loan_label: Option<String>,
+    /// matched (the instalment's amount, or confirmed) | proposed (another amount, to confirm) | to_attach (it
+    /// pays a loan, but which one is not known yet)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loan_state: Option<String>,
+}
+
+/// An operation to look at again, wherever it comes from.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OperationToReview {
+    pub document_id: String,
+    pub file_name: String,
+    pub account_name: Option<String>,
+    pub currency: String,
+    /// doubt | to_categorize | loan_proposed | loan_to_attach
+    pub why: Vec<String>,
+    pub operation: ReviewedOperation,
 }
 
 #[derive(Debug, Clone, Serialize)]

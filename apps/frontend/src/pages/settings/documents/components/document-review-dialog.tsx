@@ -5,6 +5,7 @@ import {
   validateStatementLoan,
 } from "@/adapters";
 import { invalidateLoanCaches } from "../../loans/loan-caches";
+import { LoanPaymentPicker } from "../../loans/loan-payment-picker";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
 import {
   LOAN_KINDS,
@@ -50,9 +51,9 @@ const SPENDING = "spending_categories";
 const INCOME = "income_sources";
 const SAVINGS = "savings_categories";
 
-type Choice = ReviewChoice;
+export type Choice = ReviewChoice;
 
-function money(value: string | null | undefined, currency: string): string {
+export function money(value: string | null | undefined, currency: string): string {
   if (value == null) return "—";
   const n = Number(value);
   if (!Number.isFinite(n)) return value;
@@ -67,7 +68,7 @@ function money(value: string | null | undefined, currency: string): string {
 }
 
 /** Names of the seeded and custom categories, to label a category id. */
-function useCategoryNames() {
+export function useCategoryNames() {
   const spending = useTaxonomy(SPENDING);
   const income = useTaxonomy(INCOME);
   const savings = useTaxonomy(SAVINGS);
@@ -554,7 +555,7 @@ function StatementSection({
   );
 }
 
-function OperationRow({
+export function OperationRow({
   op,
   currency,
   choice,
@@ -641,6 +642,7 @@ function OperationRow({
             }
           />
         ) : null}
+        <LoanPaymentPicker op={op} />
         {doubtful && op.activityId && (
           <div className="flex w-full flex-wrap gap-2">
             {suggestion && (

@@ -204,6 +204,9 @@ export const COMMANDS: CommandMap = {
   set_statement_loan_answers: { method: "PUT", path: "/statements/loans" },
   attach_statement_loan_document: { method: "PUT", path: "/statements/documents" },
   validate_statement_loan: { method: "POST", path: "/statements/loans" },
+  get_operations_to_review: { method: "GET", path: "/statements/operations/review" },
+  categorize_statement_operations: { method: "POST", path: "/statements/operations/categorize" },
+  attach_statement_loan_payment: { method: "PUT", path: "/statements/operations" },
   sync_statement_loan_liabilities: { method: "POST", path: "/statements/loans/sync" },
   set_statement_month_normal: { method: "PUT", path: "/statements/coverage" },
   // Asset profile
@@ -1211,6 +1214,17 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       const { documentId, choice } = payload as { documentId: string; choice: unknown };
       url += `/${encodeURIComponent(documentId)}/loan`;
       body = JSON.stringify(choice);
+      break;
+    }
+    case "categorize_statement_operations": {
+      const { decisions } = payload as { decisions: unknown };
+      body = JSON.stringify(decisions);
+      break;
+    }
+    case "attach_statement_loan_payment": {
+      const { activityId, loanKey } = payload as { activityId: string; loanKey: string | null };
+      url += `/${encodeURIComponent(activityId)}/loan`;
+      body = JSON.stringify({ loanKey });
       break;
     }
     case "validate_statement_loan": {

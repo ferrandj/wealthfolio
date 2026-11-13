@@ -2699,6 +2699,14 @@
     "answer_confirm_payments_few": "Confirm the {{count}} proposed debits",
     "answer_confirm_payments_many": "Confirm the {{count}} proposed debits",
     "answer_confirm_payments_two": "Confirm the {{count}} proposed debits",
-    "answer_confirm_payments_zero": "Confirm the {{count}} proposed debits"
+    "answer_confirm_payments_zero": "Confirm the {{count}} proposed debits",
+    "payment_no_loan": "None of these loans",
+    "payment_loan": "Loan",
+    "payment_choose_loan": "Choose the loan",
+    "payment_link": {
+      "matched": "Loan",
+      "proposed": "Proposed loan",
+      "to_attach": "Loan to attach"
+    }
   }
 }

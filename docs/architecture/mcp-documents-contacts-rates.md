@@ -135,3 +135,12 @@ puts the whole loan account back to pending. Loan payments: an instalment with
 no debit of its amount gets the debit that most looks like it
 (`state: proposed`, a first instalment pro rata), which the person (or
 `set_loan_answers` with `confirmedPayments`) confirms.
+
+Loan payments on operations: the review of a statement says, on each operation
+that pays a loan, which loan it pays (`loanKey`, `loanLabel`, `loanState`:
+matched, proposed or to_attach), validated loan account or not.
+`attach_loan_payment` attaches a debit to a loan (it pays the instalment due
+nearest to it) or detaches it. `get_operations_to_review` lists every operation
+of the imported statements to look at again (doubt, to categorize later, loan to
+attach or to confirm) and `categorize_operations` gives categories outside the
+review of a document; the Activities page has a Review button for the same list.

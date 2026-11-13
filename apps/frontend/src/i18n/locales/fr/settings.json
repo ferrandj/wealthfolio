@@ -2525,6 +2525,14 @@
     "answer_confirm_payments_other": "Confirmer les {{count}} prélèvements proposés",
     "payment_proposed": "≈ {{date}} · {{amount}}",
     "payment_confirm": "Confirmer",
-    "answer_confirm_payments_many": "Confirmer les {{count}} prélèvements proposés"
+    "answer_confirm_payments_many": "Confirmer les {{count}} prélèvements proposés",
+    "payment_no_loan": "Aucun de ces prêts",
+    "payment_loan": "Prêt",
+    "payment_choose_loan": "Choisir le prêt",
+    "payment_link": {
+      "matched": "Prêt",
+      "proposed": "Prêt proposé",
+      "to_attach": "Prêt à rattacher"
+    }
   }
 }

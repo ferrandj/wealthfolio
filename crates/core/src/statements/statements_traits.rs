@@ -152,6 +152,17 @@ pub trait StatementServiceTrait: Send + Sync {
         choice: super::LoanAccountChoice,
     ) -> Result<String>;
 
+    /// The operations of the imported statements to look at again: a doubtful category, one to categorize later,
+    /// a loan payment proposed or still to attach to its loan.
+    async fn operations_to_review(&self) -> Result<Vec<super::OperationToReview>>;
+
+    /// Give categories to operations (from any statement), outside the review of a document.
+    async fn categorize_operations(&self, decisions: Vec<ReviewDecision>) -> Result<()>;
+
+    /// Say which loan a debit pays (it is then the payment of the instalment due nearest to it), or that it pays
+    /// none of the known loans (`None`: detached, never matched to them again).
+    async fn attach_loan_payment(&self, activity_id: &str, loan_key: Option<String>) -> Result<()>;
+
     /// Validate a loan account as a whole: all its papers, the contract first, once nothing blocking is missing.
     async fn validate_loan(&self, loan_key: &str) -> Result<Vec<StatementDocument>>;
 

@@ -68,6 +68,17 @@ export interface StatementDocument {
   validatedAt?: string | null;
 }
 
+/** An operation of the imported statements to look at again. */
+export interface OperationToReview {
+  documentId: string;
+  fileName: string;
+  accountName?: string | null;
+  currency: string;
+  /** doubt | to_categorize | loan_proposed | loan_to_attach */
+  why: string[];
+  operation: ReviewedOperation;
+}
+
 export interface StatementReviewReason {
   /** Operations whose category is a low-confidence guess. */
   doubts: number;
@@ -266,6 +277,11 @@ export interface ReviewedOperation {
   outdated?: boolean;
   /** Money moved between own accounts, but the other account is not one Wealthfolio knows. */
   otherAccountUnknown?: boolean;
+  /** The loan this payment pays, when known. */
+  loanKey?: string | null;
+  loanLabel?: string | null;
+  /** matched | proposed | to_attach */
+  loanState?: "matched" | "proposed" | "to_attach" | null;
 }
 
 export interface StatementReview {
@@ -438,6 +454,8 @@ export interface LoanAnswers {
   paymentsUnchanged?: boolean;
   /** Debits confirmed for an instalment although their amount differs (a first instalment pro rata). */
   confirmedPayments?: { date: string; activityId: string }[];
+  /** Debits detached from the loan: never matched to it again. */
+  detachedActivities?: string[];
 }
 
 /** Something the loan still lacks, and the papers where it can be found. */

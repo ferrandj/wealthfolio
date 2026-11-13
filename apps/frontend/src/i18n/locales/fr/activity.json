@@ -1558,5 +1558,30 @@
     "external": "Transfert externe",
     "direction": "Sens du transfert",
     "mode": "Mode de transfert"
+  },
+  "operations_review": {
+    "button": "Revue",
+    "title": "Revue des opérations",
+    "description": "Les opérations des relevés importés à revoir : catégorie douteuse, à catégoriser plus tard, échéance de prêt à rattacher ou prélèvement proposé pour une échéance.",
+    "all": "Toutes ({{count}})",
+    "kind": {
+      "doubt": "Doutes ({{count}})",
+      "to_categorize": "À catégoriser ({{count}})",
+      "loan_to_attach": "Prêt à rattacher ({{count}})",
+      "loan_proposed": "Prêt à confirmer ({{count}})"
+    },
+    "why": {
+      "doubt": "Doute",
+      "to_categorize": "À catégoriser plus tard",
+      "loan_to_attach": "Prêt à rattacher",
+      "loan_proposed": "Prêt à confirmer"
+    },
+    "empty": "Rien à revoir.",
+    "close": "Fermer",
+    "save_one": "Enregistrer {{count}} catégorie",
+    "save_other": "Enregistrer {{count}} catégories",
+    "saved": "Catégories enregistrées",
+    "error": "Impossible d'enregistrer",
+    "save_many": "Enregistrer {{count}} catégories"
   }
 }

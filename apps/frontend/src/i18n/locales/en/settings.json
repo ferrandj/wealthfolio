@@ -2467,6 +2467,14 @@
     "answer_confirm_payments_one": "Confirm the proposed debit",
     "answer_confirm_payments_other": "Confirm the {{count}} proposed debits",
     "payment_proposed": "≈ {{date}} · {{amount}}",
-    "payment_confirm": "Confirm"
+    "payment_confirm": "Confirm",
+    "payment_no_loan": "None of these loans",
+    "payment_loan": "Loan",
+    "payment_choose_loan": "Choose the loan",
+    "payment_link": {
+      "matched": "Loan",
+      "proposed": "Proposed loan",
+      "to_attach": "Loan to attach"
+    }
   }
 }

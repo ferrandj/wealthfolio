@@ -304,6 +304,48 @@ pub async fn attach_statement_loan_document(
 }
 
 #[tauri::command]
+pub async fn get_operations_to_review(
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::OperationToReview>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .operations_to_review()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn categorize_statement_operations(
+    decisions: Vec<wealthfolio_core::statements::ReviewDecision>,
+    state: ProfileAccess,
+) -> Result<(), String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .categorize_operations(decisions)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn attach_statement_loan_payment(
+    activity_id: String,
+    loan_key: Option<String>,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::LoanView>, String> {
+    let context = state.context()?;
+    let service = context.statement_service();
+    service
+        .attach_loan_payment(&activity_id, loan_key)
+        .await
+        .map_err(|e| e.to_string())?;
+    service
+        .loans(chrono::Utc::now().date_naive())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn validate_statement_loan(
     key: String,
     state: ProfileAccess,

@@ -26,6 +26,9 @@ pub struct LoanAnswers {
     /// Debits the person confirmed for an instalment although their amount differs (a first instalment pro rata).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub confirmed_payments: Vec<ConfirmedPayment>,
+    /// Debits the person said do not pay this loan: never matched to it again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub detached_activities: Vec<String>,
 }
 
 /// A debit the person confirmed for the instalment due on `date`.
@@ -133,6 +136,26 @@ fn same_amount(a: Decimal, b: Decimal) -> bool {
     (a.abs() - b.abs()).abs() < Decimal::new(1, 2)
 }
 
+/// Whether an operation pays a loan, by its words: the loan category, or a label that says so.
+pub fn looks_like_loan_payment(
+    category_id: Option<&str>,
+    label: &str,
+    amount_negative: bool,
+) -> bool {
+    amount_negative
+        && (category_id.is_some_and(|c| c.contains("loan"))
+            || [
+                "ECHEANCE PRET",
+                "ÉCHÉANCE PRÊT",
+                "ECHEANCE DE PRET",
+                "ÉCHÉANCE DE PRÊT",
+                "REMBOURSEMENT PRET",
+                "REMBOURSEMENT ANTICIPE",
+            ]
+            .iter()
+            .any(|w| label.to_uppercase().contains(w)))
+}
+
 /// The first instalment of a loan whose papers do not date it, read from the bank statements: the earliest debit
 /// of exactly the instalment on the account debited (or, when it is not known, whose label names the loan).
 pub fn first_due_from_debits(view: &LoanView, debits: &[BankDebit]) -> Option<NaiveDate> {
@@ -162,7 +185,11 @@ pub fn reconcile(
     today: NaiveDate,
 ) -> LoanPayments {
     let fixed = view.answers.debit_account_id.clone();
-    let mut used = vec![false; debits.len()];
+    // a debit the person detached from this loan is not looked at for it
+    let mut used: Vec<bool> = debits
+        .iter()
+        .map(|d| view.answers.detached_activities.contains(&d.activity_id))
+        .collect();
     let mut lines: Vec<LoanPayment> = Vec::new();
     for (i, r) in view.plan.rows.iter().enumerate() {
         let Some(date) = r.date.filter(|d| *d <= today) else {
