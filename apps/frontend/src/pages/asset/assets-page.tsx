@@ -15,6 +15,7 @@ import {
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
+import { BulkQuoteModeDialog } from "./bulk-quote-mode-dialog";
 
 import { useHoldings } from "@/hooks/use-holdings";
 import { HoldingsScopeNotice } from "@/components/holdings-scope-notice";
@@ -69,6 +70,7 @@ export default function AssetsPage() {
   const [editingAsset, setEditingAsset] = useState<ParsedAsset | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
   const [assetPendingRefetch, setAssetPendingRefetch] = useState<ParsedAsset | null>(null);
+  const [bulkQuotesOpen, setBulkQuotesOpen] = useState(false);
 
   // The tables build their columns from these. New functions on each render (every
   // holdings refetch) would remount the rows and close an open row menu.
@@ -99,6 +101,15 @@ export default function AssetsPage() {
             aria-label={t("asset:securities.add_security")}
           >
             <Icons.Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBulkQuotesOpen(true)}
+            data-testid="bulk-quotes-button"
+          >
+            <Icons.Refresh className="me-2 h-4 w-4" />
+            {t("asset:bulk_quotes.button")}
           </Button>
           <Button
             size="sm"
@@ -141,6 +152,10 @@ export default function AssetsPage() {
           />
         )}
       </div>
+
+      {bulkQuotesOpen ? (
+        <BulkQuoteModeDialog assets={visibleAssets} onClose={() => setBulkQuotesOpen(false)} />
+      ) : null}
 
       <AssetEditSheet
         asset={editingAsset}

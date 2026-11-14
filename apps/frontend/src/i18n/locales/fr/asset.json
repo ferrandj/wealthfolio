@@ -1095,5 +1095,24 @@
     "paused": "Synchronisation suspendue après des erreurs répétées",
     "pending": "Aucune cotation du fournisseur n’a encore été synchronisée",
     "no_data": "Aucune donnée du fournisseur n’est encore disponible"
+  },
+  "bulk_quotes": {
+    "button": "Cotations automatiques",
+    "title": "Activer les cotations automatiques",
+    "description": "Les titres cochés passent en cotation automatique et leur historique de prix est récupéré. Les titres décochés restent en saisie manuelle : c'est la liste d'exclusion. Un fonds euros, sans cours de marché, est décoché d'office.",
+    "none": "Aucun titre en saisie manuelle.",
+    "all": "Tout cocher",
+    "nothing": "Tout décocher",
+    "excluded_one": "{{count}} titre exclu (reste manuel)",
+    "excluded_other": "{{count}} titres exclus (restent manuels)",
+    "cancel": "Annuler",
+    "apply_one": "Activer pour {{count}} titre",
+    "apply_other": "Activer pour {{count}} titres",
+    "done_one": "Cotation automatique activée pour {{count}} titre",
+    "done_other": "Cotation automatique activée pour {{count}} titres",
+    "failed": "Non modifiés : {{names}}",
+    "excluded_many": "{{count}} titres exclus (restent manuels)",
+    "apply_many": "Activer pour {{count}} titres",
+    "done_many": "Cotation automatique activée pour {{count}} titres"
   }
 }

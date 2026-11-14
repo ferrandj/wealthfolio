@@ -1143,5 +1143,33 @@
     "paused": "تم إيقاف المزامنة مؤقتًا بعد أخطاء متكررة",
     "pending": "لم تتم مزامنة أي سعر من مزود البيانات بعد",
     "no_data": "لا تتوفر بيانات من المزود بعد"
+  },
+  "bulk_quotes": {
+    "button": "Automatic prices",
+    "title": "Turn on automatic prices",
+    "description": "Ticked securities switch to automatic prices and their price history is fetched. Unticked ones stay manual: that is the exclusion list. A euro fund, which has no market price, starts unticked.",
+    "none": "No security is priced by hand.",
+    "all": "Tick all",
+    "nothing": "Untick all",
+    "excluded_one": "{{count}} security excluded (stays manual)",
+    "excluded_other": "{{count}} securities excluded (stay manual)",
+    "cancel": "Cancel",
+    "apply_one": "Turn on for {{count}} security",
+    "apply_other": "Turn on for {{count}} securities",
+    "done_one": "Automatic prices on for {{count}} security",
+    "done_other": "Automatic prices on for {{count}} securities",
+    "failed": "Not changed: {{names}}",
+    "excluded_few": "{{count}} securities excluded (stay manual)",
+    "excluded_many": "{{count}} securities excluded (stay manual)",
+    "excluded_two": "{{count}} securities excluded (stay manual)",
+    "excluded_zero": "{{count}} securities excluded (stay manual)",
+    "apply_few": "Turn on for {{count}} securities",
+    "apply_many": "Turn on for {{count}} securities",
+    "apply_two": "Turn on for {{count}} securities",
+    "apply_zero": "Turn on for {{count}} securities",
+    "done_few": "Automatic prices on for {{count}} securities",
+    "done_many": "Automatic prices on for {{count}} securities",
+    "done_two": "Automatic prices on for {{count}} securities",
+    "done_zero": "Automatic prices on for {{count}} securities"
   }
 }

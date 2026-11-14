@@ -1095,5 +1095,24 @@
     "paused": "Sincronização pausada após erros repetidos",
     "pending": "Nenhuma cotação do provedor foi sincronizada ainda",
     "no_data": "Ainda não há dados disponíveis do provedor"
+  },
+  "bulk_quotes": {
+    "button": "Automatic prices",
+    "title": "Turn on automatic prices",
+    "description": "Ticked securities switch to automatic prices and their price history is fetched. Unticked ones stay manual: that is the exclusion list. A euro fund, which has no market price, starts unticked.",
+    "none": "No security is priced by hand.",
+    "all": "Tick all",
+    "nothing": "Untick all",
+    "excluded_one": "{{count}} security excluded (stays manual)",
+    "excluded_other": "{{count}} securities excluded (stay manual)",
+    "cancel": "Cancel",
+    "apply_one": "Turn on for {{count}} security",
+    "apply_other": "Turn on for {{count}} securities",
+    "done_one": "Automatic prices on for {{count}} security",
+    "done_other": "Automatic prices on for {{count}} securities",
+    "failed": "Not changed: {{names}}",
+    "excluded_many": "{{count}} securities excluded (stay manual)",
+    "apply_many": "Turn on for {{count}} securities",
+    "done_many": "Automatic prices on for {{count}} securities"
   }
 }

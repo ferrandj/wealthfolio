@@ -1079,5 +1079,21 @@
     "paused": "同步因多次出错而暂停",
     "pending": "尚未同步数据源报价",
     "no_data": "数据源暂未提供数据"
+  },
+  "bulk_quotes": {
+    "button": "Automatic prices",
+    "title": "Turn on automatic prices",
+    "description": "Ticked securities switch to automatic prices and their price history is fetched. Unticked ones stay manual: that is the exclusion list. A euro fund, which has no market price, starts unticked.",
+    "none": "No security is priced by hand.",
+    "all": "Tick all",
+    "nothing": "Untick all",
+    "excluded_one": "{{count}} security excluded (stays manual)",
+    "excluded_other": "{{count}} securities excluded (stay manual)",
+    "cancel": "Cancel",
+    "apply_one": "Turn on for {{count}} security",
+    "apply_other": "Turn on for {{count}} securities",
+    "done_one": "Automatic prices on for {{count}} security",
+    "done_other": "Automatic prices on for {{count}} securities",
+    "failed": "Not changed: {{names}}"
   }
 }
