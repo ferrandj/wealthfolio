@@ -147,6 +147,18 @@ pub async fn security_headers(request: Request<Body>, next: Next) -> Response {
     response
 }
 
+/// The app's files and its answers travel compressed. Left as they are: what is already compressed (images,
+/// encrypted backups) and what must reach the browser as it is produced (event streams, the assistant's answer).
+pub fn compression(
+) -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
+    use tower_http::compression::predicate::{NotForContentType, Predicate};
+    tower_http::compression::CompressionLayer::new().compress_when(
+        tower_http::compression::DefaultPredicate::new()
+            .and(NotForContentType::new("application/x-ndjson"))
+            .and(NotForContentType::new("application/octet-stream")),
+    )
+}
+
 pub(crate) fn cors_layer(config: &Config) -> anyhow::Result<CorsLayer> {
     if config.cors_allow.iter().any(|o| o == "*") {
         Ok(CorsLayer::new().allow_origin(Any))

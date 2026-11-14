@@ -478,7 +478,72 @@ fn apply_input(identity: &mut AccountIdentity, input: &AccountIdentityInput) {
     }
 }
 
+/// How many readings of stored originals are kept at most (a reading is a few kilobytes, never the file).
+const READINGS_KEPT: usize = 256;
+
+/// What the readers found in the stored originals. Reading a file again gives the same answer as long as the
+/// file, its name and its reader are the same, so it is read once and remembered; the least recently used
+/// reading leaves when there are too many.
+#[derive(Default)]
+struct Readings {
+    kept: HashMap<String, (u64, Arc<Analysis>)>,
+    clock: u64,
+}
+
+impl Readings {
+    fn get(&mut self, key: &str) -> Option<Arc<Analysis>> {
+        self.clock += 1;
+        let clock = self.clock;
+        self.kept.get_mut(key).map(|(used, reading)| {
+            *used = clock;
+            reading.clone()
+        })
+    }
+
+    fn keep(&mut self, key: String, reading: Arc<Analysis>) {
+        self.clock += 1;
+        if self.kept.len() >= READINGS_KEPT && !self.kept.contains_key(&key) {
+            if let Some(oldest) = self
+                .kept
+                .iter()
+                .min_by_key(|(_, (used, _))| *used)
+                .map(|(k, _)| k.clone())
+            {
+                self.kept.remove(&oldest);
+            }
+        }
+        self.kept.insert(key, (self.clock, reading));
+    }
+}
+
+/// What a stored original is read under: its content, its name and the reader chosen for it.
+fn reading_key(document: &StatementDocument) -> String {
+    format!(
+        "{}|{}|{}",
+        document.sha256,
+        document.file_name,
+        document.adapter_id.as_deref().unwrap_or("")
+    )
+}
+
+/// What several reviews asked in a row share, loaded once: the list of what is left to review reads every
+/// document, and each would otherwise load the same operations, accounts and choices again.
+/// The legs of every transfer: (operation, account) by transfer group.
+type TransferLegs = HashMap<String, Vec<(String, String)>>;
+
+#[derive(Default)]
+struct ReviewContext {
+    learned: Option<Arc<HashMap<String, (String, String)>>>,
+    known_ibans: Option<Arc<HashSet<String>>>,
+    accounts: Option<Arc<Vec<Account>>>,
+    identities: Option<Arc<Vec<AccountIdentity>>>,
+    /// The operations of each account, oldest entry first.
+    by_account: HashMap<String, Arc<Vec<crate::activities::Activity>>>,
+    legs: Option<Arc<TransferLegs>>,
+}
+
 pub struct StatementService {
+    readings: std::sync::Mutex<Readings>,
     repository: Arc<dyn StatementRepositoryTrait>,
     account_service: Arc<dyn AccountServiceTrait>,
     activity_service: Arc<dyn ActivityServiceTrait>,
@@ -499,6 +564,7 @@ impl StatementService {
         counterparties: Arc<dyn CounterpartyRecorderTrait>,
     ) -> Self {
         Self {
+            readings: std::sync::Mutex::new(Readings::default()),
             repository,
             account_service,
             activity_service,
@@ -1393,6 +1459,10 @@ impl StatementService {
         documents: &[StatementDocument],
         today: chrono::NaiveDate,
     ) -> Result<Vec<super::LoanView>> {
+        // no loan paper, no loan: nothing to look for in the accounts
+        if data.is_empty() {
+            return Ok(Vec::new());
+        }
         let mut settings = self.repository.list_loan_settings()?;
         let answers = self.repository.list_loan_answers()?;
         let activities = self.activity_service.get_activities()?;
@@ -1791,12 +1861,132 @@ impl StatementService {
         document: &StatementDocument,
         content: Vec<u8>,
     ) -> Result<StatementAnalysis> {
+        let reading = self.reading_of(document, Some(content)).await?;
+        self.enrich((*reading).clone())
+    }
+
+    fn kept_reading(&self, key: &str) -> Option<Arc<Analysis>> {
+        self.readings
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(key)
+    }
+
+    fn keep_reading(&self, key: String, reading: Arc<Analysis>) {
+        self.readings
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .keep(key, reading);
+    }
+
+    /// What the reader finds in a stored original: remembered when it was already read, else read now (from the
+    /// content given, or the stored one when none is) and remembered.
+    async fn reading_of(
+        &self,
+        document: &StatementDocument,
+        content: Option<Vec<u8>>,
+    ) -> Result<Arc<Analysis>> {
+        let key = reading_key(document);
+        if let Some(reading) = self.kept_reading(&key) {
+            return Ok(reading);
+        }
+        let content = match content {
+            Some(content) => content,
+            None => {
+                self.repository
+                    .get_document_content(&document.id)?
+                    .ok_or_else(|| invalid("Document not found"))?
+                    .1
+            }
+        };
         let (name, adapter) = (document.file_name.clone(), document.adapter_id.clone());
-        let reading =
+        let reading = Arc::new(
             tokio::task::spawn_blocking(move || analyze(&name, &content, adapter.as_deref()))
                 .await
-                .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?;
-        self.enrich(reading)
+                .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?,
+        );
+        self.keep_reading(key, reading.clone());
+        Ok(reading)
+    }
+
+    /// Read the originals not read yet, a few at once: one file in memory per reader at a time.
+    async fn read_ahead(&self, documents: &[StatementDocument]) {
+        use futures::StreamExt;
+        let unread: Vec<StatementDocument> = documents
+            .iter()
+            .filter(|d| self.kept_reading(&reading_key(d)).is_none())
+            .cloned()
+            .collect();
+        if unread.len() < 2 {
+            return;
+        }
+        let readers = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+            .clamp(1, 4);
+        let mut read = futures::stream::iter(unread)
+            .map(|document| {
+                let repository = self.repository.clone();
+                async move {
+                    let key = reading_key(&document);
+                    let reading = tokio::task::spawn_blocking(move || {
+                        let (_, content) = repository.get_document_content(&document.id).ok()??;
+                        Some(analyze(
+                            &document.file_name,
+                            &content,
+                            document.adapter_id.as_deref(),
+                        ))
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+                    (key, reading)
+                }
+            })
+            .buffer_unordered(readers);
+        while let Some((key, reading)) = read.next().await {
+            if let Some(reading) = reading {
+                self.keep_reading(key, Arc::new(reading));
+            }
+        }
+    }
+
+    /// A reading with the account of each statement, for a review: what an import would also want to know (the
+    /// operations already there, the overlapping statements) is not looked for.
+    fn enrich_for_review(
+        &self,
+        reading: &Analysis,
+        context: &mut ReviewContext,
+    ) -> Result<Vec<AnalyzedStatement>> {
+        let accounts = match &context.accounts {
+            Some(accounts) => accounts.clone(),
+            None => {
+                let accounts = Arc::new(self.account_service.get_all_accounts()?);
+                context.accounts = Some(accounts.clone());
+                accounts
+            }
+        };
+        let identities = match &context.identities {
+            Some(identities) => identities.clone(),
+            None => {
+                let identities = Arc::new(self.repository.list_identities()?);
+                context.identities = Some(identities.clone());
+                identities
+            }
+        };
+        Ok(reading
+            .statements
+            .iter()
+            .map(|preview| AnalyzedStatement {
+                preview: preview.clone(),
+                mode: mode_of(preview),
+                matched_account: self.match_account(preview, &accounts, &identities),
+                suggested_account_name: suggested_name(preview),
+                suggested_account_type: account_types::CASH.to_string(),
+                known_duplicates: 0,
+                overlaps: Vec::new(),
+            })
+            .collect())
     }
 
     /// What was decided before for each payee: the category most often given by a person or a rule to the
@@ -2170,18 +2360,43 @@ impl StatementService {
     async fn review_statements(
         &self,
         document: &StatementDocument,
-        content: Vec<u8>,
+        context: &mut ReviewContext,
     ) -> Result<(Vec<StatementReview>, Vec<String>)> {
-        let analyzed = self.read_stored(document, content).await?;
-        if let Some(error) = &analyzed.analysis.error {
+        let reading = self.reading_of(document, None).await?;
+        if let Some(error) = &reading.error {
             return Err(invalid(error.clone()));
         }
+        let analyzed = self.enrich_for_review(&reading, context)?;
         // the payees the person already filed: their other operations are recognised, not doubtful any more
-        let learned = self.remembered_categories().await.unwrap_or_default();
+        let learned = match &context.learned {
+            Some(learned) => learned.clone(),
+            None => {
+                let learned = Arc::new(self.remembered_categories().await.unwrap_or_default());
+                context.learned = Some(learned.clone());
+                learned
+            }
+        };
+        // the accounts Wealthfolio knows by IBAN: a transfer to an own account outside this list is flagged
+        let known_ibans = match &context.known_ibans {
+            Some(known) => known.clone(),
+            None => {
+                let known: Arc<HashSet<String>> = Arc::new(
+                    self.repository
+                        .list_identities()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|i| i.iban)
+                        .map(|i| i.split_whitespace().collect::<String>().to_uppercase())
+                        .filter(|i| !i.is_empty())
+                        .collect(),
+                );
+                context.known_ibans = Some(known.clone());
+                known
+            }
+        };
         let mut reviews = Vec::new();
         let mut warnings = Vec::new();
         for item in analyzed
-            .statements
             .iter()
             .filter(|i| i.mode == ImportMode::Transactions)
         {
@@ -2196,7 +2411,7 @@ impl StatementService {
                 .as_ref()
                 .map(|m| m.id.clone())
                 .or_else(|| {
-                    if analyzed.statements.len() == 1 {
+                    if analyzed.len() == 1 {
                         document.account_id.clone()
                     } else {
                         None
@@ -2211,15 +2426,27 @@ impl StatementService {
                 .map(|a| a.currency.clone())
                 .unwrap_or_else(|| preview.currency.clone());
 
-            let mut by_key: HashMap<OperationKey, Vec<crate::activities::Activity>> =
-                HashMap::new();
-            if let Some(id) = &account_id {
-                let mut activities = self.activity_service.get_activities_by_account_id(id)?;
-                activities.sort_by_key(|a| a.created_at);
-                for a in activities {
-                    if let Some(key) = activity_key(&a) {
-                        by_key.entry(key).or_default().push(a);
+            let of_account = match &account_id {
+                Some(id) => match context.by_account.get(id) {
+                    Some(activities) => activities.clone(),
+                    None => {
+                        let mut activities =
+                            self.activity_service.get_activities_by_account_id(id)?;
+                        activities.sort_by_key(|a| a.created_at);
+                        let activities = Arc::new(activities);
+                        context.by_account.insert(id.clone(), activities.clone());
+                        activities
                     }
+                },
+                None => Arc::new(Vec::new()),
+            };
+            let mut by_key: HashMap<
+                OperationKey,
+                std::collections::VecDeque<&crate::activities::Activity>,
+            > = HashMap::new();
+            for a in of_account.iter() {
+                if let Some(key) = activity_key(a) {
+                    by_key.entry(key).or_default().push_back(a);
                 }
             }
             let tagged =
@@ -2228,31 +2455,33 @@ impl StatementService {
             // the transfer group of each matched operation: the other leg tells which own account it went to
             let mut groups: HashMap<String, String> = HashMap::new();
             for (row, _) in &tagged {
-                let list = by_key.get_mut(&operation_key(row));
-                matched.push(match list {
-                    Some(list) if !list.is_empty() => {
-                        let a = list.remove(0);
-                        if let Some(group) = a.source_group_id.clone() {
-                            groups.insert(a.id.clone(), group);
-                        }
-                        Some(a.id)
+                let found = by_key
+                    .get_mut(&operation_key(row))
+                    .and_then(|list| list.pop_front());
+                matched.push(found.map(|a| {
+                    if let Some(group) = a.source_group_id.clone() {
+                        groups.insert(a.id.clone(), group);
                     }
-                    _ => None,
-                });
+                    a.id.clone()
+                }));
             }
             let other_legs: HashMap<String, String> = if groups.is_empty() {
                 HashMap::new()
             } else {
-                let wanted: HashSet<&String> = groups.values().collect();
-                let mut by_group: HashMap<String, Vec<(String, String)>> = HashMap::new();
-                for a in self.activity_service.get_activities()? {
-                    if let Some(group) = a.source_group_id.as_ref().filter(|g| wanted.contains(g)) {
-                        by_group
-                            .entry(group.clone())
-                            .or_default()
-                            .push((a.id.clone(), a.account_id.clone()));
+                let by_group = match &context.legs {
+                    Some(legs) => legs.clone(),
+                    None => {
+                        let mut legs = TransferLegs::new();
+                        for a in self.activity_service.get_activities()? {
+                            if let Some(group) = a.source_group_id.clone() {
+                                legs.entry(group).or_default().push((a.id, a.account_id));
+                            }
+                        }
+                        let legs = Arc::new(legs);
+                        context.legs = Some(legs.clone());
+                        legs
                     }
-                }
+                };
                 groups
                     .iter()
                     .filter_map(|(id, group)| {
@@ -2270,17 +2499,6 @@ impl StatementService {
             } else {
                 self.category_assigner.current(&ids).await?
             };
-
-            // the accounts Wealthfolio knows by IBAN: a transfer to an own account outside this list is flagged
-            let known_ibans: HashSet<String> = self
-                .repository
-                .list_identities()
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|i| i.iban)
-                .map(|i| i.split_whitespace().collect::<String>().to_uppercase())
-                .filter(|i| !i.is_empty())
-                .collect();
 
             let operations = tagged
                 .iter()
@@ -2507,16 +2725,17 @@ impl StatementServiceTrait for StatementService {
     }
 
     async fn review_document(&self, id: &str) -> Result<DocumentReview> {
-        let (document, content) = self
+        let document = self
             .repository
-            .get_document_content(id)?
+            .get_document(id)?
             .ok_or_else(|| invalid("Document not found"))?;
-        let (mut statements, warnings) = self.review_statements(&document, content).await?;
+        let (mut statements, warnings) = self
+            .review_statements(&document, &mut ReviewContext::default())
+            .await?;
         Self::annotate_loan_payments(&mut statements, &self.loan_payments_by_activity()?);
-        let mut earlier: Vec<StatementDocument> = self
-            .repository
-            .list_documents()?
-            .into_iter()
+        let all_documents = self.repository.list_documents()?;
+        let mut earlier: Vec<StatementDocument> = all_documents
+            .iter()
             .filter(|d| {
                 d.id != document.id
                     && d.account_id.is_some()
@@ -2524,6 +2743,7 @@ impl StatementServiceTrait for StatementService {
                     && d.status == DOCUMENT_STATUS_PENDING
                     && logical_order(d, &document) == std::cmp::Ordering::Less
             })
+            .cloned()
             .collect();
         earlier.sort_by(logical_order);
         let loan = match document.document_kind.as_deref() {
@@ -2533,8 +2753,7 @@ impl StatementServiceTrait for StatementService {
                 .find(|l| l.documents.iter().any(|d| d.document_id == document.id)),
             _ => None,
         };
-        let continuity =
-            super::statements_review::continuity(&document, &self.repository.list_documents()?);
+        let continuity = super::statements_review::continuity(&document, &all_documents);
         Ok(DocumentReview {
             continuity,
             document,
@@ -3189,17 +3408,21 @@ impl StatementServiceTrait for StatementService {
         let map = self.loan_payments_by_activity()?;
         let later = ["cat_to_categorize", "cat_income_to_categorize"];
         let mut out = Vec::new();
-        for document in self.repository.list_documents()? {
-            if !matches!(document.document_kind.as_deref(), None | Some("statement"))
-                || document.import_run_id.is_none()
-            {
-                continue;
-            }
-            let Some((document, content)) = self.repository.get_document_content(&document.id)?
+        let documents: Vec<StatementDocument> = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| {
+                matches!(d.document_kind.as_deref(), None | Some("statement"))
+                    && d.import_run_id.is_some()
+            })
+            .collect();
+        self.read_ahead(&documents).await;
+        // what every document's review needs is loaded once for them all
+        let mut context = ReviewContext::default();
+        for document in documents {
+            let Ok((mut statements, _)) = self.review_statements(&document, &mut context).await
             else {
-                continue;
-            };
-            let Ok((mut statements, _)) = self.review_statements(&document, content).await else {
                 continue;
             };
             Self::annotate_loan_payments(&mut statements, &map);

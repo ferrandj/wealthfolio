@@ -733,7 +733,9 @@ pub async fn admit(
                 }
             }
         },
-    );
+    )
+    // whoever reads the body may ask once more after its end
+    .fuse();
     Ok(Response::from_parts(parts, Body::from_stream(stream)))
 }
 

@@ -126,7 +126,8 @@ async fn main() -> anyhow::Result<()> {
             tracing::error!(error = %format!("{error:#}"), "Server startup failed; no requests were served");
         })?
         .fallback_service(static_files::router(&static_dir))
-        .layer(axum::middleware::from_fn(api::security_headers));
+        .layer(axum::middleware::from_fn(api::security_headers))
+        .layer(api::compression());
     tracing::info!("Listening on {}", listener.local_addr()?);
     let result = axum::serve(
         listener,
