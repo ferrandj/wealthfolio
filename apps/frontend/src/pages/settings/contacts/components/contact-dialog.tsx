@@ -4,6 +4,7 @@ import {
   deleteContact,
   getContact,
   linkContactAccount,
+  listAccountIdentities,
   listContacts,
   mergeContacts,
   removeContactIdentifier,
@@ -13,6 +14,7 @@ import {
 } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
+import type { AccountIdentity } from "@/lib/types/statements";
 import type {
   ContactDetail,
   ContactIdentifierKind,
@@ -143,6 +145,11 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
     enabled: open && !!contactId,
   });
   const all = useQuery({ queryKey: [QueryKeys.CONTACTS], queryFn: listContacts, enabled: open });
+  const identities = useQuery({
+    queryKey: [QueryKeys.ACCOUNT_IDENTITIES],
+    queryFn: listAccountIdentities,
+    enabled: open,
+  });
 
   const [form, setForm] = useState<ContactFormValue>(emptyForm());
   const [draftIdentifiers, setDraftIdentifiers] = useState<NewContactIdentifier[]>([]);
@@ -253,8 +260,17 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
     onError: fail,
   });
 
-  const identifiers = contactId ? (detail.data?.identifiers ?? []) : null;
   const linked = contactId ? (detail.data?.linkedAccountIds ?? []) : draftAccounts;
+  // the IBAN and BIC of an account in Wealthfolio are shown under that account, for each of its holders
+  const identityOf = (accountId: string) => identities.data?.find((i) => i.accountId === accountId);
+  const linkedIbans = new Set(
+    linked.map((a) => identityOf(a)?.iban?.replace(/\s+/g, "").toUpperCase()).filter(Boolean),
+  );
+  const identifiers = contactId
+    ? (detail.data?.identifiers ?? []).filter(
+        (i) => !(i.kind === "iban" && linkedIbans.has(i.value.toUpperCase())),
+      )
+    : null;
   const complete = isFormComplete(form);
   const others = (all.data ?? []).filter((c) => c.contact.id !== contactId);
   const busy = create.isPending || save.isPending;
@@ -340,10 +356,13 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
                       key={accountId}
                       className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
                     >
-                      <span className="flex items-center gap-2 text-sm">
-                        <Icons.CreditCard className="text-muted-foreground size-4" />
-                        {accountName(accountId)}
-                      </span>
+                      <div className="grid min-w-0 flex-1 gap-0.5">
+                        <span className="flex items-center gap-2 text-sm">
+                          <Icons.CreditCard className="text-muted-foreground size-4" />
+                          {accountName(accountId)}
+                        </span>
+                        <AccountBankLine identity={identityOf(accountId)} />
+                      </div>
                       {contactId && (
                         <ShareField
                           value={
@@ -501,6 +520,33 @@ export function ContactDialog({ contactId, initial, open, onOpenChange }: Contac
         </AlertDialog>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The IBAN, BIC and bank of an account, under its name, with a button to copy the IBAN. */
+function AccountBankLine({ identity }: { identity?: AccountIdentity }) {
+  const { t } = useTranslation();
+  if (!identity?.iban && !identity?.bic) return null;
+  return (
+    <span className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+      {identity.iban ? <code>{formatIban(identity.iban)}</code> : null}
+      {[identity.bic, identity.institution].filter(Boolean).join(" · ")}
+      {identity.iban ? (
+        <button
+          type="button"
+          className="hover:text-foreground"
+          aria-label={t("settings:contacts.copy_iban")}
+          onClick={() => {
+            navigator.clipboard
+              ?.writeText(identity.iban ?? "")
+              .then(() => toast({ title: t("settings:contacts.copied") }))
+              .catch(() => undefined);
+          }}
+        >
+          <Icons.Copy className="size-3" />
+        </button>
+      ) : null}
+    </span>
   );
 }
 
