@@ -85,3 +85,17 @@ describe("toBase64", () => {
     expect(toBase64(bytes)).toBe(Buffer.from(bytes).toString("base64"));
   });
 });
+
+it.each([
+  ["purge_statement_documents", { ids: ["d1"], dryRun: true }],
+  ["invalidate_statement_documents", { ids: ["d1"] }],
+])("sends %s with a JSON body", async (command, payload) => {
+  installProfileSession({ profileId: "test", scopeId: "scope-test" });
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(0), { status: 200 }));
+  vi.stubGlobal("fetch", fetch);
+  await invoke(command, payload);
+  const init = fetch.mock.calls[0][1] as RequestInit;
+  expect(init.method).toBe("POST");
+  expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
+  expect(JSON.parse(init.body as string)).toEqual(payload);
+});

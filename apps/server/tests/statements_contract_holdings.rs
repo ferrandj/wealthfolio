@@ -35,7 +35,8 @@ fn test_config(root: &Path) -> Config {
 
 const POSITIONS: &str = "Code ISIN;Libellé;Performance (%);+/- Value financière (€);Montant (€);Poids (%);Prix de revient (€);Nombre de parts;Valeur liquidative (€);Date de valeur\n\
 EXE000000001;FDS EUROS EXEMPLE RENDEMENT;;;500,00;50,00;;;;2026-01-14\n\
-FR0000000001;FONDS EXEMPLE ACTIONS;10,00;30,00;330,00;33,00;100,00;3,0000;110,00;2026-01-12\n";
+FR0000000001;FONDS EXEMPLE ACTIONS;10,00;30,00;330,00;33,00;100,00;3,0000;110,00;2026-01-12\n\
+LU0000000002;FONDS EXEMPLE OBLIGATIONS;-2,00;-3,40;170,00;17,00;173,40;2,0000;85,00;2026-01-13\n";
 
 #[tokio::test]
 async fn the_positions_of_a_contract_become_its_holdings_and_go_with_the_document() {
@@ -81,7 +82,7 @@ async fn the_positions_of_a_contract_become_its_holdings_and_go_with_the_documen
         .await
         .unwrap();
     let messages = format!("{:?}", result);
-    assert!(messages.contains("2 support(s)"), "{messages}");
+    assert!(messages.contains("3 support(s)"), "{messages}");
     // the contract is now followed by its holdings
     let after = state.account_service.get_account(&account.id).unwrap();
     assert_eq!(after.tracking_mode, TrackingMode::Holdings);
@@ -105,7 +106,25 @@ async fn the_positions_of_a_contract_become_its_holdings_and_go_with_the_documen
         .iter()
         .find(|s| s["snapshotDate"] == "2026-01-14")
         .unwrap_or_else(|| panic!("no snapshot on the value date: {list}"));
-    assert_eq!(snapshot["positionCount"], 2);
+    assert_eq!(snapshot["positionCount"], 3);
+    // each fund gets its own net asset value as price, whatever the order the funds are saved in
+    let assets = state.asset_service.get_assets().unwrap();
+    for (isin, price) in [
+        ("EXE000000001", "1"),
+        ("FR0000000001", "110"),
+        ("LU0000000002", "85"),
+    ] {
+        let asset = assets
+            .iter()
+            .find(|a| a.instrument_symbol.as_deref() == Some(isin))
+            .unwrap_or_else(|| panic!("no asset for {isin}"));
+        let quote = state.quote_service.get_latest_quote(&asset.id).unwrap();
+        assert_eq!(
+            quote.close,
+            rust_decimal::Decimal::from_str_exact(price).unwrap(),
+            "{isin}"
+        );
+    }
 
     // a second reading reuses the same funds (no duplicate assets)
     let assets_before = state.asset_service.get_assets().unwrap().len();
@@ -115,7 +134,10 @@ async fn the_positions_of_a_contract_become_its_holdings_and_go_with_the_documen
         .revalidate_document(&documents[0].id)
         .await
         .unwrap();
-    assert_eq!(state.asset_service.get_assets().unwrap().len(), assets_before);
+    assert_eq!(
+        state.asset_service.get_assets().unwrap().len(),
+        assets_before
+    );
 
     // removing the document takes its holdings back (the account keeps other things? no: it is emptied and removed)
     let report = state

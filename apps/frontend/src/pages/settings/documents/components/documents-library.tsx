@@ -40,6 +40,7 @@ import {
 } from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { formatBytes } from "../statement-files";
 import { useDownloadDocument } from "../use-download-document";
@@ -64,6 +65,9 @@ export function DocumentsLibrary() {
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "tree">("list");
+  // opened from an account: only its documents
+  const [params, setParams] = useSearchParams();
+  const accountFilter = params.get("account");
 
   const { data: loans } = useQuery({
     queryKey: [QueryKeys.STATEMENT_LOANS],
@@ -109,8 +113,9 @@ export function DocumentsLibrary() {
     () =>
       [...(documents ?? [])]
         .filter((d) => matchesHolderFilter(d.holderName, holderFilter))
+        .filter((d) => !accountFilter || d.accountId === accountFilter)
         .sort(logicalOrder),
-    [documents, holderFilter],
+    [documents, holderFilter, accountFilter],
   );
   const pending = ordered.filter((d) => d.status === "PENDING");
 
@@ -444,6 +449,23 @@ export function DocumentsLibrary() {
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        {accountFilter ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="me-auto"
+            onClick={() => {
+              params.delete("account");
+              setParams(params, { replace: true });
+            }}
+          >
+            {t("settings:documents.only_account", {
+              name: accounts.find((a) => a.id === accountFilter)?.name ?? accountFilter,
+            })}
+            <Icons.Close className="ms-1 size-3" />
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="outline"

@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
+import { purgeStatementDocuments } from "@/adapters";
+import { useQuery } from "@tanstack/react-query";
 import {
   ACCOUNT_AUTO,
   ACCOUNT_NEW,
@@ -40,6 +42,8 @@ export interface PendingFile {
   adapterId?: string;
   choices: Record<number, StatementChoice>;
   allowDuplicateDocument: boolean;
+  /** Re-import: the document already imported is removed first, with everything it brought. */
+  replaceExisting?: boolean;
   result?: StatementImportResult;
   error?: string;
 }
@@ -257,7 +261,7 @@ export function PendingFileCard({
     file.status === "ready" &&
     !!analysis &&
     analysis.statements.length > 0 &&
-    (!existing || file.allowDuplicateDocument) &&
+    (!existing || file.allowDuplicateDocument || file.replaceExisting) &&
     !analysis.statements.some((s) => needsOverlapDecision(s, file.choices[s.preview.index]));
 
   return (
@@ -332,18 +336,35 @@ export function PendingFileCard({
                 date: existing.createdAt.slice(0, 10),
               })}
             </span>
-            <Button
-              type="button"
-              size="sm"
-              variant={file.allowDuplicateDocument ? "default" : "outline"}
-              onClick={() =>
-                onChange({
-                  allowDuplicateDocument: !file.allowDuplicateDocument,
-                })
-              }
-            >
-              {t("settings:documents.import_anyway")}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={file.replaceExisting ? "default" : "outline"}
+                onClick={() =>
+                  onChange({
+                    replaceExisting: !file.replaceExisting,
+                    allowDuplicateDocument: false,
+                  })
+                }
+              >
+                {t("settings:documents.replace_existing")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={file.allowDuplicateDocument ? "default" : "outline"}
+                onClick={() =>
+                  onChange({
+                    allowDuplicateDocument: !file.allowDuplicateDocument,
+                    replaceExisting: false,
+                  })
+                }
+              >
+                {t("settings:documents.import_anyway")}
+              </Button>
+            </div>
+            {file.replaceExisting ? <ReplacePreview documentId={existing.id} /> : null}
           </div>
         )}
 
@@ -400,5 +421,23 @@ export function PendingFileCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** What replacing a document removes first: the old document and everything it brought. */
+function ReplacePreview({ documentId }: { documentId: string }) {
+  const { t } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ["purge-preview", documentId],
+    queryFn: () => purgeStatementDocuments([documentId], true),
+  });
+  if (!data) return null;
+  return (
+    <p className="text-muted-foreground w-full text-xs" data-testid="replace-preview">
+      {t("settings:documents.replace_preview", {
+        operations: data.operations,
+        accounts: data.accounts.length ? data.accounts.join(", ") : "—",
+      })}
+    </p>
   );
 }

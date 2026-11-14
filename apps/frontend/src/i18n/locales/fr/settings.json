@@ -2247,7 +2247,15 @@
       "will_operations_many": "{{count}} opérations importées par ces documents",
       "will_accounts_many": "{{count}} comptes qui se retrouvent vides : {{names}} (avec leur identité, leurs titulaires et leurs liens)",
       "will_unpair_many": "{{count}} virements compte à compte dont l'autre côté est conservé (ils sont dissociés, pas supprimés)"
-    }
+    },
+    "only_account": "Seulement : {{name}}",
+    "account_card_less": "Réduire",
+    "account_card_open": "Ouvrir dans Documents",
+    "account_card_more_many": "Voir les {{count}} autres documents",
+    "account_card_more_one": "Voir {{count}} autre document",
+    "account_card_more_other": "Voir les {{count}} autres documents",
+    "replace_existing": "Remplacer (tout effacer puis réimporter)",
+    "replace_preview": "L'ancien document sera supprimé avec ses {{operations}} opération(s) ; comptes vidés supprimés : {{accounts}}. Puis ce fichier sera importé."
   },
   "identity": {
     "title": "Coordonnées du compte",

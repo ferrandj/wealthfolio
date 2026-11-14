@@ -1218,6 +1218,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify(choice);
       break;
     }
+    case "invalidate_statement_documents": {
+      const { ids } = payload as { ids: string[] };
+      body = JSON.stringify({ ids });
+      break;
+    }
+    case "purge_statement_documents": {
+      const { ids, dryRun } = payload as { ids: string[]; dryRun: boolean };
+      body = JSON.stringify({ ids, dryRun });
+      break;
+    }
     case "categorize_statement_operations": {
       const { decisions } = payload as { decisions: unknown };
       body = JSON.stringify(decisions);

@@ -1,4 +1,4 @@
-import { analyzeStatement, importStatement, logger } from "@/adapters";
+import { analyzeStatement, importStatement, logger, purgeStatementDocuments } from "@/adapters";
 import { LoanAccountDialog } from "../loans/loan-account-dialog";
 import { invalidateLoanCaches } from "../loans/loan-caches";
 import { LOAN_KINDS } from "./components/loan-validation-card";
@@ -94,6 +94,11 @@ export default function DocumentsPage() {
     async (file: PendingFile) => {
       patchFile(file.id, { status: "importing", error: undefined });
       try {
+        // re-import: the old document goes first, with its operations and what it set up
+        const existing = file.analysis?.existingDocument;
+        if (file.replaceExisting && existing) {
+          await purgeStatementDocuments([existing.id], false);
+        }
         const overrides = (file.analysis?.statements ?? []).flatMap((s) => {
           const choice = file.choices[s.preview.index];
           const o = choice ? overrideFor(s.preview.index, choice) : null;
@@ -144,7 +149,7 @@ export default function DocumentsPage() {
       f.status === "ready" &&
       f.analysis &&
       f.analysis.statements.length > 0 &&
-      (!f.analysis.existingDocument || f.allowDuplicateDocument) &&
+      (!f.analysis.existingDocument || f.allowDuplicateDocument || f.replaceExisting) &&
       !f.analysis.statements.some((s) => needsOverlapDecision(s, f.choices[s.preview.index])),
   );
 

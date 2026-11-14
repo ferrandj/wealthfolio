@@ -2158,7 +2158,13 @@
       "purge_confirm": "Delete everything",
       "purged": "“{{name}}” deleted",
       "purged_summary": "{{documents}} document(s), {{operations}} operation(s), {{accounts}} account(s) deleted."
-    }
+    },
+    "only_account": "Only: {{name}}",
+    "account_card_less": "Show less",
+    "account_card_open": "Open in Documents",
+    "account_card_more_other": "Show {{count}} more documents",
+    "replace_existing": "Replace (erase everything, then re-import)",
+    "replace_preview": "The old document will be removed with its {{operations}} operation(s); emptied accounts removed: {{accounts}}. Then this file is imported."
   },
   "identity": {
     "title": "Account details",

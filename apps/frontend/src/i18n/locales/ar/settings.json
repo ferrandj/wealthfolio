@@ -2433,7 +2433,18 @@
       "will_unpair_many": "{{count}} transfers between own accounts whose other side is kept (unpaired, not deleted)",
       "will_unpair_two": "{{count}} transfers between own accounts whose other side is kept (unpaired, not deleted)",
       "will_unpair_zero": "{{count}} transfers between own accounts whose other side is kept (unpaired, not deleted)"
-    }
+    },
+    "only_account": "Only: {{name}}",
+    "account_card_less": "Show less",
+    "account_card_open": "Open in Documents",
+    "account_card_more_few": "Show {{count}} more documents",
+    "account_card_more_many": "Show {{count}} more documents",
+    "account_card_more_one": "Show {{count}} more document",
+    "account_card_more_two": "Show {{count}} more documents",
+    "account_card_more_zero": "Show {{count}} more documents",
+    "account_card_more_other": "Show {{count}} more documents",
+    "replace_existing": "Replace (erase everything, then re-import)",
+    "replace_preview": "The old document will be removed with its {{operations}} operation(s); emptied accounts removed: {{accounts}}. Then this file is imported."
   },
   "identity": {
     "title": "Account details",

@@ -115,8 +115,8 @@ impl ContractHoldingsTrait for ContractHoldings {
         // the funds already known: the same asset from one document to the next
         let assets = self.asset_service.get_assets()?;
         let mut positions = Vec::new();
-        // one per position, in the same order as the asset ids the snapshot returns
-        let mut prices: Vec<Option<(Decimal, String)>> = Vec::new();
+        // the price of each fund, by its symbol, on its own value date
+        let mut prices: Vec<(String, Decimal, String, NaiveDate)> = Vec::new();
         for h in holdings {
             let Some(symbol) = holding_symbol(h) else {
                 continue;
@@ -152,7 +152,14 @@ impl ContractHoldingsTrait for ContractHoldings {
                 provider_id: None,
                 provider_symbol: None,
             });
-            prices.push(price.map(|p| (p, h.currency.clone())));
+            if let Some(p) = price {
+                let day = h
+                    .value_date
+                    .as_deref()
+                    .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .unwrap_or(date);
+                prices.push((symbol.clone(), p, h.currency.clone(), day));
+            }
         }
         let count = positions.len();
         let base = self
@@ -165,7 +172,7 @@ impl ContractHoldingsTrait for ContractHoldings {
             .read()
             .unwrap_or_else(|p| p.into_inner())
             .clone();
-        let asset_ids = ManualSnapshotService::new(
+        ManualSnapshotService::new(
             self.asset_service.clone(),
             self.fx_service.clone(),
             self.snapshot_service.clone(),
@@ -182,30 +189,40 @@ impl ContractHoldingsTrait for ContractHoldings {
             source: SnapshotSource::CsvImport,
         })
         .await?;
-        // the net asset value of each fund on the date is its price
-        let timestamp = Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap_or_default());
-        for (asset_id, (price, currency)) in asset_ids
-            .iter()
-            .zip(prices.iter())
-            .filter_map(|(id, p)| p.as_ref().map(|p| (id, p)))
-        {
-            let quote = Quote {
-                id: format!("{}_{}", timestamp.format("%Y%m%d"), asset_id.to_uppercase()),
-                asset_id: asset_id.clone(),
-                timestamp,
-                open: *price,
-                high: *price,
-                low: *price,
-                close: *price,
-                adjclose: *price,
-                volume: Decimal::ZERO,
-                currency: currency.clone(),
-                data_source: DATA_SOURCE_MANUAL.to_string(),
-                created_at: Utc::now(),
-                notes: None,
+        // the net asset value of each fund is its price, found by the fund's own symbol (never by position order)
+        let assets = self.asset_service.get_assets()?;
+        for (symbol, price, currency, day) in &prices {
+            let Some(asset) = assets.iter().find(|a| {
+                a.instrument_symbol.as_deref() == Some(symbol.as_str())
+                    && a.quote_mode == crate::assets::QuoteMode::Manual
+            }) else {
+                continue;
             };
-            if let Err(e) = self.quote_service.update_quote(quote).await {
-                log::warn!("could not record the price of a fund of the contract: {e}");
+            // on its value date, and on the snapshot's date (where a price from the cost would stand otherwise)
+            let mut days = vec![*day];
+            if *day != date {
+                days.push(date);
+            }
+            for d in days {
+                let timestamp = Utc.from_utc_datetime(&d.and_hms_opt(12, 0, 0).unwrap_or_default());
+                let quote = Quote {
+                    id: format!("{}_{}", timestamp.format("%Y%m%d"), asset.id.to_uppercase()),
+                    asset_id: asset.id.clone(),
+                    timestamp,
+                    open: *price,
+                    high: *price,
+                    low: *price,
+                    close: *price,
+                    adjclose: *price,
+                    volume: Decimal::ZERO,
+                    currency: currency.clone(),
+                    data_source: DATA_SOURCE_MANUAL.to_string(),
+                    created_at: Utc::now(),
+                    notes: None,
+                };
+                if let Err(e) = self.quote_service.update_quote(quote).await {
+                    log::warn!("could not record the price of a fund of the contract: {e}");
+                }
             }
         }
         Ok(count)
