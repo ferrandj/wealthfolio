@@ -283,7 +283,7 @@ export interface ReviewedOperation {
   loanKey?: string | null;
   loanLabel?: string | null;
   /** matched | proposed | to_attach */
-  loanState?: "matched" | "proposed" | "to_attach" | null;
+  loanState?: "matched" | "proposed" | "to_attach" | "cost" | null;
 }
 
 export interface StatementReview {
@@ -458,6 +458,8 @@ export interface LoanAnswers {
   confirmedPayments?: { date: string; activityId: string }[];
   /** Debits detached from the loan: never matched to it again. */
   detachedActivities?: string[];
+  /** Operations of the loan that are not instalments (fees…): attached, never matched to an instalment. */
+  otherActivities?: string[];
 }
 
 /** Something the loan still lacks, and the papers where it can be found. */
@@ -499,6 +501,17 @@ export interface LoanPayments {
   uncovered: number;
   proposed?: number;
   lines: LoanPayment[];
+  /** The other operations attached to the loan (fees and the like), not instalments. */
+  costs?: LoanCost[];
+}
+
+/** An operation attached to a loan that is not an instalment: a fee, a guarantee, interim interest… */
+export interface LoanCost {
+  activityId: string;
+  accountId: string;
+  date: string;
+  amount: number | string;
+  label: string;
 }
 
 export interface LoanView {

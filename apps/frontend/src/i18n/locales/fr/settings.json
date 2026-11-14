@@ -2558,7 +2558,8 @@
     "payment_link": {
       "matched": "Prêt",
       "proposed": "Prêt proposé",
-      "to_attach": "Prêt à rattacher"
+      "to_attach": "Prêt à rattacher",
+      "cost": "Frais du prêt"
     },
     "match": {
       "title": "Échéance du {{date}} · {{amount}}",
@@ -2580,6 +2581,11 @@
     "activity": {
       "title": "Remboursement de prêt",
       "instalment": "Échéance n° {{number}} du {{date}} · {{amount}}"
-    }
+    },
+    "link": {
+      "instalment": "{{loan}} — échéance",
+      "cost": "{{loan}} — frais / autre"
+    },
+    "costs_title": "Frais et autres opérations rattachés au prêt"
   }
 }

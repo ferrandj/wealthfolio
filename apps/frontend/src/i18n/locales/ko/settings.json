@@ -2470,7 +2470,8 @@
     "payment_link": {
       "matched": "Loan",
       "proposed": "Proposed loan",
-      "to_attach": "Loan to attach"
+      "to_attach": "Loan to attach",
+      "cost": "Loan fee"
     },
     "match": {
       "title": "Instalment of {{date}} · {{amount}}",
@@ -2491,6 +2492,11 @@
     "activity": {
       "title": "Loan repayment",
       "instalment": "Instalment no. {{number}} of {{date}} · {{amount}}"
-    }
+    },
+    "link": {
+      "instalment": "{{loan}} — instalment",
+      "cost": "{{loan}} — fee / other"
+    },
+    "costs_title": "Fees and other operations of the loan"
   }
 }

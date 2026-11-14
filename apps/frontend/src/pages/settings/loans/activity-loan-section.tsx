@@ -1,7 +1,4 @@
-import { attachStatementLoanPayment, getStatementLoans } from "@/adapters";
-import { QueryKeys } from "@/lib/query-keys";
 import type { LoanPayment, LoanView } from "@/lib/types/statements";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Badge,
   Button,
@@ -12,15 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useTranslation } from "react-i18next";
 import { useLoanMutations } from "./loan-answers";
-import { invalidateLoanCaches } from "./loan-caches";
-import { DEBIT_TYPES, detachedAnswers, loanLineOf, matchedAnswers } from "./loan-match";
-import { loanChoices } from "./loan-payment-picker";
+import { DEBIT_TYPES, detachedAnswers, loanCostOf, loanLineOf, matchedAnswers } from "./loan-match";
+import { loanLinkValue, useLoanLink } from "./loan-payment-picker";
 import { day, euros } from "./loans-utils";
-
-const NONE = "__none__";
 
 /** The instalment a debit pays, as found: matched, or proposed in doubt with what to confirm. */
 function MatchedLine({ loan, line }: { loan: LoanView; line: LoanPayment }) {
@@ -71,8 +64,9 @@ function MatchedLine({ loan, line }: { loan: LoanView; line: LoanPayment }) {
 }
 
 /**
- * In a transaction: which loan instalment this debit pays. The matching found by the app is shown (a doubt says so
- * and waits for a confirmation); the debit can be attached to another loan or said not to pay any.
+ * In a transaction: which loan this debit belongs to. The instalment found by the app is shown (a doubt says so and
+ * waits for a confirmation); the debit can be attached to another loan, as an instalment or as another operation of
+ * the loan (a fee…), or said not to belong to any.
  */
 export function ActivityLoanSection({
   activityId,
@@ -82,35 +76,17 @@ export function ActivityLoanSection({
   activityType: string;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { data: loans = [] } = useQuery({
-    queryKey: [QueryKeys.STATEMENT_LOANS],
-    queryFn: getStatementLoans,
-  });
-  const attach = useMutation({
-    mutationFn: (key: string | null) => attachStatementLoanPayment(activityId, key),
-    onSuccess: (result) => {
-      queryClient.setQueryData([QueryKeys.STATEMENT_LOANS], result);
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_OPERATIONS_REVIEW] });
-      invalidateLoanCaches(queryClient);
-    },
-    onError: (e) =>
-      toast({ title: t("settings:loans.error"), description: String(e), variant: "destructive" }),
-  });
-  const choices = loanChoices(loans, t("settings:loans.account_pending"));
-  if (!DEBIT_TYPES.includes(activityType) || choices.length === 0) return null;
+  const { loans, items, change, hasLoans } = useLoanLink(activityId);
+  if (![...DEBIT_TYPES, "FEE"].includes(activityType) || !hasLoans) return null;
   const hit = loanLineOf(loans, activityId);
-  const items = [...choices, { value: NONE, label: t("settings:loans.payment_no_loan") }];
+  const cost = hit ? null : loanCostOf(loans, activityId);
+  const value = hit ? hit.loan.key : cost ? loanLinkValue(cost.key, "cost") : "";
   return (
     <div className="grid gap-2" data-testid="activity-loan-section">
       <Label>{t("settings:loans.activity.title")}</Label>
       {hit ? <MatchedLine loan={hit.loan} line={hit.line} /> : null}
-      <Select
-        items={items}
-        value={hit?.loan.key ?? ""}
-        onValueChange={(v) => v && attach.mutate(v === NONE ? null : v)}
-      >
-        <SelectTrigger aria-label={t("settings:loans.payment_loan")} disabled={attach.isPending}>
+      <Select items={items} value={value} onValueChange={(v) => v && change.mutate(v)}>
+        <SelectTrigger aria-label={t("settings:loans.payment_loan")} disabled={change.isPending}>
           <SelectValue placeholder={t("settings:loans.payment_choose_loan")} />
         </SelectTrigger>
         <SelectContent>

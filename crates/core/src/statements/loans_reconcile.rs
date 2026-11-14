@@ -29,6 +29,10 @@ pub struct LoanAnswers {
     /// Debits the person said do not pay this loan: never matched to it again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub detached_activities: Vec<String>,
+    /// Operations of the loan that are not instalments (fees, guarantee, interim interest…): attached to the loan,
+    /// never matched to an instalment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_activities: Vec<String>,
 }
 
 /// A debit the person confirmed for the instalment due on `date`.
@@ -103,6 +107,20 @@ pub struct LoanPayments {
     #[serde(default)]
     pub proposed: usize,
     pub lines: Vec<LoanPayment>,
+    /// The other operations attached to the loan (fees and the like), not instalments.
+    #[serde(default)]
+    pub costs: Vec<LoanCost>,
+}
+
+/// An operation attached to a loan that is not an instalment: a fee, a guarantee, interim interest…
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LoanCost {
+    pub activity_id: String,
+    pub account_id: String,
+    pub date: NaiveDate,
+    pub amount: Decimal,
+    pub label: String,
 }
 
 /// Something the loan still lacks.
@@ -249,7 +267,21 @@ pub fn reconcile(
     // a debit the person detached from this loan is not looked at for it
     let mut used: Vec<bool> = debits
         .iter()
-        .map(|d| view.answers.detached_activities.contains(&d.activity_id))
+        .map(|d| {
+            view.answers.detached_activities.contains(&d.activity_id)
+                || view.answers.other_activities.contains(&d.activity_id)
+        })
+        .collect();
+    let costs: Vec<LoanCost> = debits
+        .iter()
+        .filter(|d| view.answers.other_activities.contains(&d.activity_id))
+        .map(|d| LoanCost {
+            activity_id: d.activity_id.clone(),
+            account_id: d.account_id.clone(),
+            date: d.date,
+            amount: d.amount.abs(),
+            label: d.label.trim().to_string(),
+        })
         .collect();
     // a debit the person pinned to an instalment is kept for that instalment: no other one takes it on the way
     let pinned = |id: &str| {
@@ -436,6 +468,7 @@ pub fn reconcile(
         uncovered: count("uncovered"),
         proposed: count("proposed"),
         lines,
+        costs,
     }
 }
 

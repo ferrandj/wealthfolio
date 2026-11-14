@@ -161,3 +161,7 @@ is only proposed, with a note: a doubt is never matched silently. A debit the
 person pinned to an instalment stays with it. `match_loan_payment` pins a debit
 to one instalment (or detaches the one matched), as the loan screen and the
 transaction form do.
+
+A loan's other operations (fees, guarantee, interim interest…) are attached to
+it without being instalments: `set_loan_answers` with `otherActivities`; they
+come back in `payments.costs` and are never matched to an instalment.

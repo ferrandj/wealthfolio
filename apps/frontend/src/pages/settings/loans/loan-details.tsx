@@ -7,6 +7,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useLoanMutations, withConfirmed } from "./loan-answers";
 import { day, euros, percent } from "./loans-utils";
 import { LoanMatchDialog } from "./loan-match-dialog";
+import { detachedAnswers } from "./loan-match";
 
 export function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -226,6 +227,34 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
     <>
       {matching ? (
         <LoanMatchDialog loan={loan} line={matching} onClose={() => setMatching(null)} />
+      ) : null}
+      {loan.payments?.costs?.length ? (
+        <div className="grid gap-1 text-sm" data-testid="loan-costs">
+          <div className="text-muted-foreground text-xs font-medium">
+            {t("settings:loans.costs_title")}
+          </div>
+          {loan.payments.costs.map((c) => (
+            <div key={c.activityId} className="flex flex-wrap items-center gap-2">
+              <span>
+                {day(c.date)} · {euros(c.amount)}
+              </span>
+              <span className="text-muted-foreground truncate text-xs">
+                {[c.label, accounts.find((a) => a.id === c.accountId)?.name]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                disabled={answer.isPending}
+                onClick={() => answer.mutate(detachedAnswers(loan, c.activityId))}
+              >
+                {t("settings:loans.match.detach")}
+              </Button>
+            </div>
+          ))}
+        </div>
       ) : null}
       <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
         {open ? t("settings:loans.hide_plan") : t("settings:loans.show_plan")}

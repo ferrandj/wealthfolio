@@ -589,7 +589,8 @@ service_tool!(
         "debitAccountId": {"type": ["string", "null"], "description": "The account the instalments are debited from, or null."},
         "noEarlyRepayment": {"type": "boolean"},
         "paymentsUnchanged": {"type": "boolean"},
-        "confirmedPayments": {"type": "array", "description": "Debits confirmed for an instalment although their amount differs (a first instalment pro rata): the proposed lines of get_loans payments.", "items": {"type": "object", "properties": {"date": {"type": "string", "description": "The instalment's due date, YYYY-MM-DD."}, "activityId": {"type": "string"}}, "required": ["date", "activityId"]}}
+        "confirmedPayments": {"type": "array", "description": "Debits confirmed for an instalment although their amount differs (a first instalment pro rata): the proposed lines of get_loans payments.", "items": {"type": "object", "properties": {"date": {"type": "string", "description": "The instalment's due date, YYYY-MM-DD."}, "activityId": {"type": "string"}}, "required": ["date", "activityId"]}},
+        "otherActivities": {"type": "array", "items": {"type": "string"}, "description": "Operations of the loan that are not instalments (fees, guarantee, interim interest…): attached to the loan, never matched to an instalment (payments.costs). Left out: kept as they are."}
     }), &["loanKey"]),
     |env, args| {
         #[derive(Deserialize)]
@@ -604,22 +605,27 @@ service_tool!(
             payments_unchanged: bool,
             #[serde(default)]
             confirmed_payments: Vec<wealthfolio_core::statements::ConfirmedPayment>,
+            #[serde(default)]
+            other_activities: Option<Vec<String>>,
         }
         let args: Args = serde_json::from_value(args)?;
         let service = need(env.statement_service(), "Statements")?;
+        let before = service
+            .loans(chrono::Utc::now().date_naive())
+            .map_err(fail)?
+            .into_iter()
+            .find(|l| l.key == args.loan_key)
+            .map(|l| l.answers)
+            .unwrap_or_default();
         let answers = wealthfolio_core::statements::LoanAnswers {
             debit_account_id: args.debit_account_id,
             no_early_repayment: args.no_early_repayment,
             payments_unchanged: args.payments_unchanged,
             confirmed_payments: args.confirmed_payments,
             // the debits detached from the loan stay detached (attach_loan_payment changes them)
-            detached_activities: service
-                .loans(chrono::Utc::now().date_naive())
-                .map_err(fail)?
-                .into_iter()
-                .find(|l| l.key == args.loan_key)
-                .map(|l| l.answers.detached_activities)
-                .unwrap_or_default(),
+            detached_activities: before.detached_activities,
+            // the loan's fees and other operations stay unless given
+            other_activities: args.other_activities.unwrap_or(before.other_activities),
         };
         service.set_loan_answers(&args.loan_key, answers).await.map_err(fail)?;
         reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)

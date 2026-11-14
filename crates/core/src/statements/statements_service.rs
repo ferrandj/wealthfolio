@@ -1320,7 +1320,12 @@ impl StatementService {
         let activities = self.activity_service.get_activities()?;
         let debits: Vec<super::BankDebit> = activities
             .iter()
-            .filter(|a| matches!(a.activity_type.as_str(), "WITHDRAWAL" | "TRANSFER_OUT"))
+            .filter(|a| {
+                matches!(
+                    a.activity_type.as_str(),
+                    "WITHDRAWAL" | "TRANSFER_OUT" | "FEE"
+                )
+            })
             .filter_map(|a| {
                 Some(super::BankDebit {
                     activity_id: a.id.clone(),
@@ -1515,6 +1520,13 @@ impl StatementService {
                 map.insert(
                     activity.clone(),
                     (view.key.clone(), label.clone(), state.to_string()),
+                );
+            }
+            // the loan's other operations (fees and the like): attached, not instalments
+            for cost in &view.payments.costs {
+                map.insert(
+                    cost.activity_id.clone(),
+                    (view.key.clone(), label.clone(), "cost".to_string()),
                 );
             }
         }
@@ -2995,6 +3007,7 @@ impl StatementServiceTrait for StatementService {
             answers
                 .confirmed_payments
                 .retain(|c| c.activity_id != activity_id);
+            answers.other_activities.retain(|a| a != activity_id);
             if loan_key.as_deref() == Some(view.key.as_str()) {
                 answers.detached_activities.retain(|a| a != activity_id);
                 // the instalment it pays: the one due nearest to the debit

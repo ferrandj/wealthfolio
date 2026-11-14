@@ -1380,6 +1380,36 @@ mod tests {
     }
 
     #[test]
+    fn a_fee_attached_to_the_loan_is_kept_apart_from_the_instalments() {
+        use crate::statements::{reconcile, BankDebit, LoanAnswers};
+        let today = day(2026, 11, 10);
+        let mut view = view_of(today);
+        let first = view
+            .plan
+            .rows
+            .iter()
+            .find(|r| r.kind == "installment")
+            .unwrap()
+            .clone();
+        // a debit of the instalment's amount, but the person says it is a fee of the loan
+        let debits = vec![BankDebit {
+            activity_id: "fee".into(),
+            account_id: "current".into(),
+            date: first.date.unwrap(),
+            amount: first.total,
+            label: "PRET LOGEMENT FRAIS".into(),
+        }];
+        view.answers = LoanAnswers {
+            other_activities: vec!["fee".into()],
+            ..Default::default()
+        };
+        let payments = reconcile(&view, &debits, &[], today);
+        assert_eq!(payments.lines[0].activity_id, None);
+        assert_eq!(payments.costs.len(), 1);
+        assert_eq!(payments.costs[0].activity_id, "fee");
+    }
+
+    #[test]
     fn what_is_missing_says_where_to_find_it() {
         use crate::statements::{gaps_of, LoanAnswers};
         let today = day(2026, 11, 10);

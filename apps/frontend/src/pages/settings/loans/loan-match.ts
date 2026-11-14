@@ -71,6 +71,19 @@ export function matchedAnswers(loan: LoanView, date: string, activityId: string)
   return answersWith(loan, {
     confirmedPayments: [...confirmed, { date, activityId }],
     detachedActivities: (loan.answers?.detachedActivities ?? []).filter((a) => a !== activityId),
+    otherActivities: (loan.answers?.otherActivities ?? []).filter((a) => a !== activityId),
+  });
+}
+
+/** The answers once `activityId` is one of the loan's other operations (a fee…): attached, not an instalment. */
+export function costAnswers(loan: LoanView, activityId: string): LoanAnswers {
+  const others = loan.answers?.otherActivities ?? [];
+  return answersWith(loan, {
+    confirmedPayments: (loan.answers?.confirmedPayments ?? []).filter(
+      (c) => c.activityId !== activityId,
+    ),
+    detachedActivities: (loan.answers?.detachedActivities ?? []).filter((a) => a !== activityId),
+    otherActivities: others.includes(activityId) ? others : [...others, activityId],
   });
 }
 
@@ -82,7 +95,19 @@ export function detachedAnswers(loan: LoanView, activityId: string): LoanAnswers
       (c) => c.activityId !== activityId,
     ),
     detachedActivities: detached.includes(activityId) ? detached : [...detached, activityId],
+    otherActivities: (loan.answers?.otherActivities ?? []).filter((a) => a !== activityId),
   });
+}
+
+/** The loan an operation is attached to as a fee or another non-instalment operation. */
+export function loanCostOf(loans: LoanView[], activityId: string): LoanView | null {
+  return (
+    loans.find(
+      (l) =>
+        l.answers?.otherActivities?.includes(activityId) ||
+        l.payments?.costs?.some((c) => c.activityId === activityId),
+    ) ?? null
+  );
 }
 
 /** Which instalment of which loan a debit pays, as the reconciliation found it (matched, or proposed in doubt). */

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  costAnswers,
   debitCandidates,
   detachedAnswers,
+  loanCostOf,
   loanLineOf,
   matchedAnswers,
   matchWindow,
 } from "./loan-match";
+import { loanLinkValue } from "./loan-payment-picker";
 
 const loan = {
   key: "L",
@@ -53,5 +56,19 @@ describe("loan matching", () => {
   it("finds the instalment a debit pays", () => {
     expect(loanLineOf([loan], "a1")?.line.date).toBe("2025-04-15");
     expect(loanLineOf([loan], "zz")).toBeNull();
+  });
+
+  it("keeps a fee of the loan apart from the instalments", () => {
+    const c = costAnswers(loan, "a1");
+    expect(c.otherActivities).toEqual(["a1"]);
+    expect(c.confirmedPayments).toEqual([{ date: "2025-05-15", activityId: "a2" }]);
+    expect(loanCostOf([{ ...(loan as object), answers: c } as never], "a1")).not.toBeNull();
+    expect(
+      matchedAnswers({ ...(loan as object), answers: c } as never, "2025-04-15", "a1")
+        .otherActivities,
+    ).toEqual([]);
+    expect(loanLinkValue("L", "cost")).toBe("cost:L");
+    expect(loanLinkValue("L", "to_attach")).toBe("");
+    expect(loanLinkValue("L", "matched")).toBe("L");
   });
 });

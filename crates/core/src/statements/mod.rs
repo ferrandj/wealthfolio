@@ -25,8 +25,8 @@ pub use loans_plan::{
 };
 pub use loans_reconcile::{
     first_due_from_debits, gaps_of, looks_like_loan_payment, prepayment_interest, pro_rata_days,
-    reconcile, BankDebit, ConfirmedPayment, LoanAnswers, LoanGap, LoanPayment, LoanPayments,
-    StatementPeriod,
+    reconcile, BankDebit, ConfirmedPayment, LoanAnswers, LoanCost, LoanGap, LoanPayment,
+    LoanPayments, StatementPeriod,
 };
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
