@@ -556,6 +556,7 @@ mod tests {
             period_end: None,
             transactions: vec![],
             holdings_count: 0,
+            holdings: vec![],
             warnings: vec![],
             confidence: "high".into(),
             extra: serde_json::Value::Null,

@@ -2215,7 +2215,8 @@
       "document": "Documents",
       "life_deposit": "Versements assurance-vie",
       "life_arbitrage": "Arbitrages assurance-vie",
-      "investor_profile": "Profil investisseur"
+      "investor_profile": "Profil investisseur",
+      "positions": "Positions du contrat"
     },
     "tree_loan": "Prêt · {{name}}",
     "group": {

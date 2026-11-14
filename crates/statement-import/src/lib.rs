@@ -19,8 +19,8 @@ pub use adapters::{
     Adapter, Detection, HoldingData, ParsedStatement, SourceDocument, TransactionData,
 };
 pub use analysis::{
-    analyze, sha256_hex, supported_documents, Analysis, StatementPreview, SupportedAdapter,
-    SupportedInstitution, TransactionPreview,
+    analyze, sha256_hex, supported_documents, Analysis, HoldingPreview, StatementPreview,
+    SupportedAdapter, SupportedInstitution, TransactionPreview,
 };
 pub use categorize::{suggest as suggest_category, CategoryInput, CategorySuggestion};
 pub use naming::{account_type_label, document_kind_label, standard_file_name};

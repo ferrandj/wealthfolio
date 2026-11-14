@@ -6,6 +6,7 @@ pub mod life_annual_pdf;
 pub mod life_arbitrage_pdf;
 pub mod life_deposit_pdf;
 pub mod life_operations_csv;
+pub mod life_positions_csv;
 pub mod loan;
 pub mod loan_offer_pdf;
 pub mod loan_prepayment_pdf;

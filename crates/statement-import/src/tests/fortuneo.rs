@@ -940,3 +940,55 @@ fn test_the_older_investor_profile_is_recognised() {
     assert_eq!(extra(&parsed[0], "investor_profile"), &json!("Dynamique"));
     assert_eq!(parsed[0].balance_date, Some(ymd(2024, 8, 29)));
 }
+
+#[test]
+fn test_life_insurance_operations_copied_from_the_screen_are_read() {
+    let doc = SourceDocument::new("releves.csv", fortuneo_life_operations_screen_csv());
+    let found = identify(&doc);
+    assert_eq!(
+        found.chosen.as_ref().unwrap().adapter.id(),
+        "fortuneo.life_operations_csv"
+    );
+    let st = &found.chosen.as_ref().unwrap().adapter.parse(&doc).unwrap()[0];
+    let lines: Vec<(String, Decimal, Option<String>)> = st
+        .transactions
+        .iter()
+        .map(|t| (t.date.to_string(), t.amount, t.kind.clone()))
+        .collect();
+    // the arbitrage and the set-up line are not operations
+    assert_eq!(lines.len(), 6);
+    assert!(lines.contains(&("2024-09-20".into(), d("300.00"), s("transfer"))));
+    assert!(lines.contains(&("2026-05-14".into(), d("0.05"), s("interest"))));
+    assert!(lines.contains(&("2025-12-31".into(), d("-3.01"), s("fee"))));
+    assert_eq!(extra(st, "arbitrages").as_array().unwrap().len(), 1);
+    assert!(st.warnings.is_empty());
+}
+
+#[test]
+fn test_life_insurance_positions_are_read_as_holdings() {
+    let doc = SourceDocument::new("positions.csv", fortuneo_life_positions_csv());
+    let found = identify(&doc);
+    assert_eq!(found.decision, "auto");
+    assert_eq!(
+        found.chosen.as_ref().unwrap().adapter.id(),
+        "fortuneo.life_positions_csv"
+    );
+    let st = &found.chosen.as_ref().unwrap().adapter.parse(&doc).unwrap()[0];
+    assert_eq!(
+        (st.document_kind.clone(), st.account_type.clone()),
+        (s("positions"), s("life_insurance"))
+    );
+    let holdings = st.holdings.as_ref().unwrap();
+    assert_eq!(holdings.len(), 3);
+    // the euro fund: one unit worth one euro
+    assert_eq!(holdings[0].quantity, d("500.00"));
+    assert_eq!(holdings[0].unit_price, Some(d("1")));
+    assert_eq!(holdings[0].asset_class, "fund_euro");
+    // a fund: its units, its net asset value and its cost per unit
+    assert_eq!(holdings[1].isin.as_deref(), Some("FR0000000001"));
+    assert_eq!(holdings[1].quantity, d("3.0000"));
+    assert_eq!(holdings[1].unit_price, Some(d("110.00")));
+    assert_eq!(holdings[1].cost_basis, Some(d("100.00")));
+    assert_eq!(st.balance, Some(d("1000.00")));
+    assert_eq!(st.balance_date, Some(ymd(2026, 11, 14)));
+}

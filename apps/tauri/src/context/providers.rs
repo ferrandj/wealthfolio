@@ -674,6 +674,18 @@ async fn build_context(
     statement_concrete.attach_loan_liabilities(Arc::new(
         wealthfolio_core::statements::LoanLiabilities::new(alternative_asset_service.clone()),
     ));
+    // the positions of an investment contract read from a document become its holdings
+    statement_concrete.attach_contract_holdings(Arc::new(
+        wealthfolio_core::statements::ContractHoldings::new(
+            account_service.clone(),
+            asset_service.clone(),
+            fx_service.clone(),
+            snapshot_service.clone(),
+            quote_service.clone(),
+            base_currency.clone(),
+            timezone.clone(),
+        ),
+    ));
     // the loans imported before their liabilities existed catch up once, in the background
     {
         let statements = statement_concrete.clone();

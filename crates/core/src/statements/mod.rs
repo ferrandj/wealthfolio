@@ -2,6 +2,7 @@
 //! operations become cash activities, their originals are kept, and the account holder's identity (name,
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
+mod contract_holdings;
 mod loans;
 mod loans_liabilities;
 mod loans_plan;
@@ -12,6 +13,7 @@ mod statements_review;
 mod statements_service;
 mod statements_traits;
 
+pub use contract_holdings::{holding_symbol, ContractHoldings, ContractHoldingsTrait};
 pub use loans::{
     assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
 };
@@ -46,7 +48,7 @@ pub use statements_traits::{
     CategoryAssignerTrait, StatementRepositoryTrait, StatementServiceTrait,
 };
 
-pub use wealthfolio_statement_import::{SupportedAdapter, SupportedInstitution};
+pub use wealthfolio_statement_import::{HoldingPreview, SupportedAdapter, SupportedInstitution};
 
 /// The documents that can be read, by institution.
 pub fn supported_documents() -> Vec<SupportedInstitution> {

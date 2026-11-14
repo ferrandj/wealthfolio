@@ -48,6 +48,27 @@ pub struct TransactionPreview {
     pub category_reason: Option<String>,
 }
 
+/// A holding of an investment account (a fund of a life insurance…), as the document gives it.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingPreview {
+    pub isin: Option<String>,
+    pub symbol: Option<String>,
+    pub name: Option<String>,
+    /// Units held (for a euro fund: its amount, one unit worth one).
+    pub quantity: String,
+    /// The price of a unit on the value date.
+    pub unit_price: Option<String>,
+    /// The holding's value.
+    pub value: Option<String>,
+    /// The cost of a unit.
+    pub cost_basis: Option<String>,
+    pub currency: String,
+    pub value_date: Option<String>,
+    /// fund | fund_euro | …
+    pub asset_class: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatementPreview {
@@ -78,6 +99,9 @@ pub struct StatementPreview {
     pub period_end: Option<String>,
     pub transactions: Vec<TransactionPreview>,
     pub holdings_count: usize,
+    /// The holdings the document gives (an investment account's positions).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub holdings: Vec<HoldingPreview>,
     pub warnings: Vec<String>,
     pub confidence: String,
     pub extra: Value,
@@ -245,6 +269,31 @@ fn statement(index: usize, st: &ParsedStatement) -> StatementPreview {
             })
             .collect(),
         holdings_count: st.holdings.as_ref().map(|h| h.len()).unwrap_or(0),
+        holdings: st
+            .holdings
+            .iter()
+            .flatten()
+            .map(|h| HoldingPreview {
+                isin: h.isin.clone(),
+                symbol: h.symbol.clone(),
+                name: h.name.clone(),
+                quantity: h.quantity.normalize().to_string(),
+                unit_price: h.unit_price.map(|v| v.normalize().to_string()),
+                value: h.value.map(|v| v.normalize().to_string()),
+                cost_basis: h.cost_basis.map(|v| v.normalize().to_string()),
+                currency: h
+                    .value_currency
+                    .clone()
+                    .unwrap_or_else(|| st.currency.clone()),
+                value_date: h
+                    .extra
+                    .as_ref()
+                    .and_then(|e| e.get("value_date"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                asset_class: h.asset_class.clone(),
+            })
+            .collect(),
         warnings: st.warnings.clone(),
         confidence: st.confidence.clone(),
         extra: Value::Object(extra),

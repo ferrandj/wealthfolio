@@ -174,3 +174,12 @@ they brought: their operations (a transfer whose other leg stays is unpaired
 first), the accounts left with no document and no operation, the loan accounts
 left without papers; accounts that keep other operations stay. `dryRun` says
 what would go — run it first.
+
+### Positions of an investment contract
+
+A document listing a contract's funds (the Fortuneo Vie positions copied from
+the site, `fortuneo.life_positions_csv`) sets the contract's holdings on its
+value date: the account switches to holdings tracking, each fund is a
+hand-priced asset found again by its ISIN, its net asset value is its price.
+Removing the document takes those holdings back. The operations copied from the
+site (Date;Opération;Statut;Montant) are read like the CSV export.

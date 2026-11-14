@@ -18,6 +18,7 @@ use super::fortuneo::life_annual_pdf::FortuneoLifeAnnualPdf;
 use super::fortuneo::life_arbitrage_pdf::FortuneoLifeArbitragePdf;
 use super::fortuneo::life_deposit_pdf::FortuneoLifeDepositPdf;
 use super::fortuneo::life_operations_csv::FortuneoLifeOperationsCsv;
+use super::fortuneo::life_positions_csv::FortuneoLifePositionsCsv;
 use super::fortuneo::loan_offer_pdf::FortuneoLoanOfferPdf;
 use super::fortuneo::loan_prepayment_pdf::FortuneoLoanPrepaymentPdf;
 use super::fortuneo::loan_schedule_pdf::FortuneoLoanSchedulePdf;
@@ -44,6 +45,7 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &FortuneoLifeAnnualPdf,
     &FortuneoInvestorProfilePdf,
     &FortuneoLifeOperationsCsv,
+    &FortuneoLifePositionsCsv,
     &FortuneoLoanOfferPdf,
     &FortuneoLoanSchedulePdf,
     &FortuneoLoanPrepaymentPdf,

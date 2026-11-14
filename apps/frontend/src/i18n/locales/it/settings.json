@@ -2215,7 +2215,8 @@
       "document": "Documents",
       "life_deposit": "Life insurance deposits",
       "life_arbitrage": "Life insurance switches",
-      "investor_profile": "Investor profile"
+      "investor_profile": "Investor profile",
+      "positions": "Contract positions"
     },
     "tree_loan": "Loan · {{name}}",
     "group": {

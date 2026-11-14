@@ -1075,3 +1075,28 @@ pub fn fortuneo_investor_profile_2024_pdf(profile: &str) -> Vec<u8> {
     );
     pdf.bytes()
 }
+
+/// Fortuneo Vie: the operations of a contract copied from the site's screen (no type column: it is in the name).
+pub fn fortuneo_life_operations_screen_csv() -> Vec<u8> {
+    "Date;Opération;Statut;Montant (€)\n\
+2026-09-15;VERSEMENT PROGRAMME;Traité;80,00\n\
+2026-08-14;ARBITRAGE MANDAT D'ARBITRAGE;Traité;50,00\n\
+2026-05-14;DISTRIBUTION FONDS EXEMPLE;Traité;0,05\n\
+2026-01-24;REVALORISATION FDS EUROS EXEMPLE RENDEMENT;Traité;5,96\n\
+2026-01-24;PRELEV /REVALO FDS EUROS EXEMPLE RENDEMENT;Traité;-1,03\n\
+2025-12-31;FRAIS ANNEE 2025;;-3,01\n\
+2025-05-19;MISE EN PLACE DE VP;Traité;\n\
+2024-09-20;ADHESION;Traité;300,00\n"
+        .as_bytes()
+        .to_vec()
+}
+
+/// Fortuneo Vie: the positions of a contract copied from the site's screen: a euro fund (no units) and two funds.
+pub fn fortuneo_life_positions_csv() -> Vec<u8> {
+    "Code ISIN;Libellé;Performance (%);+/- Value financière (€);Montant (€);Poids (%);Prix de revient (€);Nombre de parts;Valeur liquidative (€);Date de valeur\n\
+EXE000000001;FDS EUROS EXEMPLE RENDEMENT;;;500,00;50,00;;;;2026-11-14\n\
+FR0000000001;FONDS EXEMPLE ACTIONS;10,00;30,00;330,00;33,00;100,00;3,0000;110,00;2026-11-12\n\
+LU0000000002;FONDS EXEMPLE OBLIGATIONS;-2,00;-3,40;170,00;17,00;173,40;2,0000;85,00;2026-11-13\n"
+        .as_bytes()
+        .to_vec()
+}

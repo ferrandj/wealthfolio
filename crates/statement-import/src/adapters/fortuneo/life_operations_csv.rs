@@ -1,4 +1,6 @@
-//! Fortuneo Vie: the CSV "Opérations" export of a life-insurance contract (Date;Libellé;Type;État;Montant (€)).
+//! Fortuneo Vie: the CSV "Opérations" export of a life-insurance contract (Date;Libellé;Type;État;Montant (€)), or
+//! the same list copied from the site's screen (Date;Opération;Statut;Montant (€)), where the type is read from the
+//! operation's name.
 //!
 //! The file names neither the contract nor the bank, so the account is the only life-insurance account of the bank
 //! (several are asked about). What is an operation of the contract is imported; what is not is kept apart:
@@ -26,7 +28,50 @@ use crate::adapters::common::{norm, parse_amount, parse_date};
 use crate::adapters::generic::pycsv;
 use crate::py;
 
-const EXPECTED: &[&str] = &["date", "libelle", "type", "etat", "montant (€)"];
+/// The columns of the file: the export (with a type) or the copy of the screen (the type is in the name).
+struct Columns {
+    date: usize,
+    label: usize,
+    kind: Option<usize>,
+    state: usize,
+    amount: usize,
+}
+
+fn columns(row: &[String]) -> Option<Columns> {
+    let header: Vec<String> = row.iter().map(|c| norm(c)).collect();
+    let at = |names: &[&str]| header.iter().position(|h| names.contains(&h.as_str()));
+    Some(Columns {
+        date: at(&["date"])?,
+        label: at(&["libelle", "operation"])?,
+        kind: at(&["type"]),
+        state: at(&["etat", "statut"])?,
+        amount: at(&["montant (€)", "montant"])?,
+    })
+}
+
+/// The type of an operation told by its name, when the file has no type column.
+fn kind_of(label: &str) -> String {
+    let l = norm(label);
+    let starts = |w: &str| l.starts_with(w);
+    if starts("versement") || starts("adhesion") {
+        "versement"
+    } else if starts("arbitrage") {
+        "arbitrage"
+    } else if starts("distribution") {
+        "distribution"
+    } else if starts("revalorisation") {
+        "revalorisation"
+    } else if starts("prelev") {
+        "prelevement"
+    } else if starts("frais") {
+        "frais"
+    } else if starts("mise en place") {
+        "parametrage"
+    } else {
+        ""
+    }
+    .to_string()
+}
 const KNOWN_TYPES: &[&str] = &[
     "versement",
     "arbitrage",
@@ -45,8 +90,7 @@ fn rows(doc: &SourceDocument) -> Result<Vec<Vec<String>>, String> {
 }
 
 fn header_ok(row: &[String]) -> bool {
-    let header: Vec<String> = row.iter().map(|c| norm(c)).collect();
-    EXPECTED.iter().all(|e| header.iter().any(|h| h == e))
+    columns(row).is_some()
 }
 
 impl Adapter for FortuneoLifeOperationsCsv {
@@ -80,17 +124,26 @@ impl Adapter for FortuneoLifeOperationsCsv {
         if !header_ok(first) {
             return Ok(Detection::default());
         }
+        let Some(cols) = columns(first) else {
+            return Ok(Detection::default());
+        };
         let known = all
             .iter()
             .skip(1)
             .filter(|r| {
-                r.get(2)
-                    .map(|t| KNOWN_TYPES.contains(&norm(t).as_str()))
-                    .unwrap_or(false)
+                let kind = match cols.kind {
+                    Some(k) => r.get(k).map(|t| norm(t)).unwrap_or_default(),
+                    None => r.get(cols.label).map(|t| kind_of(t)).unwrap_or_default(),
+                };
+                KNOWN_TYPES.contains(&kind.as_str())
             })
             .count();
         let (s, reasons) = score(&[
-            (true, 0.6, "colonnes Date, Libellé, Type, État, Montant (€)"),
+            (
+                true,
+                0.6,
+                "colonnes Date, Libellé/Opération, État/Statut, Montant (€)",
+            ),
             (
                 known >= 1,
                 0.2,
@@ -123,21 +176,35 @@ impl Adapter for FortuneoLifeOperationsCsv {
         }
         let mut lines: Vec<Line> = vec![];
         let mut skipped = 0;
-        for row in rows(doc)?.iter().skip(1) {
+        let all = rows(doc)?;
+        let cols = all
+            .first()
+            .and_then(|r| columns(r))
+            .ok_or_else(|| "En-tête des opérations introuvable".to_string())?;
+        for row in all.iter().skip(1) {
             if row.iter().all(|c| py::strip(c).is_empty()) {
                 continue;
             }
-            let date = row.first().and_then(|d| parse_date(Some(d), None));
-            let Some(date) = date.filter(|_| row.len() >= 5) else {
+            let date = row.get(cols.date).and_then(|d| parse_date(Some(d), None));
+            let Some(date) = date else {
                 skipped += 1;
                 continue;
             };
+            let cell = |i: usize| {
+                row.get(i)
+                    .map(|c| py::strip(c).to_string())
+                    .unwrap_or_default()
+            };
+            let label = cell(cols.label);
             lines.push(Line {
                 date,
-                label: py::strip(&row[1]).to_string(),
-                kind: norm(&row[2]),
-                state: norm(&row[3]),
-                amount: parse_amount(Some(&row[4])),
+                kind: match cols.kind {
+                    Some(k) => norm(&cell(k)),
+                    None => kind_of(&label),
+                },
+                label,
+                state: norm(&cell(cols.state)),
+                amount: row.get(cols.amount).and_then(|a| parse_amount(Some(a))),
                 raw: row.join(";"),
             });
         }

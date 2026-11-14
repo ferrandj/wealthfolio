@@ -486,6 +486,7 @@ pub struct StatementService {
     counterparties: Arc<dyn CounterpartyRecorderTrait>,
     /// Keeps the liability (Passifs) of every loan rebuilt from the papers; none in the tests that do not need it.
     loan_liabilities: std::sync::OnceLock<Arc<super::LoanLiabilities>>,
+    contract_holdings: std::sync::OnceLock<Arc<dyn super::ContractHoldingsTrait>>,
 }
 
 impl StatementService {
@@ -503,7 +504,14 @@ impl StatementService {
             category_assigner,
             counterparties,
             loan_liabilities: std::sync::OnceLock::new(),
+            contract_holdings: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Also set an investment contract's holdings from the documents that list them (the positions of a life
+    /// insurance). Set once, after the portfolio services are built.
+    pub fn attach_contract_holdings(&self, holdings: Arc<dyn super::ContractHoldingsTrait>) {
+        let _ = self.contract_holdings.set(holdings);
     }
 
     /// Also keep a liability (the Passifs of the holdings) for each loan rebuilt from the papers.
@@ -564,6 +572,29 @@ impl StatementService {
             });
             if let Some(found) = by_identity.and_then(|i| pick(&i.account_id, "accountNumber")) {
                 return Some(found);
+            }
+        }
+        // a file that names no contract (the positions or operations of a life insurance copied from the site):
+        // the only account of that kind at that bank
+        if preview.iban.is_none()
+            && clean(&preview.account_number).is_none()
+            && preview.extra.get("match_by_type").and_then(|v| v.as_bool()) == Some(true)
+        {
+            let kind = preview.account_type.as_deref()?;
+            let institution = preview.institution.as_deref().unwrap_or("").to_lowercase();
+            let documents = self.repository.list_documents().unwrap_or_default();
+            let mut ids: Vec<&str> = documents
+                .iter()
+                .filter(|d| {
+                    d.account_type.as_deref() == Some(kind)
+                        && d.institution.as_deref().unwrap_or("").to_lowercase() == institution
+                })
+                .filter_map(|d| d.account_id.as_deref())
+                .collect();
+            ids.sort_unstable();
+            ids.dedup();
+            if let [only] = ids.as_slice() {
+                return pick(only, "accountType");
             }
         }
         None
@@ -917,6 +948,20 @@ impl StatementService {
                             over.and_then(|o| o.identity.as_ref()),
                         );
                         self.repository.save_identity(identity).await?;
+                        // the positions of a contract: its holdings on the document's date
+                        if !preview.holdings.is_empty() {
+                            match self.set_contract_holdings(&account.id, preview).await {
+                                Ok(n) => outcome
+                                    .messages
+                                    .push(format!("{n} support(s) du contrat mis à jour")),
+                                Err(e) => {
+                                    warn!("could not set the holdings of the contract: {e}");
+                                    outcome.messages.push(format!(
+                                        "The holdings of the contract could not be set: {e}"
+                                    ));
+                                }
+                            }
+                        }
                         outcome.account_id = Some(account.id.clone());
                         outcome.account_name = Some(account.name.clone());
                         first_account.get_or_insert(account.id);
@@ -1425,6 +1470,28 @@ impl StatementService {
 
     /// Deleting a document takes back what its import added, the account included when the import created it and
     /// nothing else is left in it: no operation, no other document. An account that existed before is never removed.
+    /// The day a document's holdings are worth: its value date, else the day it ends, else today.
+    fn holdings_date(preview: &StatementPreview) -> NaiveDate {
+        [&preview.balance_date, &preview.period_end]
+            .into_iter()
+            .flatten()
+            .find_map(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+            .unwrap_or_else(|| Utc::now().date_naive())
+    }
+
+    async fn set_contract_holdings(
+        &self,
+        account_id: &str,
+        preview: &StatementPreview,
+    ) -> Result<usize> {
+        let Some(writer) = self.contract_holdings.get() else {
+            return Ok(0);
+        };
+        writer
+            .set_holdings(account_id, Self::holdings_date(preview), &preview.holdings)
+            .await
+    }
+
     async fn remove_account_made_by(&self, document: &StatementDocument) -> Result<()> {
         let Some(account_id) = document.account_id.as_deref() else {
             return Ok(());
@@ -2680,6 +2747,26 @@ impl StatementServiceTrait for StatementService {
                 }
             }
         }
+        // the holdings a positions document had set, on an account that stays
+        if let Some(writer) = self.contract_holdings.get() {
+            for d in chosen
+                .iter()
+                .filter(|d| !d.document_kind.as_deref().is_some_and(|k| k != "positions"))
+            {
+                let (Some(account), Some(day)) = (d.account_id.as_deref(), d.period_end.as_deref())
+                else {
+                    continue;
+                };
+                if emptied.iter().any(|(id, _)| id == account) {
+                    continue;
+                }
+                if let Ok(day) = NaiveDate::parse_from_str(day, "%Y-%m-%d") {
+                    if let Err(e) = writer.remove_holdings(account, day).await {
+                        warn!("could not take back the holdings of a removed document: {e}");
+                    }
+                }
+            }
+        }
         for d in &chosen {
             self.repository.delete_document(&d.id).await?;
         }
@@ -3352,6 +3439,7 @@ mod tests {
             period_end: Some("2026-09-30".into()),
             transactions: vec![],
             holdings_count: 0,
+            holdings: vec![],
             warnings: vec![],
             confidence: "high".into(),
             extra: serde_json::Value::Null,
