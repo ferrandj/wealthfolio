@@ -2,6 +2,8 @@ import {
   addContactIdentifier,
   createContact,
   linkContactAccount,
+  listStatementDocuments,
+  removeContactIdentifier,
   listAccountIdentities,
   listContacts,
   saveAccountIdentity,
@@ -11,7 +13,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { shouldInvalidateAfterPortfolioUpdate } from "@/lib/query-invalidation";
 import { QueryKeys } from "@/lib/query-keys";
 import type { ContactSummary } from "@/lib/types/contacts";
-import type { AccountIdentity } from "@/lib/types/statements";
+import type { AccountIdentity, StatementDocument } from "@/lib/types/statements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -31,6 +33,12 @@ import {
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  guessInstitution,
+  ibanTaken,
+  isCurrentAccount,
+  printedNameOwner,
+} from "./account-holders-utils";
 import {
   emptyForm,
   formatIban,
@@ -95,10 +103,14 @@ export function AccountHoldersDialog({
     queryKey: [QueryKeys.ACCOUNT_IDENTITIES],
     queryFn: listAccountIdentities,
   });
+  const documents = useQuery({
+    queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
+    queryFn: listStatementDocuments,
+  });
   const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
   const accountId = accountIds[index];
   if (!accountId) return null;
-  const ready = !!contacts.data && !!identities.data && !isLoading;
+  const ready = !!contacts.data && !!identities.data && !documents.isLoading && !isLoading;
   const next = () => (index + 1 >= accountIds.length ? onClose() : setIndex(index + 1));
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -114,6 +126,7 @@ export function AccountHoldersDialog({
             accountName={accounts.find((a) => a.id === accountId)?.name ?? ""}
             accountType={accounts.find((a) => a.id === accountId)?.accountType}
             identity={identities.data?.find((i) => i.accountId === accountId)}
+            documents={documents.data ?? []}
             contacts={contacts.data ?? []}
             onDone={next}
           />
@@ -128,6 +141,7 @@ function HoldersForm({
   accountName,
   accountType,
   identity,
+  documents,
   contacts,
   onDone,
 }: {
@@ -135,6 +149,7 @@ function HoldersForm({
   accountName: string;
   accountType?: string;
   identity?: AccountIdentity;
+  documents: StatementDocument[];
   contacts: ContactSummary[];
   onDone: () => void;
 }) {
@@ -146,10 +161,12 @@ function HoldersForm({
       ? [identity.holderName]
       : [];
   const [rows, setRows] = useState<HolderRow[]>(() => holderRows(printed, contacts));
-  const bank = accountType === "CASH";
+  const bank = isCurrentAccount(accountId, accountType, accountName, documents);
   const [iban, setIban] = useState(formatIban(identity?.iban ?? ""));
   const [bic, setBic] = useState(identity?.bic ?? "");
-  const [institution, setInstitution] = useState(identity?.institution ?? "");
+  const [institution, setInstitution] = useState(() =>
+    guessInstitution(identity, accountId, accountName, documents),
+  );
   const nameOf = (row: HolderRow) =>
     row.choice === NEW
       ? row.name.trim()
@@ -163,8 +180,19 @@ function HoldersForm({
     mutationFn: async () => {
       const compactIban = bank ? iban.replace(/\s+/g, "").toUpperCase() : "";
       const ids: string[] = [];
+      // read again: a save that failed half-way may already have created some of the holders
+      const fresh = await listContacts();
       for (const [i, row] of rows.entries()) {
         let id = row.choice;
+        const known = id === NEW && row.name.trim() ? suggestContact(fresh, row.name) : null;
+        if (known) id = known;
+        if (id === NEW && row.name.trim()) {
+          // the printed name may already be on a contact (a printed name points to one contact only): that contact
+          // is the holder, unless it is another holder of this account, which wrongly carries it and gives it back
+          const held = printedNameOwner(fresh, row.name);
+          if (held && !rows.some((r) => r.choice === held.contactId)) id = held.contactId;
+          else if (held) await removeContactIdentifier(held.id);
+        }
         if (id === NEW) {
           const parsed = parsePrintedName(row.name);
           // the first holder is the person themselves when nobody is yet
@@ -185,7 +213,8 @@ function HoldersForm({
         if (ids.includes(id)) continue;
         ids.push(id);
         await linkContactAccount(id, accountId);
-        if (compactIban) {
+        // an IBAN points to one contact only: the first holder of a joint account carries it
+        if (compactIban && ids.length === 1 && !ibanTaken(fresh, compactIban)) {
           await addContactIdentifier(id, {
             kind: "iban",
             value: compactIban,
