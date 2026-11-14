@@ -1333,6 +1333,53 @@ mod tests {
     }
 
     #[test]
+    fn a_debit_pinned_to_an_instalment_stays_with_it_and_a_doubt_is_never_matched_silently() {
+        use crate::statements::{reconcile, BankDebit, ConfirmedPayment, LoanAnswers};
+        let today = day(2026, 11, 10);
+        let mut view = view_of(today);
+        let rows: Vec<_> = view
+            .plan
+            .rows
+            .iter()
+            .filter(|r| r.kind == "installment")
+            .take(2)
+            .cloned()
+            .collect();
+        let (first, second) = (rows[0].date.unwrap(), rows[1].date.unwrap());
+        // the debit of the first month, that the person says pays the second instalment
+        let debits = vec![BankDebit {
+            activity_id: "early".into(),
+            account_id: "current".into(),
+            date: first,
+            amount: rows[0].total,
+            label: "PRLV ECHEANCE PRET FT14103062".into(),
+        }];
+        view.answers = LoanAnswers {
+            confirmed_payments: vec![ConfirmedPayment {
+                date: second,
+                activity_id: "early".into(),
+            }],
+            ..Default::default()
+        };
+        let payments = reconcile(&view, &debits, &[], today);
+        assert_eq!(payments.lines[0].activity_id, None);
+        assert_eq!(payments.lines[1].activity_id.as_deref(), Some("early"));
+
+        // the right amount on the right day, but a label that does not name the loan: proposed, not found
+        view.answers = LoanAnswers::default();
+        let vague = vec![BankDebit {
+            activity_id: "vague".into(),
+            account_id: "current".into(),
+            date: first,
+            amount: rows[0].total,
+            label: "REMBOURSEMENT".into(),
+        }];
+        let payments = reconcile(&view, &vague, &[], today);
+        assert_eq!(payments.lines[0].state, "proposed");
+        assert!(payments.lines[0].note.is_some());
+    }
+
+    #[test]
     fn what_is_missing_says_where_to_find_it() {
         use crate::statements::{gaps_of, LoanAnswers};
         let today = day(2026, 11, 10);

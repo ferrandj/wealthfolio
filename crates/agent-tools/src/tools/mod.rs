@@ -402,6 +402,7 @@ pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(ValidateLoan),
         Arc::new(GetOperationsToReview),
         Arc::new(GetTodo),
+        Arc::new(MatchLoanPayment),
         Arc::new(CategorizeOperations),
         Arc::new(AttachLoanPayment),
         Arc::new(SyncLoanLiabilities),

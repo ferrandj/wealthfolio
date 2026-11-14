@@ -6,6 +6,7 @@ import { Button } from "@wealthfolio/ui";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLoanMutations, withConfirmed } from "./loan-answers";
 import { day, euros, percent } from "./loans-utils";
+import { LoanMatchDialog } from "./loan-match-dialog";
 
 export function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -220,8 +221,12 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
   const { accounts } = useAccounts({ filterActive: false });
   const payments = new Map((loan.payments?.lines ?? []).map((l) => [l.row, l]));
   const { answer } = useLoanMutations(loan);
+  const [matching, setMatching] = useState<LoanPayment | null>(null);
   return (
     <>
+      {matching ? (
+        <LoanMatchDialog loan={loan} line={matching} onClose={() => setMatching(null)} />
+      ) : null}
       <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
         {open ? t("settings:loans.hide_plan") : t("settings:loans.show_plan")}
       </Button>
@@ -274,6 +279,18 @@ export function LoanPlan({ loan, defaultOpen = false }: { loan: LoanView; defaul
                       line={payments.get(i)}
                       account={accounts.find((a) => a.id === payments.get(i)?.accountId)?.name}
                     />
+                    {payments.get(i) ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ms-1 h-6 px-2 text-xs"
+                        onClick={() => setMatching(payments.get(i) ?? null)}
+                      >
+                        {payments.get(i)?.activityId
+                          ? t("settings:loans.match.change")
+                          : t("settings:loans.match.open")}
+                      </Button>
+                    ) : null}
                   </td>
                 </tr>
               ))}

@@ -35,6 +35,10 @@ async function chooseAccount(user: ReturnType<typeof userEvent.setup>, name: Reg
 }
 
 vi.mock("@/adapters", () => ({
+  getStatementLoans: vi.fn(() => Promise.resolve([])),
+  attachStatementLoanPayment: vi.fn(),
+  setStatementLoanAnswers: vi.fn(),
+  setStatementLoanFirstDue: vi.fn(),
   createActivity: vi.fn(),
   updateActivity: vi.fn((payload: unknown) => Promise.resolve(payload)),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },

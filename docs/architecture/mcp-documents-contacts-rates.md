@@ -152,3 +152,12 @@ by kind (to_categorize = left for later, doubt, loan_to_attach, loan_proposed),
 loans with missing information or an account to validate, accounts without a
 holder, months without a statement, own accounts and counterparties to identify,
 activities flagged for review. Each section names the tools that fix it.
+
+### Loan payments matched one by one
+
+Each instalment already due is matched to one debit. A debit of the right
+amount and day whose label does not name the loan (and no debit account given)
+is only proposed, with a note: a doubt is never matched silently. A debit the
+person pinned to an instalment stays with it. `match_loan_payment` pins a debit
+to one instalment (or detaches the one matched), as the loan screen and the
+transaction form do.

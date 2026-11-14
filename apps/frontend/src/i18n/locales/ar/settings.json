@@ -2513,7 +2513,7 @@
     "wizard_field_iban": "IBAN",
     "wizard_field_bic": "BIC",
     "wizard_field_institution": "Bank",
-    "wizard_field_label": "Account name",
+    "wizard_field_label": "Holders as shown",
     "wizard_create_account": "Create this account in Wealthfolio",
     "wizard_create_account_hint": "As if you had created it yourself: you can then import its statements.",
     "wizard_account_name": "Name in Wealthfolio ({{currency}})",
@@ -2735,6 +2735,30 @@
       "matched": "Loan",
       "proposed": "Proposed loan",
       "to_attach": "Loan to attach"
+    },
+    "match": {
+      "title": "Instalment of {{date}} · {{amount}}",
+      "description": "Choose the operation that pays this instalment: the debits around its date, the same amount first. An operation pays one instalment only.",
+      "current": "Matched: {{date}} · {{amount}}",
+      "detach": "Not this loan",
+      "none": "No debit around this date.",
+      "same_amount": "Exact amount",
+      "other_amount": "Other amount",
+      "used_for": "Matched to the instalment of {{date}}",
+      "gap_one": "{{count}} day apart",
+      "gap_other": "{{count}} days apart",
+      "choose": "Match",
+      "chosen": "Matched",
+      "open": "Match…",
+      "change": "Change",
+      "gap_few": "{{count}} days apart",
+      "gap_many": "{{count}} days apart",
+      "gap_two": "{{count}} days apart",
+      "gap_zero": "{{count}} days apart"
+    },
+    "activity": {
+      "title": "Loan repayment",
+      "instalment": "Instalment no. {{number}} of {{date}} · {{amount}}"
     }
   }
 }

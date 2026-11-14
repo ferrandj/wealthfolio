@@ -103,6 +103,10 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/adapters", () => ({
+  getStatementLoans: vi.fn(() => Promise.resolve([])),
+  attachStatementLoanPayment: vi.fn(),
+  setStatementLoanAnswers: vi.fn(),
+  setStatementLoanFirstDue: vi.fn(),
   createActivity: mocks.createActivity,
   saveActivities: mocks.saveActivities,
   deleteActivity: vi.fn(),

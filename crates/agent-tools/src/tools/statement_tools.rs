@@ -743,3 +743,59 @@ service_tool!(
         }))
     }
 );
+
+service_tool!(
+    MatchLoanPayment, "match_loan_payment", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Match one debit to one instalment of a loan by hand (the loan screen's 'Associer'): loanKey, dueDate (the instalment's due date, YYYY-MM-DD, from get_statement_loans payments) and activityId (the debit). The debit then pays this instalment only (it leaves any other one), and is no longer detached from the loan. With activityId null, the debit currently matched to that instalment is said not to pay this loan (never matched to it again). Doubts (state proposed) are never confirmed silently: they wait for this tool or set_loan_answers. Returns the loans.",
+    schema = object(json!({
+        "loanKey": {"type": "string"},
+        "dueDate": {"type": "string", "description": "The instalment's due date, YYYY-MM-DD."},
+        "activityId": {"type": ["string", "null"], "description": "The debit that pays it, or null to detach the one matched now."}
+    }), &["loanKey", "dueDate"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            loan_key: String,
+            due_date: chrono::NaiveDate,
+            #[serde(default)]
+            activity_id: Option<String>,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        let service = need(env.statement_service(), "Statements")?;
+        let today = chrono::Utc::now().date_naive();
+        let view = service
+            .loans(today)
+            .map_err(fail)?
+            .into_iter()
+            .find(|l| l.key == args.loan_key)
+            .ok_or_else(|| crate::tool::AgentToolError::InvalidInput("Unknown loan".to_string()))?;
+        let mut answers = view.answers.clone();
+        match args.activity_id {
+            Some(id) => {
+                answers.confirmed_payments.retain(|c| c.date != args.due_date && c.activity_id != id);
+                answers.detached_activities.retain(|a| a != &id);
+                answers.confirmed_payments.push(wealthfolio_core::statements::ConfirmedPayment {
+                    date: args.due_date,
+                    activity_id: id,
+                });
+            }
+            None => {
+                let current = view
+                    .payments
+                    .lines
+                    .iter()
+                    .find(|l| l.date == args.due_date)
+                    .and_then(|l| l.activity_id.clone())
+                    .ok_or_else(|| crate::tool::AgentToolError::InvalidInput("No debit is matched to this instalment".to_string()))?;
+                answers.confirmed_payments.retain(|c| c.activity_id != current);
+                if !answers.detached_activities.contains(&current) {
+                    answers.detached_activities.push(current);
+                }
+            }
+        }
+        service.set_loan_answers(&args.loan_key, answers).await.map_err(fail)?;
+        reply(&service.loans(today).map_err(fail)?)
+    }
+);

@@ -1,3 +1,4 @@
+import { ActivityLoanSection } from "@/pages/settings/loans/activity-loan-section";
 import { getCategoryLabel } from "@/lib/taxonomy-labels";
 
 import { isActivityEditCancelled, useActivitySplitReview } from "./activity-split-review-provider";
@@ -989,6 +990,15 @@ export function CashActivityForm({
     />
   );
 
+  // a debit of a loan instalment: which instalment it pays, and the doubts to confirm
+  const loanField =
+    isEditing && activity?.id ? (
+      <ActivityLoanSection
+        activityId={activity.id}
+        activityType={form.watch("activityType") ?? activity.activityType}
+      />
+    ) : null;
+
   // On phones the amount leads the form, large and centred.
   const amountHero = (
     <FormField
@@ -1085,6 +1095,7 @@ export function CashActivityForm({
           {categoryField}
           {eventField}
           {notesField}
+          {loanField}
           {/* Collapsed by default, so the everyday case — a charge in
     the account's own currency — never sees it. Open, it
     covers a foreign charge on a domestic card, which the
@@ -1131,6 +1142,7 @@ export function CashActivityForm({
       {showDetailsFields && (
         <>
           <FormRowGroup>{notesField}</FormRowGroup>
+          {loanField}
           <FormRowGroup>
             <button
               type="button"

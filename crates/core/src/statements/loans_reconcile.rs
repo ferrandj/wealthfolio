@@ -251,6 +251,13 @@ pub fn reconcile(
         .iter()
         .map(|d| view.answers.detached_activities.contains(&d.activity_id))
         .collect();
+    // a debit the person pinned to an instalment is kept for that instalment: no other one takes it on the way
+    let pinned = |id: &str| {
+        view.answers
+            .confirmed_payments
+            .iter()
+            .any(|c| c.activity_id == id)
+    };
     let mut lines: Vec<LoanPayment> = Vec::new();
     for (i, r) in view.plan.rows.iter().enumerate() {
         let Some(date) = r.date.filter(|d| *d <= today) else {
@@ -281,6 +288,7 @@ pub fn reconcile(
                 .enumerate()
                 .filter(|(j, d)| {
                     !used[*j]
+                        && !pinned(&d.activity_id)
                         && same_amount(d.amount, r.total)
                         && d.date >= date - Duration::days(before)
                         && d.date <= date + Duration::days(after)
@@ -310,7 +318,16 @@ pub fn reconcile(
         };
         if let Some((j, d)) = best {
             used[j] = true;
-            line.state = "found".into();
+            // the right amount on the right day, but nothing says it is this loan (no account given, the label does
+            // not name it): a doubt to confirm, never matched silently
+            let sure =
+                confirmed.is_some() || fixed.is_some() || names_the_loan(&view.key, &d.label);
+            line.state = if sure { "found" } else { "proposed" }.into();
+            if !sure {
+                line.note = Some(
+                    "montant et date de l'échéance, mais le libellé ne cite pas ce prêt : à confirmer".into(),
+                );
+            }
             line.activity_id = Some(d.activity_id.clone());
             line.account_id = Some(d.account_id.clone());
             line.paid_on = Some(d.date);
@@ -332,6 +349,7 @@ pub fn reconcile(
             .enumerate()
             .filter(|(j, d)| {
                 !used[*j]
+                    && !pinned(&d.activity_id)
                     && d.amount.abs() > Decimal::ZERO
                     && d.date >= line.date - Duration::days(before)
                     && d.date <= line.date + Duration::days(after)
