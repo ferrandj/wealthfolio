@@ -306,6 +306,9 @@ pub struct ReviewedOperation {
     /// The operation is money moved between own accounts, but the other account is not one Wealthfolio knows.
     #[serde(default)]
     pub other_account_unknown: bool,
+    /// A transfer between own accounts linked to its other leg: the account the money went to or came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer_account_id: Option<String>,
     /// A loan instalment (or early repayment): the loan it pays, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loan_key: Option<String>,

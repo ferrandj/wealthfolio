@@ -2112,7 +2112,14 @@
     "chain_next_gap": "Days are missing between this statement and the next one ({{name}}).",
     "chain_next_overlap": "The next statement ({{name}}) overlaps this one.",
     "chain_next_balance_off": "The next statement's opening balance ({{name}}) does not take up this closing balance.",
-    "chain_go_previous": "See the previous statement"
+    "chain_go_previous": "See the previous statement",
+    "transfer_linked": "With the account {{account}}",
+    "transfer_with": "Link to {{account}}",
+    "transfer_which": "Which other account? (you can do it later)",
+    "transfer_choose": "Choose the account",
+    "transfer_other": "Another account",
+    "transfer_link_error": "Could not link the two accounts",
+    "review_previous": "Previous"
   },
   "identity": {
     "title": "Account details",

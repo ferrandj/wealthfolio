@@ -143,7 +143,11 @@ fn non_empty(s: &Option<String>) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-fn transaction(t: &TransactionData, holder: Option<&str>) -> TransactionPreview {
+fn transaction(
+    t: &TransactionData,
+    holder: Option<&str>,
+    account_type: Option<&str>,
+) -> TransactionPreview {
     let amount = t.amount.to_string().parse::<f64>().unwrap_or(0.0);
     let (counterparty, memo, kind) = (
         non_empty(&t.counterparty),
@@ -157,6 +161,7 @@ fn transaction(t: &TransactionData, holder: Option<&str>) -> TransactionPreview 
         kind: kind.as_deref(),
         amount,
         holder_name: holder,
+        account_type,
     });
     TransactionPreview {
         date: t.date.format("%Y-%m-%d").to_string(),
@@ -231,7 +236,13 @@ fn statement(index: usize, st: &ParsedStatement) -> StatementPreview {
         transactions: st
             .transactions
             .iter()
-            .map(|t| transaction(t, non_empty(&st.holder_name).as_deref()))
+            .map(|t| {
+                transaction(
+                    t,
+                    non_empty(&st.holder_name).as_deref(),
+                    st.account_type.as_deref(),
+                )
+            })
             .collect(),
         holdings_count: st.holdings.as_ref().map(|h| h.len()).unwrap_or(0),
         warnings: st.warnings.clone(),

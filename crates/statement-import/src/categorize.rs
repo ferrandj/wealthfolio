@@ -66,6 +66,32 @@ fn rule(
 // Outgoing money. First match wins, so the specific merchants come before the generic keywords.
 static EXPENSE_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
+        // a notary: the deposit or the contribution paid for a purchase, the notary's fees
+        rule(
+            r"\b(NOTAIRES?|NOTARIAL|NOTARIALE|ETUDE NOTARIALE|OFFICE NOTARIAL|SCP NOTAIRES?|CDC NOTAIRE)\b",
+            "housing_notary",
+            HIGH,
+            Some("Notaire (achat immobilier)"),
+        ),
+        // money put on an investment of the person: a life insurance, a PEA, a retirement plan
+        rule(
+            r"\b(VRST|VERST|VERSEMENT)\b.*\b(VIE|ASSURANCE.?VIE|AV)\b|\b(FORTUNEO VIE|LINXEA|SPIRICA|SURAVENIR|PREDICA|GENERALI VIE|ASSURANCE.?VIE)\b",
+            "investments_life",
+            HIGH,
+            Some("Versement sur une assurance-vie"),
+        ),
+        rule(
+            r"\b(VRST|VERST|VERSEMENT)\b.*\bPEA\b",
+            "investments_pea",
+            HIGH,
+            Some("Versement sur un PEA"),
+        ),
+        rule(
+            r"\b(VRST|VERST|VERSEMENT)\b.*\b(PER|PERP|PERCO|PERIN)\b",
+            "investments_retirement",
+            HIGH,
+            Some("Versement sur un plan d'épargne retraite"),
+        ),
         // the transfer a bank asks to open an account: money moved from or to the person's other account
         rule(
             r"(VIREMENT CREATION COMPTE|VIREMENT D'?OUVERTURE|VIREMENT DE CREATION)",
@@ -360,7 +386,13 @@ static INCOME_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
             None,
         ),
         rule(
-            r"(PRIME BRS|OFFRE MOBILITE|MOBILITE BANCAIRE|PARRAINAGE|PRIME DE BIENVENUE|BIENVENUE|PRIME )",
+            r"\bPRIMES? (DE )?(SOUSCRIPTION|OUVERTURE|BIENVENUE|PARRAINAGE)\b",
+            "income_prime",
+            HIGH,
+            Some("Prime versée par la banque (souscription, ouverture…)"),
+        ),
+        rule(
+            r"(PRIME BRS|OFFRE MOBILITE|MOBILITE BANCAIRE|PARRAINAGE|BIENVENUE|\bPRIMES?\b)",
             "income_prime",
             MEDIUM,
             Some("Prime ou offre d'une banque"),
@@ -506,7 +538,21 @@ pub struct CategoryInput<'a> {
     /// Signed: negative for money going out.
     pub amount: f64,
     pub holder_name: Option<&'a str>,
+    /// The kind of account the statement is for (checking, savings, livret_a, ldds, pel…).
+    pub account_type: Option<&'a str>,
 }
+
+/// Savings accounts: money only comes from and goes back to the holder's own current account.
+const SAVINGS_ACCOUNTS: &[&str] = &[
+    "savings",
+    "livret_a",
+    "ldds",
+    "lep",
+    "livret_jeune",
+    "pel",
+    "cel",
+    "term_deposit",
+];
 
 fn worse(a: &'static str, b: &'static str) -> &'static str {
     let rank = |c: &str| match c {
@@ -549,6 +595,24 @@ pub fn suggest(input: &CategoryInput) -> CategorySuggestion {
         } else {
             suggestion(taxonomy, "income_interest", HIGH, None)
         };
+    }
+    // on a savings account, every deposit or withdrawal is money moved from or to the holder's current account:
+    // a transfer between own accounts, whatever the label says ("Virement avec Fortuneo Livre", "Versement initial")
+    if input
+        .account_type
+        .is_some_and(|t| SAVINGS_ACCOUNTS.contains(&t))
+        && !matches!(kind, "fee" | "tax")
+    {
+        return suggestion(
+            taxonomy,
+            if outgoing {
+                "transfers_own"
+            } else {
+                "income_transfers_own"
+            },
+            HIGH,
+            Some("Livret : les versements et retraits passent par vos propres comptes".into()),
+        );
     }
     if kind == "loan_payment" && outgoing {
         return suggestion(
@@ -707,11 +771,38 @@ mod tests {
             kind: Some(kind),
             amount,
             holder_name: Some("M FERRAND JEREMIE"),
+            account_type: None,
         }
     }
 
     fn cat(label: &str, cp: Option<&str>, kind: &str, amount: f64) -> CategorySuggestion {
         suggest(&input(label, cp, kind, amount))
+    }
+
+    #[test]
+    fn every_movement_of_a_savings_account_is_a_transfer_between_own_accounts() {
+        for (label, amount, category) in [
+            (
+                "Virement avec Fortuneo Livre",
+                130.0,
+                "cat_income_transfers_own",
+            ),
+            ("Versement Initial", 10.0, "cat_income_transfers_own"),
+            ("Virement avec Fortuneo Compt", -15.0, "cat_transfers_own"),
+        ] {
+            let s = suggest(&CategoryInput {
+                account_type: Some("savings"),
+                ..input(label, None, "transfer", amount)
+            });
+            assert_eq!(s.category_id, category, "{label}");
+            assert_eq!(s.confidence, HIGH);
+        }
+        // the interest stays interest
+        let interest = suggest(&CategoryInput {
+            account_type: Some("livret_a"),
+            ..input("Intérêts 2023", None, "interest", 3.2)
+        });
+        assert_eq!(interest.category_id, "cat_income_interest");
     }
 
     #[test]
@@ -925,6 +1016,14 @@ mod tests {
         assert_eq!(s.category_id, "cat_income_prime");
         let s2 = cat("Offre Mobilite Bancaire", None, "other", 50.0);
         assert_eq!(s2.category_id, "cat_income_prime");
+        let av = cat("VRST FORTUNEO VIE 734639427101", None, "transfer", -100.0);
+        assert_eq!(av.category_id, "cat_investments_life");
+        assert_eq!(av.confidence, HIGH);
+        let notary = cat("APPORT NOTAIRE", None, "transfer", -9518.0);
+        assert_eq!(notary.category_id, "cat_housing_notary");
+        let s3 = cat("PRIMES SOUSCRIPTION AV", None, "other", 80.0);
+        assert_eq!(s3.category_id, "cat_income_prime");
+        assert_eq!(s3.confidence, HIGH);
     }
 
     #[test]
@@ -948,6 +1047,12 @@ mod tests {
             ),
             include_str!(
                 "../../storage-sqlite/migrations/2026-11-10-000009_transfer_categories/up.sql"
+            ),
+            include_str!(
+                "../../storage-sqlite/migrations/2026-11-13-000012_investment_categories/up.sql"
+            ),
+            include_str!(
+                "../../storage-sqlite/migrations/2026-11-14-000013_notary_category/up.sql"
             ),
         ]
         .join("\n");

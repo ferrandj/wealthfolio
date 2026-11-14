@@ -2113,13 +2113,45 @@ impl StatementService {
             let tagged =
                 operation_rows_tagged(preview, &currency, account_id.as_deref().unwrap_or(""));
             let mut matched: Vec<Option<String>> = Vec::with_capacity(tagged.len());
+            // the transfer group of each matched operation: the other leg tells which own account it went to
+            let mut groups: HashMap<String, String> = HashMap::new();
             for (row, _) in &tagged {
                 let list = by_key.get_mut(&operation_key(row));
                 matched.push(match list {
-                    Some(list) if !list.is_empty() => Some(list.remove(0).id),
+                    Some(list) if !list.is_empty() => {
+                        let a = list.remove(0);
+                        if let Some(group) = a.source_group_id.clone() {
+                            groups.insert(a.id.clone(), group);
+                        }
+                        Some(a.id)
+                    }
                     _ => None,
                 });
             }
+            let other_legs: HashMap<String, String> = if groups.is_empty() {
+                HashMap::new()
+            } else {
+                let wanted: HashSet<&String> = groups.values().collect();
+                let mut by_group: HashMap<String, Vec<(String, String)>> = HashMap::new();
+                for a in self.activity_service.get_activities()? {
+                    if let Some(group) = a.source_group_id.as_ref().filter(|g| wanted.contains(g)) {
+                        by_group
+                            .entry(group.clone())
+                            .or_default()
+                            .push((a.id.clone(), a.account_id.clone()));
+                    }
+                }
+                groups
+                    .iter()
+                    .filter_map(|(id, group)| {
+                        by_group
+                            .get(group)?
+                            .iter()
+                            .find(|(other, _)| other != id)
+                            .map(|(_, account)| (id.clone(), account.clone()))
+                    })
+                    .collect()
+            };
             let ids: Vec<String> = matched.iter().flatten().cloned().collect();
             let current = if ids.is_empty() {
                 vec![]
@@ -2173,7 +2205,10 @@ impl StatementService {
                         (_, Some(tax), Some(cat)) => is_own_transfer_category(tax, cat),
                         _ => false,
                     };
+                    let transfer_account_id =
+                        activity_id.as_ref().and_then(|id| other_legs.get(id).cloned());
                     let other_account_unknown = own_transfer
+                        && transfer_account_id.is_none()
                         && !t
                             .counterparty_iban
                             .as_deref()
@@ -2222,6 +2257,7 @@ impl StatementService {
                             && ((guessed && t.category_confidence == "low") || outdated),
                         outdated,
                         other_account_unknown,
+                        transfer_account_id,
                         loan_key: None,
                         loan_label: None,
                         loan_state: None,

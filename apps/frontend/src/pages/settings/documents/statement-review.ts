@@ -54,6 +54,33 @@ export function parseReviewReason(value: string | null | undefined): StatementRe
   }
 }
 
+/** Whether a category is "account to account" (money moved between the person's own accounts). */
+export function isOwnTransferCategory(
+  taxonomyId: string | null | undefined,
+  categoryId: string | null | undefined,
+): boolean {
+  if (!categoryId) return false;
+  if (taxonomyId === "spending_categories") {
+    return categoryId === "cat_transfers" || categoryId.startsWith("cat_transfers_");
+  }
+  if (taxonomyId === "income_sources") {
+    return categoryId === "cat_income_transfers" || categoryId.startsWith("cat_income_transfers_");
+  }
+  return false;
+}
+
+/** Money put on an investment of the person (life insurance, PEA…): it goes to another of their accounts. */
+export function isInvestmentCategory(
+  taxonomyId: string | null | undefined,
+  categoryId: string | null | undefined,
+): boolean {
+  return (
+    taxonomyId === "spending_categories" &&
+    !!categoryId &&
+    (categoryId === "cat_investments" || categoryId.startsWith("cat_investments_"))
+  );
+}
+
 /** "Account to account": money moved between the person's own accounts, neither spent nor earned. */
 export function ownTransferChoice(amount: string): ReviewChoice {
   return Number(amount) < 0

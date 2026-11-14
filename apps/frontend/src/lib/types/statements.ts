@@ -277,6 +277,8 @@ export interface ReviewedOperation {
   outdated?: boolean;
   /** Money moved between own accounts, but the other account is not one Wealthfolio knows. */
   otherAccountUnknown?: boolean;
+  /** A transfer between own accounts linked to its other leg: the account on the other side. */
+  transferAccountId?: string | null;
   /** The loan this payment pays, when known. */
   loanKey?: string | null;
   loanLabel?: string | null;

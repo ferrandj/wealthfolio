@@ -2367,7 +2367,14 @@
     "chain_earlier_pending_few": "{{count}} older statements of this account are not validated.",
     "chain_earlier_pending_many": "{{count}} older statements of this account are not validated.",
     "chain_earlier_pending_two": "{{count}} older statements of this account are not validated.",
-    "chain_earlier_pending_zero": "{{count}} older statements of this account are not validated."
+    "chain_earlier_pending_zero": "{{count}} older statements of this account are not validated.",
+    "transfer_linked": "With the account {{account}}",
+    "transfer_with": "Link to {{account}}",
+    "transfer_which": "Which other account? (you can do it later)",
+    "transfer_choose": "Choose the account",
+    "transfer_other": "Another account",
+    "transfer_link_error": "Could not link the two accounts",
+    "review_previous": "Previous"
   },
   "identity": {
     "title": "Account details",

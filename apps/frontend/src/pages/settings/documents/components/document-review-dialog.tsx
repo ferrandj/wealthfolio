@@ -6,6 +6,7 @@ import {
 } from "@/adapters";
 import { invalidateLoanCaches } from "../../loans/loan-caches";
 import { LoanPaymentPicker } from "../../loans/loan-payment-picker";
+import { OwnTransferAccount } from "./own-transfer-account";
 import { QuickCategorizePopover } from "@/features/spending/components/quick-categorize-popover";
 import {
   LOAN_KINDS,
@@ -41,6 +42,8 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   confirmDoubts,
+  isInvestmentCategory,
+  isOwnTransferCategory,
   ownTransferChoice,
   suggestedChoice,
   type ReviewChoice,
@@ -188,9 +191,12 @@ export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogPr
   const open = currentId !== null;
 
   const [done, setDone] = useState<string[]>([]);
+  // the documents seen before this one, to go back to them
+  const [history, setHistory] = useState<string[]>([]);
   const next = (after: string, validated: string[] = []) => {
     const gone = [...done, ...validated, after];
     setDone(gone);
+    setHistory((h) => [...h, after]);
     const remaining = queue.filter((d) => !gone.includes(d.id) && !skipped.includes(d.id));
     setCurrentId(remaining[0]?.id ?? null);
     if (remaining.length === 0) onClose();
@@ -210,6 +216,17 @@ export function DocumentReviewDialog({ startId, queue, onClose }: ReviewDialogPr
               next(currentId);
             }}
             onValidated={(validated) => next(currentId, validated)}
+            onPrevious={
+              history.length > 0
+                ? () => {
+                    const previous = history[history.length - 1];
+                    setHistory((h) => h.slice(0, -1));
+                    setDone((d) => d.filter((x) => x !== previous));
+                    setSkipped((x) => x.filter((y) => y !== previous));
+                    setCurrentId(previous);
+                  }
+                : undefined
+            }
             onClose={onClose}
           />
         )}
@@ -224,12 +241,15 @@ function ReviewBody({
   onGoTo,
   onSkip,
   onValidated,
+  onPrevious,
   onClose,
 }: {
   id: string;
   remaining: number;
   onGoTo: (id: string) => void;
   onSkip: () => void;
+  /** Back to the document seen before this one (validated or skipped). */
+  onPrevious?: () => void;
   /** The papers validated with this one (all the papers of a loan account). */
   onValidated: (validated: string[]) => void;
   onClose: () => void;
@@ -465,6 +485,17 @@ function ReviewBody({
         </label>
       )}
       <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
+        {onPrevious ? (
+          <Button
+            variant="ghost"
+            className="me-auto"
+            onClick={onPrevious}
+            disabled={validate.isPending}
+          >
+            <Icons.ChevronLeft className="mr-1 size-4" />
+            {t("settings:documents.review_previous")}
+          </Button>
+        ) : null}
         <Button variant="ghost" onClick={onClose}>
           {t("settings:documents.review_close")}
         </Button>
@@ -601,7 +632,7 @@ export function OperationRow({
             })}
           </div>
         )}
-        {op.otherAccountUnknown && (
+        {op.otherAccountUnknown && !isOwnTransferCategory(taxonomyId, categoryId) && (
           <div className="text-xs text-amber-700">
             {t("settings:documents.review_unknown_account")}
           </div>
@@ -643,6 +674,8 @@ export function OperationRow({
           />
         ) : null}
         <LoanPaymentPicker op={op} />
+        {(isOwnTransferCategory(taxonomyId, categoryId) ||
+          isInvestmentCategory(taxonomyId, categoryId)) && <OwnTransferAccount op={op} />}
         {doubtful && op.activityId && (
           <div className="flex w-full flex-wrap gap-2">
             {suggestion && (

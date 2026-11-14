@@ -2196,7 +2196,14 @@
     "chain_next_overlap": "Le relevé suivant ({{name}}) chevauche celui-ci.",
     "chain_next_balance_off": "Le solde d'ouverture du relevé suivant ({{name}}) ne reprend pas la clôture de celui-ci.",
     "chain_go_previous": "Voir le relevé précédent",
-    "chain_earlier_pending_many": "{{count}} relevés plus anciens de ce compte ne sont pas validés."
+    "chain_earlier_pending_many": "{{count}} relevés plus anciens de ce compte ne sont pas validés.",
+    "transfer_linked": "Avec le compte {{account}}",
+    "transfer_with": "Associer à {{account}}",
+    "transfer_which": "Quel autre compte ? (vous pourrez le faire plus tard)",
+    "transfer_choose": "Choisir le compte",
+    "transfer_other": "Autre compte",
+    "transfer_link_error": "Impossible d'associer les deux comptes",
+    "review_previous": "Précédent"
   },
   "identity": {
     "title": "Coordonnées du compte",
