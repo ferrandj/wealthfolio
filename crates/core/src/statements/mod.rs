@@ -3,6 +3,7 @@
 //! address, IBAN, BIC, RIB) is stored with the account so it can be copied.
 
 mod contract_holdings;
+mod document_sources;
 mod loans;
 mod loans_liabilities;
 mod loans_plan;
@@ -14,6 +15,10 @@ mod statements_service;
 mod statements_traits;
 
 pub use contract_holdings::{holding_symbol, ContractHoldings, ContractHoldingsTrait};
+pub use document_sources::{
+    document_sources, source_key, DocumentSource, DocumentSourceSettings, DEFAULT_EVERY_DAYS,
+    DOCUMENT_SOURCES_KEY,
+};
 pub use loans::{
     assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,
 };

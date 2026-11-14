@@ -103,7 +103,7 @@ pub struct AccountIdentityInput {
 }
 
 /// A stored original (its bytes stay in the repository; this is what lists show).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct StatementDocument {
     pub id: String,

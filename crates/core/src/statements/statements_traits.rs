@@ -107,6 +107,21 @@ pub trait StatementServiceTrait: Send + Sync {
     /// The same for some documents only (a bank, an account, a kind of document): they go back to waiting for
     /// review. Returns how many were invalidated.
     async fn invalidate_documents(&self, ids: &[String]) -> Result<u32>;
+    /// The documents brought back regularly, one source per account and kind of reading: how the person gets each,
+    /// how often, and which ones are due today.
+    fn document_sources(&self) -> Result<Vec<super::DocumentSource>>;
+    /// What the person says about a source (how they get it, how often). Returns the sources.
+    async fn set_document_source(
+        &self,
+        key: &str,
+        settings: super::DocumentSourceSettings,
+    ) -> Result<Vec<super::DocumentSource>>;
+    /// Put these sources off until `until` ("later"). Returns the sources.
+    async fn snooze_document_sources(
+        &self,
+        keys: &[String],
+        until: chrono::NaiveDate,
+    ) -> Result<Vec<super::DocumentSource>>;
     /// Remove documents and everything they brought: their operations (a transfer whose other leg stays is unpaired
     /// first), then the accounts left with no document and no operation, and the loan accounts left without
     /// papers. With `dry_run`, nothing changes: the report says what would go.

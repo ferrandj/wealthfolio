@@ -140,3 +140,52 @@ async fn removing_documents_takes_their_operations_and_the_accounts_they_leave_e
     assert!(state.account_service.get_account(&a.id).is_err());
     assert!(state.account_service.get_account(&b.id).is_ok());
 }
+
+#[tokio::test]
+async fn a_source_remembers_how_the_document_is_obtained() {
+    let root = tempdir().unwrap();
+    let state = build_state(&test_config(root.path())).await.unwrap();
+    let a = state
+        .account_service
+        .create_account(new_account("Current"))
+        .await
+        .unwrap();
+    state
+        .statement_service
+        .import(StatementImportRequest {
+            file_name: "a.ofx".into(),
+            content_base64: base64::engine::general_purpose::STANDARD
+                .encode(ofx("11111111111", "A")),
+            adapter_id: None,
+            overrides: vec![StatementOverride {
+                index: 0,
+                account_id: Some(a.id.clone()),
+                new_account_name: None,
+                skip: false,
+                identity: None,
+            }],
+            allow_duplicate_document: false,
+            replace_document_ids: vec![],
+        })
+        .await
+        .unwrap();
+    let sources = state.statement_service.document_sources().unwrap();
+    assert_eq!(sources.len(), 1);
+    assert!(sources[0].needs_setup);
+    let key = sources[0].key.clone();
+    let after = state
+        .statement_service
+        .set_document_source(
+            &key,
+            wealthfolio_core::statements::DocumentSourceSettings {
+                how_to: Some("Banque > Relevés > OFX".into()),
+                every_days: Some(7),
+                snoozed_until: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(after[0].how_to.as_deref(), Some("Banque > Relevés > OFX"));
+    assert_eq!(after[0].every_days, 7);
+    assert!(!after[0].needs_setup);
+}

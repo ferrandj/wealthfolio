@@ -192,6 +192,45 @@ pub async fn invalidate_all_statement_documents(state: ProfileAccess) -> Result<
 }
 
 #[tauri::command]
+pub async fn get_statement_document_sources(
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::DocumentSource>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .document_sources()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_statement_document_source(
+    key: String,
+    settings: wealthfolio_core::statements::DocumentSourceSettings,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::DocumentSource>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .set_document_source(&key, settings)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn snooze_statement_document_sources(
+    keys: Vec<String>,
+    until: chrono::NaiveDate,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::statements::DocumentSource>, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .snooze_document_sources(&keys, until)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn invalidate_statement_documents(
     ids: Vec<String>,
     state: ProfileAccess,

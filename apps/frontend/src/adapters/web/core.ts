@@ -194,6 +194,9 @@ export const COMMANDS: CommandMap = {
   invalidate_all_statement_documents: { method: "POST", path: "/statements/invalidate" },
   invalidate_statement_documents: { method: "POST", path: "/statements/documents/invalidate" },
   purge_statement_documents: { method: "POST", path: "/statements/documents/purge" },
+  get_statement_document_sources: { method: "GET", path: "/statements/sources" },
+  set_statement_document_source: { method: "PUT", path: "/statements/sources" },
+  snooze_statement_document_sources: { method: "POST", path: "/statements/sources/snooze" },
   list_account_identities: { method: "GET", path: "/statements/identities" },
   get_account_identity: { method: "GET", path: "/statements/identities" },
   save_account_identity: { method: "PUT", path: "/statements/identities" },
@@ -1216,6 +1219,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       const { documentId, choice } = payload as { documentId: string; choice: unknown };
       url += `/${encodeURIComponent(documentId)}/loan`;
       body = JSON.stringify(choice);
+      break;
+    }
+    case "set_statement_document_source": {
+      const { key, settings } = payload as { key: string; settings: unknown };
+      body = JSON.stringify({ key, settings });
+      break;
+    }
+    case "snooze_statement_document_sources": {
+      const { keys, until } = payload as { keys: string[]; until: string };
+      body = JSON.stringify({ keys, until });
       break;
     }
     case "invalidate_statement_documents": {

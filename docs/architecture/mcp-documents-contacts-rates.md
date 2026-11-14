@@ -183,3 +183,11 @@ value date: the account switches to holdings tracking, each fund is a
 hand-priced asset found again by its ISIN, its net asset value is its price.
 Removing the document takes those holdings back. The operations copied from the
 site (Date;Opération;Statut;Montant) are read like the CSV export.
+
+### Documents brought back regularly
+
+Each account and kind of reading is a source of documents. The user says once
+how they get it (`howTo`) and how often to ask (`everyDays`, default 14, 0
+never); when a source is due, the app asks for it when it opens, with the
+expected format and how to get it. `get_document_sources`,
+`set_document_source`.

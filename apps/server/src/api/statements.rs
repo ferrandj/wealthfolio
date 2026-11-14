@@ -188,6 +188,50 @@ struct DocumentIdsBody {
     dry_run: bool,
 }
 
+async fn document_sources(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::DocumentSource>>> {
+    Ok(Json(state.statement_service.document_sources()?))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentSourceBody {
+    key: String,
+    settings: wealthfolio_core::statements::DocumentSourceSettings,
+}
+
+async fn set_document_source(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<DocumentSourceBody>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::DocumentSource>>> {
+    Ok(Json(
+        state
+            .statement_service
+            .set_document_source(&body.key, body.settings)
+            .await?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SnoozeSourcesBody {
+    keys: Vec<String>,
+    until: chrono::NaiveDate,
+}
+
+async fn snooze_document_sources(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<SnoozeSourcesBody>,
+) -> ApiResult<Json<Vec<wealthfolio_core::statements::DocumentSource>>> {
+    Ok(Json(
+        state
+            .statement_service
+            .snooze_document_sources(&body.keys, body.until)
+            .await?,
+    ))
+}
+
 async fn invalidate_documents(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<DocumentIdsBody>,
@@ -448,6 +492,11 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
             post(invalidate_documents),
         )
         .route("/statements/documents/purge", post(purge_documents))
+        .route(
+            "/statements/sources",
+            get(document_sources).put(set_document_source),
+        )
+        .route("/statements/sources/snooze", post(snooze_document_sources))
         .route("/statements/documents/{id}/review", get(review_document))
         .route(
             "/statements/documents/{id}/validate",

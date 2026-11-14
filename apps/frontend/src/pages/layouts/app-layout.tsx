@@ -5,6 +5,7 @@ import AppLauncher from "@/components/app-launcher";
 import { MobileLoadingIndicator } from "@/components/mobile-loading-indicator";
 import { RatesReviewDialog } from "@/components/rates-review-dialog";
 import { UpdateDialog } from "@/components/update-dialog";
+import { DocumentSourcesReminder } from "@/pages/settings/documents/sources/document-sources-dialogs";
 import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
 import { useActiveAppSyncTrigger } from "@/features/devices-sync/hooks/use-active-app-sync-trigger";
 import { usePostLoginConnectSync } from "@/features/wealthfolio-connect/hooks";
@@ -154,6 +155,7 @@ const AppLayoutContent = () => {
         <AppLauncher />
         <RatesReviewDialog />
         <UpdateDialog />
+        <DocumentSourcesReminder />
       </ApplicationShell>
     </ErrorBoundary>
   );

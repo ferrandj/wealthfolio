@@ -838,3 +838,36 @@ service_tool!(
         reply(&need(env.statement_service(), "Statements")?.purge_documents(&args.document_ids, args.dry_run).await.map_err(fail)?)
     }
 );
+
+service_tool!(
+    GetDocumentSources, "get_document_sources", Read, additive = true,
+    scopes = [DocumentsRead],
+    description = "The documents the user brings back regularly, one source per account and kind of reading (a life insurance's positions, a bank's statements…): label, expected formats, how the user gets the document (howTo), how often (everyDays, 0 = never asked), the last import, and whether one is due today. Use it to tell the user exactly what to bring and how to get it.",
+    schema = no_args(),
+    |env, _args| {
+        reply(&need(env.statement_service(), "Statements")?.document_sources().map_err(fail)?)
+    }
+);
+
+service_tool!(
+    SetDocumentSource, "set_document_source", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Record what the user says about a source of documents (key from get_document_sources): howTo (how they get it, e.g. 'Fortuneo > Assurance-vie > Positions, copy the table into a CSV'), everyDays (how often to ask, 0 never), snoozedUntil (YYYY-MM-DD, not asked before). Replaces the source's settings. Returns the sources.",
+    schema = object(json!({
+        "key": {"type": "string"},
+        "howTo": {"type": ["string", "null"]},
+        "everyDays": {"type": ["integer", "null"], "minimum": 0},
+        "snoozedUntil": {"type": ["string", "null"], "description": "YYYY-MM-DD"}
+    }), &["key"]),
+    |env, args| {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            key: String,
+            #[serde(flatten)]
+            settings: wealthfolio_core::statements::DocumentSourceSettings,
+        }
+        let args: Args = serde_json::from_value(args)?;
+        reply(&need(env.statement_service(), "Statements")?.set_document_source(&args.key, args.settings).await.map_err(fail)?)
+    }
+);

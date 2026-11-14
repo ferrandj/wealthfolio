@@ -1,5 +1,6 @@
 import { analyzeStatement, importStatement, logger, purgeStatementDocuments } from "@/adapters";
 import { LoanAccountDialog } from "../loans/loan-account-dialog";
+import { DescribeNewSourcesDialog, DocumentSourcesPanel } from "./sources/document-sources-dialogs";
 import { invalidateLoanCaches } from "../loans/loan-caches";
 import { LOAN_KINDS } from "./components/loan-validation-card";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -41,6 +42,8 @@ export default function DocumentsPage() {
   const [newAccounts, setNewAccounts] = useState<string[]>([]);
   // each loan paper imported is attached to its loan account at once (made now, empty, if it does not exist)
   const [attachQueue, setAttachQueue] = useState<string[]>([]);
+  // after an import: the sources brought for the first time are described once (how to get them, how often)
+  const [describe, setDescribe] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const patchFile = useCallback((id: string, patch: Partial<PendingFile>) => {
@@ -117,6 +120,8 @@ export default function DocumentsPage() {
           o.createdAccount && o.accountId ? [o.accountId] : [],
         );
         if (created.length > 0) setNewAccounts((list) => [...new Set([...list, ...created])]);
+        void queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENT_SOURCES] });
+        setDescribe(true);
         const imported = result.document;
         if (
           imported &&
@@ -270,6 +275,8 @@ export default function DocumentsPage() {
 
       <CoverageCard />
 
+      <DocumentSourcesPanel />
+
       <SupportedDocuments />
 
       <Separator />
@@ -283,6 +290,9 @@ export default function DocumentsPage() {
       />
       {newAccounts.length > 0 && !busy ? (
         <AccountOwnerPrompt accountIds={newAccounts} onClose={() => setNewAccounts([])} />
+      ) : null}
+      {describe && !busy && newAccounts.length === 0 && attachQueue.length === 0 ? (
+        <DescribeNewSourcesDialog onClose={() => setDescribe(false)} />
       ) : null}
     </div>
   );

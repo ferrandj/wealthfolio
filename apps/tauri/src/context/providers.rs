@@ -675,6 +675,8 @@ async fn build_context(
         wealthfolio_core::statements::LoanLiabilities::new(alternative_asset_service.clone()),
     ));
     // the positions of an investment contract read from a document become its holdings
+    // the documents brought back regularly: how they are obtained, how often
+    statement_concrete.attach_settings(settings_service.clone());
     statement_concrete.attach_contract_holdings(Arc::new(
         wealthfolio_core::statements::ContractHoldings::new(
             account_service.clone(),

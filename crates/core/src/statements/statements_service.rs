@@ -487,6 +487,7 @@ pub struct StatementService {
     /// Keeps the liability (Passifs) of every loan rebuilt from the papers; none in the tests that do not need it.
     loan_liabilities: std::sync::OnceLock<Arc<super::LoanLiabilities>>,
     contract_holdings: std::sync::OnceLock<Arc<dyn super::ContractHoldingsTrait>>,
+    settings: std::sync::OnceLock<Arc<dyn crate::settings::SettingsServiceTrait>>,
 }
 
 impl StatementService {
@@ -505,7 +506,39 @@ impl StatementService {
             counterparties,
             loan_liabilities: std::sync::OnceLock::new(),
             contract_holdings: std::sync::OnceLock::new(),
+            settings: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Where the documents' sources are remembered (how the person gets each, how often). Set once.
+    pub fn attach_settings(&self, settings: Arc<dyn crate::settings::SettingsServiceTrait>) {
+        let _ = self.settings.set(settings);
+    }
+
+    fn source_settings(&self) -> HashMap<String, super::DocumentSourceSettings> {
+        self.settings
+            .get()
+            .and_then(|s| {
+                s.get_setting_value(super::DOCUMENT_SOURCES_KEY)
+                    .ok()
+                    .flatten()
+            })
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default()
+    }
+
+    async fn save_source_settings(
+        &self,
+        all: &HashMap<String, super::DocumentSourceSettings>,
+    ) -> Result<()> {
+        let settings = self
+            .settings
+            .get()
+            .ok_or_else(|| invalid("Settings are not available"))?;
+        let json = serde_json::to_string(all).map_err(|e| invalid(e.to_string()))?;
+        settings
+            .set_setting_value(super::DOCUMENT_SOURCES_KEY, &json)
+            .await
     }
 
     /// Also set an investment contract's holdings from the documents that list them (the positions of a life
@@ -2780,6 +2813,39 @@ impl StatementServiceTrait for StatementService {
             warn!("could not update the loan documents: {e}");
         }
         Ok(report)
+    }
+
+    fn document_sources(&self) -> Result<Vec<super::DocumentSource>> {
+        Ok(super::document_sources(
+            &self.repository.list_documents()?,
+            &self.source_settings(),
+            &wealthfolio_statement_import::supported_documents(),
+            Utc::now().date_naive(),
+        ))
+    }
+
+    async fn set_document_source(
+        &self,
+        key: &str,
+        settings: super::DocumentSourceSettings,
+    ) -> Result<Vec<super::DocumentSource>> {
+        let mut all = self.source_settings();
+        all.insert(key.to_string(), settings);
+        self.save_source_settings(&all).await?;
+        self.document_sources()
+    }
+
+    async fn snooze_document_sources(
+        &self,
+        keys: &[String],
+        until: NaiveDate,
+    ) -> Result<Vec<super::DocumentSource>> {
+        let mut all = self.source_settings();
+        for key in keys {
+            all.entry(key.clone()).or_default().snoozed_until = Some(until);
+        }
+        self.save_source_settings(&all).await?;
+        self.document_sources()
     }
 
     async fn invalidate_documents(&self, ids: &[String]) -> Result<u32> {

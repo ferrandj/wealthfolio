@@ -1,6 +1,8 @@
 // Bank statements & account documents
 import type {
   AccountCoverage,
+  DocumentSource,
+  DocumentSourceSettings,
   PurgeReport,
   LoanAssetLink,
   LoanAssetLinked,
@@ -109,6 +111,26 @@ export const revalidateAllStatementDocuments = async (): Promise<RevalidationRes
 };
 
 /** Every validated statement goes back to waiting for review; returns how many. */
+/** The documents brought back regularly: how each is obtained, how often, which are due. */
+export const getStatementDocumentSources = async (): Promise<DocumentSource[]> => {
+  return invoke<DocumentSource[]>("get_statement_document_sources");
+};
+
+export const setStatementDocumentSource = async (
+  key: string,
+  settings: DocumentSourceSettings,
+): Promise<DocumentSource[]> => {
+  return invoke<DocumentSource[]>("set_statement_document_source", { key, settings });
+};
+
+/** Put sources off until a day (YYYY-MM-DD). */
+export const snoozeStatementDocumentSources = async (
+  keys: string[],
+  until: string,
+): Promise<DocumentSource[]> => {
+  return invoke<DocumentSource[]>("snooze_statement_document_sources", { keys, until });
+};
+
 /** Some documents only (a bank, an account, a kind) go back to waiting for review. */
 export const invalidateStatementDocuments = async (ids: string[]): Promise<number> => {
   return invoke<number>("invalidate_statement_documents", { ids });

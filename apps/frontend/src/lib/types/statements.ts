@@ -580,3 +580,32 @@ export interface PurgeReport {
   /** Accounts that keep operations entered by hand or from other documents. */
   accountsKept: string[];
 }
+
+/** What the person says about a source of documents. */
+export interface DocumentSourceSettings {
+  /** How they get the document. */
+  howTo?: string | null;
+  /** Every how many days; 0 never asks. */
+  everyDays?: number | null;
+  /** Not asked before this day (YYYY-MM-DD). */
+  snoozedUntil?: string | null;
+}
+
+/** A document brought back regularly: one per account and kind of reading. */
+export interface DocumentSource {
+  key: string;
+  accountId: string;
+  adapterId: string;
+  institution?: string | null;
+  label: string;
+  description: string;
+  formats: string[];
+  lastImport?: string | null;
+  documents: number;
+  howTo?: string | null;
+  everyDays: number;
+  snoozedUntil?: string | null;
+  needsSetup: boolean;
+  due: boolean;
+  nextDue?: string | null;
+}

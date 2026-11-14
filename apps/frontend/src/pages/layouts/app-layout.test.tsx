@@ -37,6 +37,9 @@ vi.mock("./navigation/app-sidebar", () => ({ AppSidebar: () => null }));
 vi.mock("./navigation/floating-navigation-bar", () => ({ FloatingNavigationBar: () => null }));
 vi.mock("./navigation/mobile-navbar", () => ({ MobileNavBar: () => null }));
 vi.mock("./mobile-navigation-container", () => ({ MobileNavigationContainer: () => null }));
+vi.mock("@/pages/settings/documents/sources/document-sources-dialogs", () => ({
+  DocumentSourcesReminder: () => null,
+}));
 vi.mock("@/components/app-launcher", () => ({ default: () => null }));
 vi.mock("@/components/update-dialog", () => ({ UpdateDialog: () => null }));
 vi.mock("@/components/rates-review-dialog", () => ({ RatesReviewDialog: () => null }));
