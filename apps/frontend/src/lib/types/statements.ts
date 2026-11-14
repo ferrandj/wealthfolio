@@ -568,3 +568,15 @@ export interface LoanAssetLinked {
   linkedAssetId: string | null;
   createdAsset: boolean;
 }
+
+/** What removing a set of documents takes away (or would, for a dry run). */
+export interface PurgeReport {
+  dryRun: boolean;
+  documents: number;
+  operations: number;
+  /** The accounts left empty, removed with their identity, holders and links. */
+  accounts: string[];
+  transfersUnlinked: number;
+  /** Accounts that keep operations entered by hand or from other documents. */
+  accountsKept: string[];
+}

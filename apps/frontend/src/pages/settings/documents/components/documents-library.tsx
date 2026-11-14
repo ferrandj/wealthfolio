@@ -45,6 +45,7 @@ import { formatBytes } from "../statement-files";
 import { useDownloadDocument } from "../use-download-document";
 import { logicalOrder, parseReviewReason } from "../statement-review";
 import { DocumentReviewDialog } from "./document-review-dialog";
+import { DocumentGroupActions } from "./document-group-actions";
 import { matchesHolderFilter, type HolderFilter } from "../holders";
 
 const NO_ACCOUNT = "none";
@@ -244,7 +245,7 @@ export function DocumentsLibrary() {
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
           <Icons.FileText className="text-muted-foreground hidden size-5 shrink-0 md:block" />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-medium" title={doc.storedName}>
+            <div className="font-medium break-all" title={doc.storedName}>
               {doc.storedName}
             </div>
             <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
@@ -276,7 +277,7 @@ export function DocumentsLibrary() {
             {isLoan ? (
               <div className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 space-y-0.5">
-                  <div className="truncate font-medium">
+                  <div className="font-medium break-words">
                     {loan?.liabilityName ?? t("settings:loans.account_none")}
                   </div>
                   <div className="text-muted-foreground text-xs">
@@ -360,31 +361,59 @@ export function DocumentsLibrary() {
     );
   };
 
-  // institution → account → kind → year
+  // institution → account (a loan's papers under its loan account) → kind → year
   const renderTree = () => {
     const accountName = (id: string | null | undefined) =>
       id ? (accounts.find((a) => a.id === id)?.name ?? id) : t("settings:documents.no_account");
+    const nodeOf = (d: StatementDocument) => {
+      if (LOAN_KINDS.includes(d.documentKind ?? "")) {
+        const loan = loanOfDocument(loans, d.id);
+        const name = loan?.liabilityName ?? loan?.label;
+        if (name) return t("settings:documents.tree_loan", { name });
+      }
+      return accountName(d.accountId);
+    };
+    const kindName = (kind: string | null | undefined) =>
+      t(`settings:documents.kind.${kind ?? "document"}`, {
+        defaultValue: kind ? kind.replace(/_/g, " ") : t("settings:documents.kind.document"),
+      });
     const tree = new Map<string, Map<string, Map<string, StatementDocument[]>>>();
     for (const d of ordered) {
       const inst = d.institution ?? "—";
-      const acc = accountName(d.accountId);
-      const leaf = `${d.documentKind ?? "—"} · ${(d.periodEnd ?? d.createdAt).slice(0, 4)}`;
+      const acc = nodeOf(d);
+      const leaf = `${kindName(d.documentKind)} · ${(d.periodEnd ?? d.createdAt).slice(0, 4)}`;
       const byAcc = tree.get(inst) ?? new Map();
       const byLeaf = byAcc.get(acc) ?? new Map();
       byLeaf.set(leaf, [...(byLeaf.get(leaf) ?? []), d]);
       byAcc.set(acc, byLeaf);
       tree.set(inst, byAcc);
     }
+    const docsOf = (leaves: Map<string, StatementDocument[]>) => [...leaves.values()].flat();
     return [...tree.entries()].map(([inst, accs]) => (
       <details key={inst} open className="rounded-lg border p-2">
-        <summary className="cursor-pointer font-semibold">{inst}</summary>
+        <summary className="cursor-pointer font-semibold">
+          {inst}
+          <DocumentGroupActions
+            name={inst}
+            documents={[...accs.values()].flatMap(docsOf)}
+            onDone={refreshOperations}
+          />
+        </summary>
         {[...accs.entries()].map(([acc, leaves]) => (
           <details key={acc} open className="mt-2 ml-4">
-            <summary className="cursor-pointer font-medium">{acc}</summary>
+            <summary className="cursor-pointer font-medium">
+              {acc}
+              <DocumentGroupActions
+                name={acc}
+                documents={docsOf(leaves)}
+                onDone={refreshOperations}
+              />
+            </summary>
             {[...leaves.entries()].map(([leaf, docs]) => (
               <details key={leaf} open className="mt-2 ml-4">
                 <summary className="text-muted-foreground cursor-pointer text-sm">
                   {leaf} ({docs.length})
+                  <DocumentGroupActions name={leaf} documents={docs} onDone={refreshOperations} />
                 </summary>
                 <div className="mt-2 space-y-2">{docs.map(renderDoc)}</div>
               </details>

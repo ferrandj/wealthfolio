@@ -467,6 +467,8 @@ pub fn run() {
             commands::statements::revalidate_statement_document,
             commands::statements::revalidate_all_statement_documents,
             commands::statements::invalidate_all_statement_documents,
+            commands::statements::invalidate_statement_documents,
+            commands::statements::purge_statement_documents,
             commands::statements::get_statement_coverage,
             commands::statements::get_statement_loans,
             commands::statements::set_statement_loan_first_due,

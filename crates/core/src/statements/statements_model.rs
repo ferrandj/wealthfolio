@@ -397,6 +397,24 @@ pub struct RevalidationOutcome {
     pub error: Option<String>,
 }
 
+/// What removing a set of documents takes away (or would take away, for a dry run).
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeReport {
+    pub dry_run: bool,
+    /// The documents removed.
+    pub documents: usize,
+    /// The operations they brought in, removed with them.
+    pub operations: usize,
+    /// The accounts left with no document and no operation, removed too (their identity, holders and links go
+    /// with them).
+    pub accounts: Vec<String>,
+    /// Transfers between own accounts whose other leg stays: unpaired, that leg is kept.
+    pub transfers_unlinked: usize,
+    /// Accounts of these documents that keep operations entered by hand or from other documents: kept.
+    pub accounts_kept: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RevalidationResult {

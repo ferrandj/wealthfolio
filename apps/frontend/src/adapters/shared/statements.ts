@@ -1,6 +1,7 @@
 // Bank statements & account documents
 import type {
   AccountCoverage,
+  PurgeReport,
   LoanAssetLink,
   LoanAssetLinked,
   LoanView,
@@ -108,6 +109,19 @@ export const revalidateAllStatementDocuments = async (): Promise<RevalidationRes
 };
 
 /** Every validated statement goes back to waiting for review; returns how many. */
+/** Some documents only (a bank, an account, a kind) go back to waiting for review. */
+export const invalidateStatementDocuments = async (ids: string[]): Promise<number> => {
+  return invoke<number>("invalidate_statement_documents", { ids });
+};
+
+/** Remove documents and everything they brought (operations, emptied accounts); `dryRun` only says what would go. */
+export const purgeStatementDocuments = async (
+  ids: string[],
+  dryRun: boolean,
+): Promise<PurgeReport> => {
+  return invoke<PurgeReport>("purge_statement_documents", { ids, dryRun });
+};
+
 export const invalidateAllStatementDocuments = async (): Promise<number> => {
   return invoke<number>("invalidate_all_statement_documents");
 };

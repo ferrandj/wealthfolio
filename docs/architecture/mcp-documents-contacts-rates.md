@@ -165,3 +165,12 @@ transaction form do.
 A loan's other operations (fees, guarantee, interim interest…) are attached to
 it without being instalments: `set_loan_answers` with `otherActivities`; they
 come back in `payments.costs` and are never matched to an instalment.
+
+### Removing part of the documents
+
+`invalidate_statement_documents` puts some documents back to review (a bank, an
+account, a kind). `purge_statement_documents` removes documents and everything
+they brought: their operations (a transfer whose other leg stays is unpaired
+first), the accounts left with no document and no operation, the loan accounts
+left without papers; accounts that keep other operations stay. `dryRun` says
+what would go — run it first.

@@ -192,6 +192,8 @@ export const COMMANDS: CommandMap = {
   revalidate_statement_document: { method: "POST", path: "/statements/documents" },
   revalidate_all_statement_documents: { method: "POST", path: "/statements/revalidate" },
   invalidate_all_statement_documents: { method: "POST", path: "/statements/invalidate" },
+  invalidate_statement_documents: { method: "POST", path: "/statements/documents/invalidate" },
+  purge_statement_documents: { method: "POST", path: "/statements/documents/purge" },
   list_account_identities: { method: "GET", path: "/statements/identities" },
   get_account_identity: { method: "GET", path: "/statements/identities" },
   save_account_identity: { method: "PUT", path: "/statements/identities" },

@@ -192,6 +192,37 @@ pub async fn invalidate_all_statement_documents(state: ProfileAccess) -> Result<
 }
 
 #[tauri::command]
+pub async fn invalidate_statement_documents(
+    ids: Vec<String>,
+    state: ProfileAccess,
+) -> Result<u32, String> {
+    let context = state.context()?;
+    context
+        .statement_service()
+        .invalidate_documents(&ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn purge_statement_documents(
+    ids: Vec<String>,
+    dry_run: bool,
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::statements::PurgeReport, String> {
+    let context = state.context()?;
+    let report = context
+        .statement_service()
+        .purge_documents(&ids, dry_run)
+        .await
+        .map_err(|e| e.to_string())?;
+    if !dry_run {
+        context.health_service().clear_cache().await;
+    }
+    Ok(report)
+}
+
+#[tauri::command]
 pub async fn list_account_identities(state: ProfileAccess) -> Result<Vec<AccountIdentity>, String> {
     let context = state.context()?;
     context

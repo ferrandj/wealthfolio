@@ -104,6 +104,13 @@ pub trait StatementServiceTrait: Send + Sync {
     /// Every validated statement goes back to waiting for review. Nothing is changed in the operations: each one
     /// is looked at again and validated again. Returns how many were invalidated.
     async fn invalidate_all(&self) -> Result<u32>;
+    /// The same for some documents only (a bank, an account, a kind of document): they go back to waiting for
+    /// review. Returns how many were invalidated.
+    async fn invalidate_documents(&self, ids: &[String]) -> Result<u32>;
+    /// Remove documents and everything they brought: their operations (a transfer whose other leg stays is unpaired
+    /// first), then the accounts left with no document and no operation, and the loan accounts left without
+    /// papers. With `dry_run`, nothing changes: the report says what would go.
+    async fn purge_documents(&self, ids: &[String], dry_run: bool) -> Result<super::PurgeReport>;
     /// Undo what every document brought in, then read all the stored originals again, oldest first. Obvious ones
     /// come back validated; the others wait for review with the reason. Categories chosen by hand are kept.
     async fn revalidate_all(&self) -> Result<RevalidationResult>;

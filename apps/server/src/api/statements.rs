@@ -180,6 +180,40 @@ async fn invalidate_all(
     Ok(Json(state.statement_service.invalidate_all().await?))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentIdsBody {
+    ids: Vec<String>,
+    #[serde(default)]
+    dry_run: bool,
+}
+
+async fn invalidate_documents(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<DocumentIdsBody>,
+) -> ApiResult<Json<u32>> {
+    Ok(Json(
+        state
+            .statement_service
+            .invalidate_documents(&body.ids)
+            .await?,
+    ))
+}
+
+async fn purge_documents(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<DocumentIdsBody>,
+) -> ApiResult<Json<wealthfolio_core::statements::PurgeReport>> {
+    let report = state
+        .statement_service
+        .purge_documents(&body.ids, body.dry_run)
+        .await?;
+    if !body.dry_run {
+        state.health_service.clear_cache().await;
+    }
+    Ok(Json(report))
+}
+
 async fn list_identities(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AccountIdentity>>> {
@@ -409,6 +443,11 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/review-queue", get(review_queue))
         .route("/statements/revalidate", post(revalidate_all))
         .route("/statements/invalidate", post(invalidate_all))
+        .route(
+            "/statements/documents/invalidate",
+            post(invalidate_documents),
+        )
+        .route("/statements/documents/purge", post(purge_documents))
         .route("/statements/documents/{id}/review", get(review_document))
         .route(
             "/statements/documents/{id}/validate",

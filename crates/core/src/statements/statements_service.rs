@@ -2565,8 +2565,144 @@ impl StatementServiceTrait for StatementService {
     }
 
     async fn invalidate_all(&self) -> Result<u32> {
+        let ids: Vec<String> = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .map(|d| d.id)
+            .collect();
+        self.invalidate_documents(&ids).await
+    }
+
+    async fn purge_documents(&self, ids: &[String], dry_run: bool) -> Result<super::PurgeReport> {
+        let all = self.repository.list_documents()?;
+        let chosen: Vec<StatementDocument> = all
+            .iter()
+            .filter(|d| ids.contains(&d.id))
+            .cloned()
+            .collect();
+        if chosen.is_empty() {
+            return Err(invalid("No document to remove"));
+        }
+        let chosen_ids: HashSet<&str> = chosen.iter().map(|d| d.id.as_str()).collect();
+        let runs: HashSet<&str> = chosen
+            .iter()
+            .filter_map(|d| d.import_run_id.as_deref())
+            .collect();
+        let activities = self.activity_service.get_activities()?;
+        let doomed: Vec<&crate::activities::Activity> = activities
+            .iter()
+            .filter(|a| a.import_run_id.as_deref().is_some_and(|r| runs.contains(r)))
+            .collect();
+        let doomed_ids: HashSet<&str> = doomed.iter().map(|a| a.id.as_str()).collect();
+        // a transfer between own accounts whose other leg stays: unpaired, so that leg is not taken away
+        let mut crossing: Vec<(String, String)> = Vec::new();
+        for a in doomed.iter().filter(|a| a.source_group_id.is_some()) {
+            if let Ok(Some(pair)) = self
+                .activity_service
+                .get_transfer_pair_for_activity(a.id.clone())
+            {
+                let other = if pair.transfer_in.id == a.id {
+                    pair.transfer_out.id
+                } else {
+                    pair.transfer_in.id
+                };
+                if !doomed_ids.contains(other.as_str()) {
+                    crossing.push((a.id.clone(), other));
+                }
+            }
+        }
+        // the accounts these documents and operations belong to: removed when nothing is left in them
+        let mut touched: Vec<String> = Vec::new();
+        for id in chosen
+            .iter()
+            .filter_map(|d| d.account_id.clone())
+            .chain(doomed.iter().map(|a| a.account_id.clone()))
+        {
+            if !touched.contains(&id) {
+                touched.push(id);
+            }
+        }
+        let mut emptied = Vec::new();
+        let mut kept = Vec::new();
+        for account_id in &touched {
+            let documents_left = all.iter().any(|d| {
+                !chosen_ids.contains(d.id.as_str()) && d.account_id.as_deref() == Some(account_id)
+            });
+            let operations_left = activities
+                .iter()
+                .any(|a| &a.account_id == account_id && !doomed_ids.contains(a.id.as_str()));
+            let Ok(account) = self.account_service.get_account(account_id) else {
+                continue;
+            };
+            if documents_left || operations_left {
+                kept.push(account.name);
+            } else {
+                emptied.push((account.id, account.name));
+            }
+        }
+        let report = super::PurgeReport {
+            dry_run,
+            documents: chosen.len(),
+            operations: doomed.len(),
+            accounts: emptied.iter().map(|(_, n)| n.clone()).collect(),
+            transfers_unlinked: crossing.len(),
+            accounts_kept: kept,
+        };
+        if dry_run {
+            return Ok(report);
+        }
+
+        for (a, b) in &crossing {
+            if let Err(e) = self
+                .activity_service
+                .unlink_transfer_activities(a.clone(), b.clone())
+                .await
+            {
+                warn!("could not unpair a transfer before removing its documents: {e}");
+            }
+        }
+        if !doomed_ids.is_empty() {
+            self.activity_service
+                .bulk_mutate_activities(ActivityBulkMutationRequest {
+                    creates: vec![],
+                    updates: vec![],
+                    delete_ids: doomed_ids.iter().map(|s| s.to_string()).collect(),
+                })
+                .await?;
+        }
+        // the statements next to the removed ones that stay are looked at again
+        let mut reopen: Vec<String> = Vec::new();
+        for d in &chosen {
+            for id in super::statements_review::neighbours_to_reopen(d, &all) {
+                if !chosen_ids.contains(id.as_str()) && !reopen.contains(&id) {
+                    reopen.push(id);
+                }
+            }
+        }
+        for d in &chosen {
+            self.repository.delete_document(&d.id).await?;
+        }
+        self.reopen(&reopen).await;
+        for (id, name) in &emptied {
+            if let Err(e) = self.account_service.delete_account(id).await {
+                warn!("could not remove the emptied account {name}: {e}");
+            }
+        }
+        if let Err(e) = self.sync_loan_statuses().await {
+            warn!("could not update the loan documents: {e}");
+        }
+        Ok(report)
+    }
+
+    async fn invalidate_documents(&self, ids: &[String]) -> Result<u32> {
         let mut invalidated = 0;
-        for mut document in self.repository.list_documents()? {
+        for mut document in self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| ids.contains(&d.id))
+        {
             // the statements that were validated, and the loan papers (invalidating them takes back their liability)
             let loan_paper = document
                 .document_kind

@@ -805,3 +805,36 @@ service_tool!(
         reply(&service.loans(today).map_err(fail)?)
     }
 );
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentIdsArgs {
+    document_ids: Vec<String>,
+    #[serde(default)]
+    dry_run: bool,
+}
+
+service_tool!(
+    InvalidateStatementDocuments, "invalidate_statement_documents", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Put some validated documents back to waiting for review (a bank, an account, a kind of document: documentIds from list_statement_documents). Nothing is changed in their operations. Returns how many were invalidated.",
+    schema = object(json!({"documentIds": {"type": "array", "items": {"type": "string"}}}), &["documentIds"]),
+    |env, args| {
+        let args: DocumentIdsArgs = serde_json::from_value(args)?;
+        reply(&need(env.statement_service(), "Statements")?.invalidate_documents(&args.document_ids).await.map_err(fail)?)
+    }
+);
+
+service_tool!(
+    PurgeStatementDocuments, "purge_statement_documents", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Remove documents (a bank, an account, a kind: documentIds from list_statement_documents) and everything they brought: their operations (a transfer whose other leg stays is unpaired first), the accounts left with no document and no operation (with their identity and holders), the loan accounts left without papers. Accounts that keep other operations are kept. Run with dryRun true first and show the report to the user: it says what would go. Cannot be undone.",
+    schema = object(json!({
+        "documentIds": {"type": "array", "items": {"type": "string"}},
+        "dryRun": {"type": "boolean", "description": "Only say what would be removed."}
+    }), &["documentIds"]),
+    |env, args| {
+        let args: DocumentIdsArgs = serde_json::from_value(args)?;
+        reply(&need(env.statement_service(), "Statements")?.purge_documents(&args.document_ids, args.dry_run).await.map_err(fail)?)
+    }
+);

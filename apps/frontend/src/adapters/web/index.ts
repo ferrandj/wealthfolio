@@ -293,6 +293,8 @@ export {
   revalidateStatementDocument,
   revalidateAllStatementDocuments,
   invalidateAllStatementDocuments,
+  invalidateStatementDocuments,
+  purgeStatementDocuments,
   listAccountIdentities,
   getAccountIdentity,
   saveAccountIdentity,
