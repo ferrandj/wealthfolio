@@ -156,8 +156,8 @@ export function LoanDocuments({ loan }: { loan: LoanView }) {
           <Icons.FileText className="text-muted-foreground size-4" />
           <span>{d.fileName}</span>
           <Badge variant="outline">{t(`settings:loans.kind.${d.kind}`, d.kind)}</Badge>
-          <Badge variant={d.status === "validated" ? "secondary" : "outline"}>
-            {t(`settings:loans.status.${d.status}`, d.status)}
+          <Badge variant={d.status.toLowerCase() === "validated" ? "secondary" : "outline"}>
+            {t(`settings:loans.status.${d.status.toLowerCase()}`, d.status)}
           </Badge>
         </div>
       ))}

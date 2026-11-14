@@ -51,7 +51,12 @@ export interface HolderRow {
 /** The holders of an account, each matched to a known contact when one bears the printed name. */
 export function holderRows(names: string[], contacts: ContactSummary[]): HolderRow[] {
   const taken = new Set<string>();
-  const rows = (names.length > 0 ? names : [""]).map((name, i) => {
+  // nothing printed (a life insurance, a PEA…): the person themselves, when known
+  if (names.length === 0) {
+    const self = contacts.find((c) => c.contact.kind === "self");
+    return [{ key: "h0", choice: self?.contact.id ?? NEW, name: "" }];
+  }
+  const rows = names.map((name, i) => {
     const found = name
       ? suggestContact(
           contacts.filter((c) => !taken.has(c.contact.id)),
