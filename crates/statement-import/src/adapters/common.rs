@@ -459,6 +459,28 @@ pub fn rib_valid(bank: &str, branch: &str, account: &str, key: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The French IBAN of a RIB: "FR", the two check digits that make it valid, then the RIB. `None` when the RIB's own
+/// key is wrong (a number that only looks like one).
+pub fn iban_from_rib(bank: &str, branch: &str, account: &str, key: &str) -> Option<String> {
+    if !rib_valid(bank, branch, account, key) {
+        return None;
+    }
+    let bban = format!("{bank}{branch}{account}{key}").to_uppercase();
+    (0..100)
+        .map(|check| format!("FR{check:02}{bban}"))
+        .find(|candidate| iban_valid(candidate))
+}
+
+/// A RIB printed as one block of 23 characters ("30004031660000676140728"), as an IBAN.
+pub fn iban_from_rib_block(block: &str) -> Option<String> {
+    let b: Vec<char> = block.trim().chars().collect();
+    if b.len() != 23 || !b.iter().all(|c| c.is_ascii_alphanumeric()) {
+        return None;
+    }
+    let part = |from: usize, to: usize| b[from..to].iter().collect::<String>();
+    iban_from_rib(&part(0, 5), &part(5, 10), &part(10, 21), &part(21, 23))
+}
+
 /// A French IBAN is "FR" + 2 check digits + the RIB.
 pub fn iban_matches_rib(iban: &str, bank: &str, branch: &str, account: &str, key: &str) -> bool {
     let i = iban.replace(' ', "").to_uppercase();
@@ -489,6 +511,27 @@ mod num_big {
         pub fn rem97(&self) -> u64 {
             self.0.iter().fold(0u64, |r, d| (r * 10 + *d as u64) % 97)
         }
+    }
+}
+
+#[cfg(test)]
+mod rib_tests {
+    use super::{iban_from_rib, iban_from_rib_block, iban_valid};
+
+    #[test]
+    fn a_rib_gives_its_iban_and_a_wrong_key_gives_none() {
+        // made-up account: the key is computed, not copied
+        let key = super::rib_key("30004", "00999", "00012345678").unwrap();
+        let iban = iban_from_rib("30004", "00999", "00012345678", &key).unwrap();
+        assert!(iban_valid(&iban));
+        assert!(iban.starts_with("FR") && iban.ends_with(&format!("00012345678{key}")));
+        assert_eq!(
+            iban_from_rib_block(&format!("300040099900012345678{key}")),
+            Some(iban)
+        );
+        let wrong = if key == "00" { "01" } else { "00" };
+        assert_eq!(iban_from_rib("30004", "00999", "00012345678", wrong), None);
+        assert_eq!(iban_from_rib_block("123"), None);
     }
 }
 

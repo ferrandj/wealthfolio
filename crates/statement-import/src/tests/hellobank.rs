@@ -265,3 +265,243 @@ fn an_empty_month_is_read_too() {
     );
     assert_eq!(st.confidence, "high");
 }
+
+#[test]
+fn a_livret_a_statement_is_a_savings_account_fed_by_the_other_account() {
+    let mut spec = HSpec::new(vec![
+        hentry(
+            ymd(2026, 9, 23),
+            &["DEPOT INITIAL DU COMPTE", &h_rib_block(H_ACCOUNT)],
+            "10.00",
+        ),
+        hentry(
+            ymd(2026, 9, 28),
+            &["VERSEMENT PERIODIQUE DU COMPTE", &h_rib_block(H_ACCOUNT)],
+            "25.00",
+        ),
+        hentry(
+            ymd(2026, 10, 2),
+            &[
+                "VIR CPTE A CPTE RECU /DE MARTIN PAUL",
+                "/MOTIF LIVRET A /REF",
+            ],
+            "400.00",
+        ),
+    ]);
+    spec.heading = "RELEVE DE LIVRET A".into();
+    spec.opening = d("0.00");
+    spec.account = "00055555555".into();
+    let (found, st) = read(hello_statement_pdf(&spec));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.statement_pdf"
+    );
+    assert_eq!(st.account_type.as_deref(), Some("livret_a"));
+    assert_eq!(
+        st.account_label.as_deref(),
+        Some("Livret A Hello bank …5555")
+    );
+    assert_eq!(st.balance, Some(d("435.00")));
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+    // the first deposit and the standing order name the account they come from by its RIB
+    let first = &st.transactions[0];
+    assert_eq!(
+        (first.kind.as_deref(), first.label.as_str()),
+        (Some("transfer"), "Dépôt initial")
+    );
+    assert_eq!(first.counterparty_iban, Some(h_iban(H_ACCOUNT)));
+    assert_eq!(first.details.as_ref().unwrap()["internal"], true);
+    assert_eq!(st.transactions[1].label, "Versement périodique");
+    assert_eq!(
+        st.transactions[1].counterparty_iban,
+        Some(h_iban(H_ACCOUNT))
+    );
+    // a transfer from the holder's own name is between own accounts too
+    assert_eq!(
+        st.transactions[2].details.as_ref().unwrap()["internal"],
+        true
+    );
+}
+
+#[test]
+fn a_savings_statement_whose_title_is_printed_apart_is_read() {
+    let mut spec = HSpec::new(vec![hentry(
+        ymd(2026, 9, 23),
+        &["DEPOT INITIAL DU COMPTE", &h_rib_block(H_ACCOUNT)],
+        "20.00",
+    )]);
+    spec.heading = "R ELEVE DE COMPTE D'EPARGNE".into();
+    spec.opening = d("0.00");
+    let (found, st) = read(hello_statement_pdf(&spec));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(st.account_type.as_deref(), Some("savings"));
+    assert_eq!(st.extra["product"].as_str(), Some("Compte d'épargne"));
+}
+
+#[test]
+fn the_newer_layout_prints_the_name_above_the_rib_and_new_kinds_of_lines() {
+    let mut spec = HSpec::new(vec![
+        hentry(
+            ymd(2026, 9, 29),
+            &[
+                "VIRT CPTE A CPTE EMIS SUR LE",
+                &format!("L.A{}", h_rib_block("00055555555")),
+            ],
+            "-25.00",
+        ),
+        hentry(
+            ymd(2026, 10, 7),
+            &[
+                "FACTURE(S) CARTE 4609XXXXXXXX4806",
+                "DU 061026 BOUTIQUE EXEMPLE",
+                "POL 2,65EUR",
+            ],
+            "-2.65",
+        ),
+        hentry(
+            ymd(2026, 10, 9),
+            &["REMISE CHEQUES BORDEREAU 09141068"],
+            "700.00",
+        ),
+        hentry(
+            ymd(2026, 10, 12),
+            &[
+                "VIR CPTE A CPTE RECU /DE MARTIN PAUL",
+                "/MOTIF A REMBOURSER /REF",
+            ],
+            "400.00",
+        ),
+    ]);
+    spec.name_above = true;
+    spec.holder = "MARTIN PAUL".into();
+    let (found, st) = read(hello_statement_pdf(&spec));
+    assert_eq!(found.decision, "auto");
+    // no civility: the name is already last name first, and the flat's code is part of the address
+    assert_eq!(st.holder_name.as_deref(), Some("MARTIN PAUL"));
+    assert_eq!(
+        st.holder_address.as_deref(),
+        Some("A101\n8 RUE DES TILLEULS\n69003 LYON")
+    );
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+
+    let to_livret = &st.transactions[0];
+    assert_eq!(to_livret.label, "Virement vers le Livret A");
+    assert_eq!(to_livret.counterparty_iban, Some(h_iban("00055555555")));
+    assert_eq!(to_livret.details.as_ref().unwrap()["internal"], true);
+
+    let card = &st.transactions[1];
+    assert_eq!(
+        (card.kind.as_deref(), card.counterparty.as_deref()),
+        (Some("card"), Some("BOUTIQUE EXEMPLE"))
+    );
+    assert_eq!(
+        card.details.as_ref().unwrap()["purchase_date"],
+        "2026-10-06"
+    );
+
+    let cheque = &st.transactions[2];
+    assert_eq!(
+        (cheque.kind.as_deref(), cheque.reference.as_deref()),
+        (Some("cheque"), Some("09141068"))
+    );
+    // the holder's own name on a transfer: between own accounts
+    assert_eq!(
+        st.transactions[3].details.as_ref().unwrap()["internal"],
+        true
+    );
+}
+
+fn read_paper(data: Vec<u8>) -> (Identification, ParsedStatement) {
+    let (found, st) = read(data);
+    assert_eq!(found.decision, "auto", "{}", found.message);
+    assert_eq!(st.document_kind.as_deref(), Some("info"));
+    assert!(st.transactions.is_empty());
+    (found, st)
+}
+
+#[test]
+fn the_account_agreement_is_filed_with_its_account() {
+    let (found, st) = read_paper(hello_account_agreement_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.account_agreement_pdf"
+    );
+    assert_eq!(st.iban, Some(h_iban(H_ACCOUNT)));
+    assert_eq!(st.account_number.as_deref(), Some(H_ACCOUNT));
+    assert_eq!(st.account_type.as_deref(), Some("checking"));
+    assert_eq!(st.holder_name.as_deref(), Some("MME DURAND LEA"));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Convention de compte de dépôt · offre Hello One")
+    );
+    assert_eq!(st.extra["issued_on"].as_str(), Some("2026-01-04"));
+}
+
+#[test]
+fn a_livret_contract_gives_its_number_its_rate_and_its_first_deposit() {
+    // the Livret Hello+: an account number, a rate by slices
+    let (found, st) = read_paper(hello_savings_contract_pdf(false));
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.savings_contract_pdf"
+    );
+    assert_eq!(st.account_type.as_deref(), Some("savings"));
+    assert_eq!(st.iban, Some(h_iban("00087654321")));
+    assert_eq!(st.holder_name.as_deref(), Some("MME DURAND LEA"));
+    assert_eq!(st.extra["title"].as_str(), Some("Contrat · Livret Hello+"));
+    assert_eq!(st.extra["initial_deposit"].as_str(), Some("20.00"));
+    assert_eq!(
+        st.extra["funded_from_iban"].as_str(),
+        Some(h_iban(H_ACCOUNT).as_str())
+    );
+    assert_eq!(st.extra["rate_tiers"].as_array().unwrap().len(), 2);
+    assert_eq!(st.extra["issued_on"].as_str(), Some("2026-01-09"));
+    assert!(st.extra.get("match_by_type").is_none());
+
+    // the Livret A: only a reservation number yet, so it goes to the bank's only Livret A
+    let (_, st) = read_paper(hello_savings_contract_pdf(true));
+    assert_eq!(st.account_type.as_deref(), Some("livret_a"));
+    assert_eq!(st.iban, None);
+    assert_eq!(
+        st.extra["reservation_number"].as_str(),
+        Some("30280000000000001")
+    );
+    assert_eq!(st.extra["rate_percent"].as_str(), Some("3.00"));
+    assert_eq!(st.extra["initial_deposit"].as_str(), Some("10.00"));
+    assert_eq!(st.extra["match_by_type"], true);
+    assert_eq!(st.extra["title"].as_str(), Some("Contrat · Livret A"));
+}
+
+#[test]
+fn the_opening_letter_names_the_livret_and_the_day_it_opened() {
+    let (found, st) = read_paper(hello_opening_letter_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.opening_letter_pdf"
+    );
+    assert_eq!(st.account_type.as_deref(), Some("livret_a"));
+    assert_eq!(st.iban, Some(h_iban("00055555555")));
+    assert_eq!(st.holder_name.as_deref(), Some("MME DURAND LEA"));
+    assert_eq!(st.balance_date, Some(ymd(2026, 2, 20)));
+    assert_eq!(st.extra["opened_on"].as_str(), Some("2026-02-20"));
+    assert_eq!(
+        st.extra["reservation_number"].as_str(),
+        Some("30280000000000001")
+    );
+}
+
+#[test]
+fn the_price_list_is_kept_and_dated_by_its_month() {
+    let (found, st) = read_paper(hello_price_list_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.price_list_pdf"
+    );
+    assert_eq!(st.iban, None);
+    assert_eq!(st.balance_date, Some(ymd(2026, 1, 1)));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Conditions et tarifs · 01/2026")
+    );
+}

@@ -24,6 +24,10 @@ use super::fortuneo::loan_prepayment_pdf::FortuneoLoanPrepaymentPdf;
 use super::fortuneo::loan_schedule_pdf::FortuneoLoanSchedulePdf;
 use super::fortuneo::statement_pdf::FortuneoStatementPdf;
 use super::generic::{GenericCsv, GenericOfx, GenericPdf, GenericQif};
+use super::hellobank::papers_pdf::{
+    HelloBankAccountAgreementPdf, HelloBankOpeningLetterPdf, HelloBankPriceListPdf,
+    HelloBankSavingsContractPdf,
+};
 use super::hellobank::statement_pdf::HelloBankStatementPdf;
 use super::revolut::statement_csv::RevolutStatementCsv;
 
@@ -50,6 +54,10 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &FortuneoLoanSchedulePdf,
     &FortuneoLoanPrepaymentPdf,
     &HelloBankStatementPdf,
+    &HelloBankAccountAgreementPdf,
+    &HelloBankSavingsContractPdf,
+    &HelloBankOpeningLetterPdf,
+    &HelloBankPriceListPdf,
     &RevolutStatementCsv,
     &GenericOfx,
     &GenericQif,

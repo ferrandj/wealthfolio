@@ -1,4 +1,5 @@
-//! Hello bank!: the "Relevé de compte chèques" PDF (a BNP Paribas group layout).
+//! Hello bank!: the account statements (a BNP Paribas group layout): "Relevé de compte chèques", "Relevé de compte
+//! d'épargne" (the Livret Hello+) and "Relevé de Livret A".
 //!
 //! A title with the period ("du 23 septembre 2022 au 15 octobre 2022"), a block on the left with the RIB, the IBAN
 //! and the BIC, the holder and the address on the right (the first name comes before the last name), then the table
@@ -15,8 +16,9 @@ use crate::adapters::base::{
     TransactionData, W,
 };
 use crate::adapters::boursobank::statement_pdf::last4;
-use crate::adapters::common::{find_iban, french_date, name_key, norm, parse_amount, ymd};
-use crate::adapters::fortuneo::identity::read_address_block;
+use crate::adapters::common::{
+    find_iban, french_date, iban_from_rib_block, name_key, norm, parse_amount, ymd,
+};
 use crate::adapters::fortuneo::statement_pdf::{check, resolve, AMOUNT_RE};
 use crate::adapters::lines::{describe, is_own, label as make_label};
 use crate::adapters::pdftools;
@@ -36,6 +38,10 @@ const CIVILITIES: &[&str] = &[
     "MADEMOISELLE",
 ];
 const ICS_RE: &str = r"^[A-Z]{2}\d{2}ZZZ[A-Z0-9]+$";
+/// The titles of the statements, as they read once accents and spaces are gone.
+const STATEMENT_TITLES: &[&str] = &["relevedecompte", "relevedelivret", "relevedeplan"];
+/// A RIB printed in one block inside a label: the other account of a movement between two accounts of the bank.
+const RIB_BLOCK_RE: &str = r"(?:^|[^0-9])(\d{10}[0-9A-Z]{11}\d{2})$";
 
 struct Entry {
     day: i64,
@@ -85,9 +91,9 @@ impl Adapter for HelloBankStatementPdf {
         let (mut s, reasons) = score(&[
             (hello, 0.3, "mentionne Hello bank!"),
             (
-                c.contains("relevedecompte"),
+                STATEMENT_TITLES.iter().any(|t| c.contains(t)),
                 0.25,
-                "titre « Relevé de compte »",
+                "titre « Relevé de compte / de livret »",
             ),
             (
                 c.contains("soldecrediteurau") || c.contains("soldedebiteurau"),
@@ -105,7 +111,10 @@ impl Adapter for HelloBankStatementPdf {
                 "colonnes Valeur, Débit et Crédit",
             ),
         ]);
-        if !hello {
+        // a contract or a brochure quotes "relevé de compte" too: without the table's balance lines it is not one
+        let table = (c.contains("soldecrediteurau") || c.contains("soldedebiteurau"))
+            && c.contains("totaldesoperations");
+        if !hello || !table {
             s = s.min(0.3);
         }
         Ok(Detection {
@@ -287,7 +296,7 @@ impl Adapter for HelloBankStatementPdf {
 
 /// "M PAUL MARTIN" (first name first) as "M MARTIN PAUL", the order the rest of the application reads. Anything
 /// that is not a civility and two words (a joint holder, a compound name) is left as printed: it is asked once.
-fn last_name_first(name: &str) -> String {
+pub(super) fn last_name_first(name: &str) -> String {
     let words = py::split_ws(name);
     let (civility, rest): (Option<&str>, &[&str]) = match words.first() {
         Some(w) if CIVILITIES.contains(&py::upper(w.trim_end_matches('.')).as_str()) => {
@@ -298,7 +307,8 @@ fn last_name_first(name: &str) -> String {
     let joint = rest
         .iter()
         .any(|w| matches!(py::upper(w).as_str(), "OU" | "ET"));
-    if rest.len() != 2 || joint {
+    // without a civility the bank prints the last name first already ("MARTIN PAUL")
+    if rest.len() != 2 || joint || civility.is_none() {
         return py::strip(name).to_string();
     }
     let mut out: Vec<&str> = civility.into_iter().collect();
@@ -336,29 +346,93 @@ fn read_header(st: &mut ParsedStatement, rows: &[Vec<W>], texts: &[String]) {
         }
     }
     if let (Some(r), Some(b)) = (rib_row, bic_row) {
-        if r > 0 && b >= r {
-            let (name, address) = read_address_block(rows, r - 1, b + 1, RIGHT_X);
-            if let Some(name) = name {
+        if b >= r {
+            // The holder and the address are printed on the right of the RIB block. The name is on the RIB's row, or
+            // on the row above it in the newer layout (where the branch's codes are printed higher up, alone).
+            let right = |row: &Vec<W>| {
+                py::strip(
+                    &row.iter()
+                        .filter(|w| w.x0 >= RIGHT_X)
+                        .map(|w| w.text.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                )
+                .to_string()
+            };
+            let codes = |t: &str| fullmatch(r"\d{5}\s+\d{5}", t).is_some();
+            let above = r > 0 && {
+                let t = right(&rows[r - 1]);
+                !t.is_empty() && !codes(&t)
+            };
+            let after = if above {
+                r as isize - 2
+            } else {
+                r as isize - 1
+            };
+            let block: Vec<String> = rows
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| (*i as isize) > after && *i <= b)
+                .map(|(_, row)| right(row))
+                .filter(|t| !t.is_empty() && !codes(t))
+                .collect();
+            // the address starts at the first line that begins with a digit or is a lone code ("A101", a flat)
+            let start = block
+                .iter()
+                .enumerate()
+                .position(|(i, t)| {
+                    i > 0
+                        && (t.chars().next().is_some_and(py::is_digit_char)
+                            || (!t.contains(' ') && t.chars().any(py::is_digit_char)))
+                })
+                .unwrap_or(if block.len() >= 2 {
+                    (block.len() - 2).max(1)
+                } else {
+                    1
+                })
+                .min(block.len());
+            let name = block[..start].join(" ");
+            if !name.is_empty() {
                 st.set_extra("holder_printed", name.clone());
                 st.holder_name = Some(last_name_first(&name));
             }
-            st.holder_address = address;
+            let address = block[start..].join("\n");
+            st.holder_address = some(address);
         }
     }
-    // "RELEVE DE COMPTE CHEQUES": what the account is
+    // "RELEVE DE COMPTE CHEQUES", "RELEVE DE COMPTE D'EPARGNE", "RELEVE DE LIVRET A": what the account is. The title's
+    // first letter is sometimes printed apart ("R ELEVE"): it is read without its spaces.
     let mut product = "Compte".to_string();
     for text in texts {
         let n = norm(text);
-        if let Some(rest) = n.strip_prefix("releve de compte") {
-            let rest = py::strip(&sub(r"\bp\.?\s*\d+\s*/\s*\d+.*$", "", rest)).to_string();
-            if rest.contains("cheque") {
-                product = "Compte chèques".into();
-            } else if !rest.is_empty() {
-                product = format!("Compte {rest}");
-                st.account_type = Some(guess_account_type(&rest, "checking"));
-            }
-            break;
+        let squeezed = n.replace(' ', "").replace('’', "'");
+        if !squeezed.starts_with("relevede") {
+            continue;
         }
+        let rest = sub(r"p\.?\d+/\d+.*$", "", &squeezed["relevede".len()..]);
+        if rest.starts_with("comptecheque") {
+            product = "Compte chèques".into();
+        } else if rest.starts_with("livreta") {
+            product = "Livret A".into();
+            st.account_type = Some("livret_a".into());
+        } else if rest.starts_with("livretdedeveloppementdurable") || rest.starts_with("ldd") {
+            product = "LDDS".into();
+            st.account_type = Some("ldds".into());
+        } else if rest.starts_with("compted'epargne") || rest.starts_with("comptedepargne") {
+            product = "Compte d'épargne".into();
+            st.account_type = Some("savings".into());
+        } else if !rest.is_empty() {
+            // the words as printed, for a product not met yet
+            let words = py::strip(&sub(
+                r"(?i)^r\s*eleve de\s+|\bp\.?\s*\d+\s*/\s*\d+.*$",
+                "",
+                &n,
+            ))
+            .to_string();
+            st.account_type = Some(guess_account_type(&words, "checking"));
+            product = py::capitalize(&words);
+        }
+        break;
     }
     for text in texts {
         if let Some(m) = search(
@@ -430,7 +504,66 @@ fn to_transaction(
     let mut memo: Option<String> = None;
     let label;
 
-    if let Some(m) = py_match(
+    // the other account of the bank a movement comes from or goes to, printed as its RIB in one block ("DEPOT
+    // INITIAL DU COMPTE" then "30004…28", "VIRT CPTE A CPTE EMIS SUR LE" then "L.A30004…28")
+    let other_account = std::iter::once(&first)
+        .chain(e.cont.iter())
+        .find_map(|line| {
+            let line = py::upper(py::strip(line));
+            search(RIB_BLOCK_RE, &line).and_then(|m| iban_from_rib_block(&m[1]))
+        });
+    let mut counterparty_iban: Option<String> = None;
+
+    if let Some(iban) = other_account {
+        kind = "transfer".into();
+        details.insert("internal".into(), Value::Bool(true));
+        counterparty_iban = Some(iban);
+        let up = py::upper(&full);
+        let what = if up.starts_with("DEPOT INITIAL") {
+            "Dépôt initial"
+        } else if up.starts_with("VERSEMENT PERIODIQUE") {
+            "Versement périodique"
+        } else if up.contains("L.A") {
+            "Virement vers le Livret A"
+        } else if e.amount < Decimal::ZERO {
+            "Virement vers un autre compte"
+        } else {
+            "Virement depuis un autre compte"
+        };
+        label = what.to_string();
+    } else if let Some(m) = py_match(r"(?i)^FACTURE(?:\(S\)|S)?\s+CARTE\s+\S+\s*(.*)$", &first) {
+        // "FACTURE(S) CARTE 4609XXXXXXXX4806" then "DU 070224 SHOP NAME" then the place and the amount
+        kind = "card".into();
+        let rest = std::iter::once(py::strip(&m[1]).to_string())
+            .chain(e.cont.iter().cloned())
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>();
+        let mut bought = None;
+        let mut shop = None;
+        let mut others = vec![];
+        for line in &rest {
+            match py_match(r"(?i)^DU\s+(\d{2})(\d{2})(\d{2})\s+(.*)$", line) {
+                Some(d) if shop.is_none() => {
+                    bought = ymd(
+                        2000 + d[3].parse::<i64>().unwrap_or(0),
+                        d[2].parse().unwrap_or(0),
+                        d[1].parse().unwrap_or(0),
+                    );
+                    shop = some(py::strip(&d[4]).to_string());
+                }
+                _ => others.push(line.clone()),
+            }
+        }
+        counterparty = shop;
+        details.insert(
+            "purchase_date".into(),
+            bought
+                .map(|b| Value::String(b.format("%Y-%m-%d").to_string()))
+                .unwrap_or(Value::Null),
+        );
+        memo = some(others.join(" "));
+        label = make_label(counterparty.as_deref().or(Some("Carte")), None);
+    } else if let Some(m) = py_match(
         r"(?i)^(?:PAIEMENT\s+|ACHAT\s+)?CARTE\s+(?:X?\d+\s+)?(?:(\d{2}/\d{2})\s+)?(.*)$",
         &first,
     ) {
@@ -448,7 +581,7 @@ fn to_transaction(
         );
         memo = some(e.cont.join(" "));
         label = make_label(counterparty.as_deref(), memo.as_deref());
-    } else if py_match(r"(?i)^VIR(?:EMENT)?\b", &head).is_some() {
+    } else if py_match(r"(?i)^VIR(?:T|EMENT)?\b", &head).is_some() {
         kind = if py::upper(&head).contains("INST") {
             "instant_transfer".into()
         } else {
@@ -502,7 +635,10 @@ fn to_transaction(
         kind = "interest".into();
         memo = some(e.cont.join(" "));
         label = make_label(Some(&first), memo.as_deref());
-    } else if let Some(m) = py_match(r"(?i)^(?:REMISE\s+)?CH(?:Q|[EÈ]QUE)\b\s*(.*)$", &first) {
+    } else if let Some(m) = py_match(
+        r"(?i)^(?:REMISE\s+(?:DE\s+)?)?CH(?:Q|[EÈ]QUES?)\b\s*(?:BORDEREAU\s+)?(.*)$",
+        &first,
+    ) {
         kind = "cheque".into();
         reference = py::split_ws(&m[1]).first().map(|s| s.to_string());
         let what = if py::upper(&first).starts_with("REMISE") {
@@ -535,6 +671,7 @@ fn to_transaction(
     t.value_date = value_date;
     t.kind = Some(kind);
     t.counterparty = counterparty;
+    t.counterparty_iban = counterparty_iban;
     t.reference = reference;
     t.memo = memo;
     t.raw = Some(raw);
