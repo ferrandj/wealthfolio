@@ -102,7 +102,8 @@
     "label_holdings": "Bestände anzeigen",
     "label_activities": "Aktivitäten anzeigen",
     "label_goals": "Ziele",
-    "label_assistant": "KI-Assistent"
+    "label_assistant": "KI-Assistent",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "Suchen...",
@@ -730,5 +731,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

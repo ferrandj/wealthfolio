@@ -105,7 +105,8 @@
     "label_holdings": "Ver posições",
     "label_activities": "Ver atividades",
     "label_goals": "Metas",
-    "label_assistant": "Assistente de IA"
+    "label_assistant": "Assistente de IA",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "Buscar...",
@@ -747,5 +748,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

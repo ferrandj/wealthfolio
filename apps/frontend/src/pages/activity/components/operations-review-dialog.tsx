@@ -33,12 +33,21 @@ export const countByKind = (items: OperationToReview[]) =>
  * Every operation of the imported statements that needs a look: a doubtful category, one left to categorize later,
  * a loan instalment to attach to its loan or a payment of another amount proposed for an instalment.
  */
-export function OperationsReviewDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function OperationsReviewDialog({
+  open,
+  onClose,
+  initialKind = null,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Open on one kind of review (the operations to categorize later…), the others a click away. */
+  initialKind?: string | null;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const names = useCategoryNames();
   const [choices, setChoices] = useState<Record<string, Choice>>({});
-  const [kind, setKind] = useState<string | null>(null);
+  const [kind, setKind] = useState<string | null>(initialKind);
   const { data = [], isLoading } = useQuery({
     queryKey: [QueryKeys.STATEMENT_OPERATIONS_REVIEW],
     queryFn: getOperationsToReview,

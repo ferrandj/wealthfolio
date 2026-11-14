@@ -374,7 +374,8 @@
     "label_dashboard": "عرض لوحة المعلومات",
     "label_goals": "الأهداف",
     "label_holdings": "عرض الحيازات",
-    "label_insights": "عرض الرؤى التحليلية"
+    "label_insights": "عرض الرؤى التحليلية",
+    "label_todo": "Show what is left to do"
   },
   "navStyle": {
     "floating": "شريط عائم",
@@ -798,5 +799,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

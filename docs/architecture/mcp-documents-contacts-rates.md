@@ -144,3 +144,11 @@ nearest to it) or detaches it. `get_operations_to_review` lists every operation
 of the imported statements to look at again (doubt, to categorize later, loan to
 attach or to confirm) and `categorize_operations` gives categories outside the
 review of a document; the Activities page has a Review button for the same list.
+
+### To-do (« À faire »)
+
+`get_todo` is the « À faire » screen: documents to validate, operations to review
+by kind (to_categorize = left for later, doubt, loan_to_attach, loan_proposed),
+loans with missing information or an account to validate, accounts without a
+holder, months without a statement, own accounts and counterparties to identify,
+activities flagged for review. Each section names the tools that fix it.

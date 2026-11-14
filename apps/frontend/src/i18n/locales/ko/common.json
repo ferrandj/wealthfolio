@@ -105,7 +105,8 @@
     "label_holdings": "보유 종목 보기",
     "label_activities": "활동 보기",
     "label_goals": "목표",
-    "label_assistant": "AI 어시스턴트"
+    "label_assistant": "AI 어시스턴트",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "검색...",
@@ -719,5 +720,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

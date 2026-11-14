@@ -648,6 +648,15 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
         <Icons.ListChecks className="me-2 h-4 w-4" />
         {t("activity:operations_review.button")}
       </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="todo-button"
+        onClick={() => navigate("/todo")}
+      >
+        <Icons.AlertCircle className="me-2 h-4 w-4" />
+        {t("activity:todo.button")}
+      </Button>
       <SyncButton />
       {/* Desktop action palette */}
       <div className="hidden sm:flex">
@@ -712,6 +721,15 @@ const ActivityPage = ({ initialAction }: ActivityPageProps) => {
       >
         <Icons.ListChecks className="me-2 h-4 w-4" />
         {t("activity:operations_review.button")}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="todo-button"
+        onClick={() => navigate("/todo")}
+      >
+        <Icons.AlertCircle className="me-2 h-4 w-4" />
+        {t("activity:todo.button")}
       </Button>
       <SyncButton />
       {/* Ask AI to categorize uncategorized transactions */}

@@ -105,7 +105,8 @@
     "label_holdings": "查看持仓",
     "label_activities": "查看活动",
     "label_goals": "目标",
-    "label_assistant": "AI 助手"
+    "label_assistant": "AI 助手",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "搜索...",
@@ -719,5 +720,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

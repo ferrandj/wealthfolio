@@ -648,3 +648,98 @@ service_tool!(
         reply(&service.loans(chrono::Utc::now().date_naive()).map_err(fail)?)
     }
 );
+
+/// The kinds of operations to review, in the order the to-do screen shows them.
+const TODO_OPERATION_KINDS: [&str; 4] =
+    ["to_categorize", "doubt", "loan_to_attach", "loan_proposed"];
+
+service_tool!(
+    GetTodo, "get_todo", Read, additive = true,
+    scopes = [DocumentsRead],
+    description = "Everything missing or waiting for the user (the 'À faire' screen): documents to validate, operations to review by kind (to_categorize = left to categorize later, doubt, loan_to_attach, loan_proposed), loans whose papers miss information or whose account waits for validation (with the gaps), accounts without a holder, months without a statement and balance breaks, own accounts missing from Wealthfolio, counterparties without a contact and activities flagged for review. Each section names the tools that fix it.",
+    schema = no_args(),
+    |env, _args| {
+        let statements = need(env.statement_service(), "Statements")?;
+        let documents: Vec<_> = statements
+            .list_documents()
+            .map_err(fail)?
+            .into_iter()
+            .filter(|d| d.status == "PENDING")
+            .map(|d| json!({"documentId": d.id, "fileName": d.file_name, "accountId": d.account_id, "toReviewCount": d.to_review_count}))
+            .collect();
+        let operations = statements.operations_to_review().await.map_err(fail)?;
+        let by_kind: serde_json::Map<String, serde_json::Value> = TODO_OPERATION_KINDS
+            .iter()
+            .map(|k| {
+                let n = operations.iter().filter(|o| o.why.iter().any(|w| w == k)).count();
+                (k.to_string(), json!(n))
+            })
+            .collect();
+        let loans: Vec<_> = statements
+            .loans(chrono::Utc::now().date_naive())
+            .map_err(fail)?
+            .into_iter()
+            .filter(|l| !l.gaps.is_empty() || l.liability_pending)
+            .map(|l| json!({
+                "loanKey": l.key,
+                "label": l.liability_name.clone().unwrap_or(l.label.clone()),
+                "accountPending": l.liability_pending,
+                "gaps": l.gaps.iter().map(|g| json!({"code": g.code, "text": g.text, "blocking": g.blocking, "answer": g.answer})).collect::<Vec<_>>(),
+            }))
+            .collect();
+        let statements_missing: Vec<_> = statements
+            .coverage()
+            .map_err(fail)?
+            .into_iter()
+            .filter_map(|c| {
+                let months: Vec<String> = c.missing_months.iter().filter(|m| !m.normal).map(|m| m.month.clone()).collect();
+                (!months.is_empty() || !c.balance_breaks.is_empty()).then(|| json!({
+                    "accountId": c.account_id,
+                    "missingMonths": months,
+                    "balanceBreaks": c.balance_breaks.len(),
+                }))
+            })
+            .collect();
+        let accounts = env.account_service().get_active_accounts().map_err(fail)?;
+        let contacts = env.contacts_service();
+        let (ownerless, missing_own, counterparties) = match &contacts {
+            Some(service) => {
+                let list = service.list().map_err(fail)?;
+                let ownerless: Vec<_> = accounts
+                    .iter()
+                    .filter(|a| !a.is_archived && !list.iter().any(|c| c.linked_account_ids.contains(&a.id)))
+                    .map(|a| json!({"accountId": a.id, "name": a.name}))
+                    .collect();
+                let missing_own = service.missing_own_accounts().map_err(fail)?;
+                let counterparties = service.unresolved(false).map_err(fail)?.len();
+                (ownerless, serde_json::to_value(missing_own)?, counterparties)
+            }
+            None => (Vec::new(), json!([]), 0),
+        };
+        let pending_activities = env
+            .activity_service()
+            .search_activities(0, 1, None, None, None, None, Some(true), None, None, None, None)
+            .map_err(fail)?
+            .meta
+            .total_row_count;
+        let total = documents.len()
+            + operations.len()
+            + loans.len()
+            + ownerless.len()
+            + statements_missing.len()
+            + missing_own.as_array().map_or(0, Vec::len)
+            + counterparties
+            + pending_activities.max(0) as usize;
+        reply(&json!({
+            "total": total,
+            "documentsToValidate": {"items": documents, "fixWith": ["review_statement_document", "validate_statement_document"]},
+            "operations": {"byKind": by_kind, "fixWith": ["get_operations_to_review", "categorize_operations", "attach_loan_payment", "set_loan_answers"]},
+            "loans": {"items": loans, "fixWith": ["get_statement_loans", "set_loan_answers", "attach_loan_document", "validate_loan"]},
+            "accountsWithoutHolder": {"items": ownerless, "fixWith": ["link_contact_account", "create_contact"]},
+            "statementsMissing": {"items": statements_missing, "fixWith": ["get_statement_coverage", "set_statement_month_normal", "import_statement"]},
+            "missingOwnAccounts": {"items": missing_own, "fixWith": ["create_account"]},
+            "counterpartiesWithoutContact": {"count": counterparties, "fixWith": ["list_unresolved_counterparties", "create_contact", "add_contact_identifier"]},
+            "activitiesToReview": {"count": pending_activities, "fixWith": ["search_activities"]},
+        }))
+    }
+);

@@ -56,6 +56,13 @@ function buildStaticNavigation(t: TFunction): NavigationProps {
         label: t("common:nav.label_activities"),
       },
       {
+        icon: <Icons.ListChecks className="size-6" />,
+        title: t("common:todo"),
+        href: "/todo",
+        keywords: ["todo", "to do", "review", "missing", "pending", "à faire", "classify"],
+        label: t("common:nav.label_todo"),
+      },
+      {
         icon: <Icons.Goals className="size-6" />,
         title: t("common:goals"),
         href: "/goals",

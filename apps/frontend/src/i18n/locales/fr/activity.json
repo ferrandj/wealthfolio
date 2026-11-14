@@ -1583,5 +1583,64 @@
     "saved": "Catégories enregistrées",
     "error": "Impossible d'enregistrer",
     "save_many": "Enregistrer {{count}} catégories"
+  },
+  "todo": {
+    "button": "À faire",
+    "heading": "À faire",
+    "text": "Tout ce qui manque ou attend une action, et de quoi le régler d'ici.",
+    "all_done": "Rien à faire : tout est à jour.",
+    "open": "Ouvrir",
+    "fix": "Régler",
+    "no_account": "Sans compte",
+    "documents": {
+      "title": "Documents à valider",
+      "description": "Les relevés et papiers importés qui attendent une relecture.",
+      "review_all": "Tout revoir à la suite",
+      "to_review_one": "{{count}} opération à revoir",
+      "to_review_other": "{{count}} opérations à revoir",
+      "to_review_many": "{{count}} opérations à revoir"
+    },
+    "operations": {
+      "title": "Opérations à classer",
+      "description": "Catégories à choisir (dont celles laissées pour plus tard), doutes, échéances de prêt à rattacher ou à confirmer."
+    },
+    "loans": {
+      "title": "Prêts incomplets",
+      "description": "Des informations manquent encore pour suivre le prêt ou valider son compte.",
+      "to_validate": "Compte de prêt à valider"
+    },
+    "holders": {
+      "title": "Comptes sans titulaire",
+      "description": "Personne n'est encore rattaché à ces comptes.",
+      "set_all": "Définir les titulaires"
+    },
+    "statements": {
+      "title": "Relevés manquants",
+      "description": "Des mois sans relevé ou des soldes qui ne s'enchaînent pas.",
+      "months_one": "{{count}} mois manquant : {{months}}",
+      "months_other": "{{count}} mois manquants : {{months}}",
+      "breaks_one": "{{count}} rupture de solde",
+      "breaks_other": "{{count}} ruptures de solde",
+      "months_many": "{{count}} mois manquants : {{months}}",
+      "breaks_many": "{{count}} ruptures de solde"
+    },
+    "contacts": {
+      "title": "Comptes et contreparties à identifier",
+      "description": "Des virements vers vos comptes absents de Wealthfolio, et des contreparties sans contact.",
+      "missing_account_one": "Compte de {{name}} absent · {{count}} opération",
+      "missing_account_other": "Compte de {{name}} absent · {{count}} opérations",
+      "create": "Créer le compte",
+      "counterparties_one": "{{count}} contrepartie sans contact",
+      "counterparties_other": "{{count}} contreparties sans contact",
+      "missing_account_many": "Compte de {{name}} absent · {{count}} opérations",
+      "counterparties_many": "{{count}} contreparties sans contact"
+    },
+    "activities": {
+      "title": "Activités à vérifier",
+      "description": "Activités signalées à l'import ou à la synchronisation.",
+      "open_one": "Voir {{count}} activité",
+      "open_other": "Voir {{count}} activités",
+      "open_many": "Voir {{count}} activités"
+    }
   }
 }

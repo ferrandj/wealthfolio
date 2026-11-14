@@ -1522,5 +1522,58 @@
     "save_other": "Save {{count}} categories",
     "saved": "Categories saved",
     "error": "Could not save"
+  },
+  "todo": {
+    "button": "To do",
+    "heading": "To do",
+    "text": "Everything missing or waiting for you, with a way to fix it from here.",
+    "all_done": "Nothing to do: everything is up to date.",
+    "open": "Open",
+    "fix": "Fix",
+    "no_account": "No account",
+    "documents": {
+      "title": "Documents to validate",
+      "description": "Imported statements and papers waiting for a review.",
+      "review_all": "Review them all",
+      "to_review_one": "{{count}} operation to review",
+      "to_review_other": "{{count}} operations to review"
+    },
+    "operations": {
+      "title": "Operations to categorize",
+      "description": "Categories to choose (including those left for later), doubts, loan instalments to attach or confirm."
+    },
+    "loans": {
+      "title": "Incomplete loans",
+      "description": "Some information is still missing to follow the loan or validate its account.",
+      "to_validate": "Loan account to validate"
+    },
+    "holders": {
+      "title": "Accounts without a holder",
+      "description": "Nobody is attached to these accounts yet.",
+      "set_all": "Set the holders"
+    },
+    "statements": {
+      "title": "Missing statements",
+      "description": "Months without a statement or balances that do not follow.",
+      "months_one": "{{count}} missing month: {{months}}",
+      "months_other": "{{count}} missing months: {{months}}",
+      "breaks_one": "{{count}} balance break",
+      "breaks_other": "{{count}} balance breaks"
+    },
+    "contacts": {
+      "title": "Accounts and counterparties to identify",
+      "description": "Transfers to your accounts missing from Wealthfolio, and counterparties without a contact.",
+      "missing_account_one": "{{name}}'s account missing · {{count}} operation",
+      "missing_account_other": "{{name}}'s account missing · {{count}} operations",
+      "create": "Create the account",
+      "counterparties_one": "{{count}} counterparty without a contact",
+      "counterparties_other": "{{count}} counterparties without a contact"
+    },
+    "activities": {
+      "title": "Activities to check",
+      "description": "Activities flagged during import or sync.",
+      "open_one": "See {{count}} activity",
+      "open_other": "See {{count}} activities"
+    }
   }
 }

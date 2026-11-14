@@ -105,7 +105,8 @@
     "label_holdings": "保有銘柄を表示",
     "label_activities": "取引を表示",
     "label_goals": "目標",
-    "label_assistant": "AIアシスタント"
+    "label_assistant": "AIアシスタント",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "検索...",
@@ -719,5 +720,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }

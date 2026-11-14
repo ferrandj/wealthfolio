@@ -105,7 +105,8 @@
     "label_holdings": "View Holdings",
     "label_activities": "View Activities",
     "label_goals": "Goals",
-    "label_assistant": "AI Assistant"
+    "label_assistant": "AI Assistant",
+    "label_todo": "Show what is left to do"
   },
   "layout": {
     "search": "Search...",
@@ -730,5 +731,6 @@
     "save": "Save",
     "later": "Later",
     "typed_source": "Typed by hand"
-  }
+  },
+  "todo": "To do"
 }
