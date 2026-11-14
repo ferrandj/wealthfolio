@@ -1,4 +1,5 @@
 import { TimePeriod } from "@/lib/types";
+import { useCurrencyAxis } from "./use-currency-axis";
 import { formatDate } from "@/lib/utils";
 import { useAmountFormatting, useDateFormatting, useNumberFormatting } from "@wealthfolio/ui";
 import type { TFunction } from "i18next";
@@ -77,6 +78,7 @@ export default function HistoryChart({
   averageCost?: number;
 }) {
   const amountFormatting = useAmountFormatting();
+  const currencyAxis = useCurrencyAxis(data[0]?.currency);
   const [hoveredMarker, setHoveredMarker] = useState(false);
   const markerByTimestamp = useMemo(() => {
     const markers = new Map<string, HistoryChartActivityMarker>();
@@ -132,9 +134,11 @@ export default function HistoryChart({
               // Callers overlay IntervalSelector (z-30) on the chart's bottom edge.
               wrapperStyle={{ pointerEvents: "none", zIndex: 40 }}
             />
-            {interval !== "ALL" && interval !== "1Y" ? (
-              <YAxis hide={true} type="number" domain={["auto", "auto"]} />
-            ) : null}
+            <YAxis
+              {...currencyAxis}
+              type="number"
+              domain={interval !== "ALL" && interval !== "1Y" ? ["auto", "auto"] : [0, "auto"]}
+            />
             <XAxis hide dataKey="timestamp" type="category" />
             <Area
               animationDuration={300}

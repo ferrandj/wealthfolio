@@ -1,6 +1,7 @@
 import { useHapticFeedback } from "@/hooks";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport, useViewportBelow } from "@/hooks/use-platform";
+import { useCurrencyAxis } from "./use-currency-axis";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay, useDateFormatting } from "@wealthfolio/ui";
 import { ChartConfig, ChartContainer } from "@wealthfolio/ui/components/ui/chart";
@@ -153,6 +154,7 @@ export function HistoryChart({
   const { t } = useTranslation();
   const { triggerHaptic } = useHapticFeedback();
   const { isBalanceHidden } = useBalancePrivacy();
+  const currencyAxis = useCurrencyAxis(data[0]?.currency);
   const [isChartHovered, setIsChartHovered] = useState(false);
   const [hoveredMarker, setHoveredMarker] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -372,7 +374,7 @@ export function HistoryChart({
         />
         <XAxis hide dataKey="date" type="category" />
         <YAxis
-          hide
+          {...currencyAxis}
           type="number"
           scale={scaleConfig.scale === "log" ? "log" : "auto"}
           domain={scaleConfig.domain}

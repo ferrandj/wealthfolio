@@ -1,4 +1,5 @@
 import { useHapticFeedback } from "@/hooks";
+import { useCurrencyAxis } from "@/components/use-currency-axis";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport, useViewportBelow } from "@/hooks/use-platform";
 import type { NetWorthHistoryPoint } from "@/lib/types";
@@ -138,6 +139,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const fillGradientId = `nwFill-${id}`;
 
   const chartData = transformData(data);
+  const currencyAxis = useCurrencyAxis(chartData[0]?.currency);
 
   const chartConfig = {
     netWorth: {
@@ -217,7 +219,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
           )}
         />
         <YAxis
-          hide
+          {...currencyAxis}
           type="number"
           domain={
             isFlat
