@@ -505,3 +505,86 @@ fn the_price_list_is_kept_and_dated_by_its_month() {
         Some("Conditions et tarifs · 01/2026")
     );
 }
+
+#[test]
+fn a_precontract_note_is_filed_with_the_account_it_is_about() {
+    // the deposit account's, dated in words
+    let (found, st) = read_paper(hello_precontract_note_pdf(
+        "COMPTE DE DEPOT INDIVIDUEL OU JOINT POUR LES CLIENTS MAJEURS",
+        "Informations commerciales au 01 avril 2026",
+    ));
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.precontract_note_pdf"
+    );
+    assert_eq!(st.account_type.as_deref(), Some("checking"));
+    assert_eq!(st.extra["match_by_type"].as_bool(), Some(true));
+    assert_eq!(st.iban, None);
+    assert_eq!(st.balance_date, Some(ymd(2026, 4, 1)));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Note d'information précontractuelle · Compte de dépôt")
+    );
+
+    // a card's, dated in figures: it goes with the account the card pays from
+    let (found, st) = read_paper(hello_precontract_note_pdf(
+        "carte Hello One dans le cadre de l’offre Hello One",
+        "Informations commerciales au 01.05.2026",
+    ));
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.precontract_note_pdf"
+    );
+    assert_eq!(st.account_type.as_deref(), Some("checking"));
+    assert_eq!(st.balance_date, Some(ymd(2026, 5, 1)));
+    assert_eq!(st.extra["offer"].as_str(), Some("Hello One"));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Note d'information précontractuelle · Carte Hello One")
+    );
+}
+
+#[test]
+fn a_contract_that_carries_a_note_is_still_the_contract() {
+    let (found, _) = read_paper(hello_savings_contract_pdf(false));
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.savings_contract_pdf"
+    );
+    let (found, _) = read_paper(hello_account_agreement_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.account_agreement_pdf"
+    );
+}
+
+#[test]
+fn the_fee_information_document_is_kept_though_it_names_the_parent_bank() {
+    let (found, st) = read_paper(hello_fee_information_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.fee_information_pdf"
+    );
+    assert_eq!(st.institution.as_deref(), Some("Hello bank!"));
+    assert_eq!(st.account_type, None);
+    assert_eq!(st.balance_date, Some(ymd(2026, 8, 1)));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Document d'information tarifaire · 08/2026")
+    );
+}
+
+#[test]
+fn the_personal_data_notice_is_kept_and_dated_by_its_edition() {
+    let (found, st) = read_paper(hello_privacy_notice_pdf());
+    assert_eq!(
+        found.chosen.unwrap().adapter.id(),
+        "hellobank.privacy_notice_pdf"
+    );
+    assert_eq!(st.account_type, None);
+    assert_eq!(st.balance_date, Some(ymd(2026, 5, 1)));
+    assert_eq!(
+        st.extra["title"].as_str(),
+        Some("Protection des données personnelles · 05/2026")
+    );
+}

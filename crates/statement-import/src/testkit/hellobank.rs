@@ -477,3 +477,63 @@ pub fn hello_price_list_pdf() -> Vec<u8> {
     );
     pdf.bytes()
 }
+
+/// A pre-contractual information note: what it is about under its title, then its date.
+pub fn hello_precontract_note_pdf(subject: &str, date_line: &str) -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    lines(
+        &mut pdf,
+        60.0,
+        60.0,
+        &[
+            "NOTE D’INFORMATION PRECONTRACTUELLE",
+            subject,
+            date_line,
+            "1 - L’ESSENTIEL",
+            "Le compte de dépôt Hello bank! est ouvert sur les livres de la banque au nom d'un ou de deux titulaires.",
+            "2 - CONDITIONS DE SOUSCRIPTION",
+            "Droit de rétractation",
+            "Vous disposez d'un délai de rétractation de 14 jours calendaires.",
+        ],
+    );
+    pdf.bytes()
+}
+
+/// The fee information document: the provider is the parent bank, the offers are Hello bank's.
+pub fn hello_fee_information_pdf() -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    lines(
+        &mut pdf,
+        60.0,
+        60.0,
+        &[
+            "Document d’information tarifaire",
+            "Nom du prestataire de compte : BANQUE MERE",
+            "Intitulé du compte : Compte de dépôt à vue en euros",
+            "Date : 1er août 2026",
+            "Tenue de compte Gratuit",
+            "Offre [Hello One] incluant :",
+            "Fourniture d’une carte de débit [Hello Prime avec assurance] Annuellement : 100€",
+        ],
+    );
+    pdf.bytes()
+}
+
+/// The personal data notice.
+pub fn hello_privacy_notice_pdf() -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    lines(
+        &mut pdf,
+        60.0,
+        60.0,
+        &[
+            "PROTECTION DES DONNEES PERSONNELLES",
+            "NOTICE D’INFORMATION",
+            "Edition mai 2026",
+            "Avant-propos : principaux changements",
+            "La banque, en tant que responsable du traitement, notamment à travers ses marques comme Hello Bank!,",
+            "est responsable de la collecte et du traitement de vos données personnelles.",
+        ],
+    );
+    pdf.bytes()
+}

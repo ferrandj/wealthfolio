@@ -25,7 +25,8 @@ use super::fortuneo::loan_schedule_pdf::FortuneoLoanSchedulePdf;
 use super::fortuneo::statement_pdf::FortuneoStatementPdf;
 use super::generic::{GenericCsv, GenericOfx, GenericPdf, GenericQif};
 use super::hellobank::papers_pdf::{
-    HelloBankAccountAgreementPdf, HelloBankOpeningLetterPdf, HelloBankPriceListPdf,
+    HelloBankAccountAgreementPdf, HelloBankFeeInformationPdf, HelloBankOpeningLetterPdf,
+    HelloBankPrecontractNotePdf, HelloBankPriceListPdf, HelloBankPrivacyNoticePdf,
     HelloBankSavingsContractPdf,
 };
 use super::hellobank::statement_pdf::HelloBankStatementPdf;
@@ -58,6 +59,9 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &HelloBankSavingsContractPdf,
     &HelloBankOpeningLetterPdf,
     &HelloBankPriceListPdf,
+    &HelloBankFeeInformationPdf,
+    &HelloBankPrecontractNotePdf,
+    &HelloBankPrivacyNoticePdf,
     &RevolutStatementCsv,
     &GenericOfx,
     &GenericQif,

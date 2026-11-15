@@ -5,7 +5,8 @@
 //! - the contract of a savings account ("Livret Hello+" or "Livret A": the information note, the particular
 //!   conditions with the account or reservation number, the rate and the first deposit, then the general conditions);
 //! - the letter confirming a Livret A is open (sent once the tax administration answered);
-//! - the price list ("Conditions et tarifs").
+//! - the price list ("Conditions et tarifs") and the fee information document ("Document d'information tarifaire");
+//! - the pre-contractual information notes (deposit account, card) and the personal data notice.
 //!
 //! Each is recognised, dated, given a title and filed with its account: the account is named by its IBAN or its RIB
 //! when the paper prints one, and is otherwise the only account of that kind at the bank.
@@ -544,6 +545,307 @@ impl Adapter for HelloBankPriceListPdf {
         }
         st.set_extra("title", title);
         st.set_extra("category", "Tarifs");
+        Ok(vec![st])
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+/// "COMPTE DE DEPOT INDIVIDUEL" → "Compte de depot individuel"; a line already in lower case keeps its capitals.
+fn sentence_case(line: &str) -> String {
+    let line = py::strip(line);
+    if line.chars().any(char::is_lowercase) {
+        let mut c = line.chars();
+        return c
+            .next()
+            .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+            .unwrap_or_default();
+    }
+    let lower = line.to_lowercase();
+    let mut c = lower.chars();
+    c.next()
+        .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+        .unwrap_or_default()
+}
+
+/// The date a paper is issued on, set on the statement.
+fn issued(st: &mut ParsedStatement, date: Option<chrono::NaiveDate>) {
+    if let Some(d) = date {
+        st.balance_date = Some(d);
+        st.set_extra("issued_on", d.format("%Y-%m-%d").to_string());
+    }
+}
+
+/// A pre-contractual information note ("Note d'information précontractuelle") handed before a contract is signed:
+/// the deposit account's, a card's.
+pub struct HelloBankPrecontractNotePdf;
+
+impl Adapter for HelloBankPrecontractNotePdf {
+    fn id(&self) -> &'static str {
+        "hellobank.precontract_note_pdf"
+    }
+    fn institution(&self) -> Option<&'static str> {
+        Some(INSTITUTION)
+    }
+    fn kind(&self) -> &'static str {
+        "info"
+    }
+    fn label(&self) -> &'static str {
+        "Hello bank! · note d'information précontractuelle (PDF)"
+    }
+    fn description(&self) -> &'static str {
+        "La note d'information remise avant la signature (compte de dépôt, carte) : à classer avec le compte, elle ne porte ni numéro ni opération."
+    }
+    fn formats(&self) -> &'static [&'static str] {
+        &["pdf"]
+    }
+
+    fn detect(&self, doc: &SourceDocument) -> Result<Detection, String> {
+        if doc.format() != "pdf" {
+            return Ok(Detection::default());
+        }
+        let c = squeezed(doc)?;
+        let hello = c.contains("hellobank");
+        // the note alone opens on its title; a contract carries a note too, after its request or with its conditions
+        let opens = c
+            .chars()
+            .take(60)
+            .collect::<String>()
+            .contains("noted'informationprecontractuelle");
+        let mut d = detection(
+            &[
+                (hello, 0.25, "mentionne Hello bank!"),
+                (opens, 0.4, "« Note d'information précontractuelle »"),
+                (
+                    c.contains("informationscommercialesau"),
+                    0.2,
+                    "« Informations commerciales au »",
+                ),
+                (
+                    c.contains("droitderetractation"),
+                    0.15,
+                    "droit de rétractation",
+                ),
+            ],
+            hello,
+        );
+        let contract = c.contains("demandedesouscription")
+            || c.contains("conditionsparticulieres") && c.contains("versementinitial");
+        if !opens || contract {
+            d.score = d.score.min(0.3);
+        }
+        Ok(d)
+    }
+
+    fn parse(&self, doc: &SourceDocument) -> ParseResult {
+        let mut st = info(self);
+        let text = rows_text(doc)?;
+        let rows: Vec<&str> = text.lines().map(py::strip).collect();
+        // what the note is about is printed under its title, above "Informations commerciales au …"
+        let subject = rows
+            .iter()
+            .position(|l| norm(l).contains("note d'information precontractuelle"))
+            .and_then(|at| rows.get(at + 1))
+            .filter(|l| !norm(l).starts_with("informations commerciales"))
+            .map(|l| sentence_case(l));
+        let about = subject.as_deref().map(norm).unwrap_or_default();
+        let squeezed_about: String = about.split_whitespace().collect();
+        let (title, kind) = if squeezed_about.contains("livret") {
+            let (product, kind) = savings_product(&squeezed_about);
+            (product.to_string(), kind)
+        } else if about.contains("compte de depot") {
+            ("Compte de dépôt".to_string(), "checking")
+        } else {
+            // "carte Hello One dans le cadre de l'offre Hello One": the card
+            let short = subject
+                .as_deref()
+                .map(|s| {
+                    search(r"(?i)^(.*?)\s+dans le cadre\b", s)
+                        .map_or(s.to_string(), |m| m[1].to_string())
+                })
+                .unwrap_or_else(|| "Compte".to_string());
+            (short, "checking")
+        };
+        st.account_type = Some(kind.into());
+        // no account number: the note goes to the only account of that kind at the bank
+        st.set_extra("match_by_type", true);
+        let line = rows
+            .iter()
+            .find(|l| norm(l).starts_with("informations commerciales au"));
+        issued(
+            &mut st,
+            date_after(&text, r"informations commerciales au")
+                .or_else(|| french_date(line.copied())),
+        );
+        if about.contains("hello prime") {
+            st.set_extra("offer", "Hello Prime");
+        } else if about.contains("hello one") {
+            st.set_extra("offer", "Hello One");
+        }
+        if let Some(subject) = subject {
+            st.set_extra("subject", subject);
+        }
+        st.set_extra(
+            "title",
+            format!("Note d'information précontractuelle · {title}"),
+        );
+        st.set_extra("category", "Contrat");
+        Ok(vec![st])
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+/// The fee information document ("Document d'information tarifaire"): the standard page of the main fees of a
+/// deposit account. It is BNP Paribas's, with the Hello offers.
+pub struct HelloBankFeeInformationPdf;
+
+impl Adapter for HelloBankFeeInformationPdf {
+    fn id(&self) -> &'static str {
+        "hellobank.fee_information_pdf"
+    }
+    fn institution(&self) -> Option<&'static str> {
+        Some(INSTITUTION)
+    }
+    fn kind(&self) -> &'static str {
+        "info"
+    }
+    fn label(&self) -> &'static str {
+        "Hello bank! · document d'information tarifaire (PDF)"
+    }
+    fn description(&self) -> &'static str {
+        "Le document d'information tarifaire (les principaux frais d'un compte de dépôt, offres Hello One et Hello Prime) : à classer, il ne concerne pas un compte en particulier."
+    }
+    fn formats(&self) -> &'static [&'static str] {
+        &["pdf"]
+    }
+
+    fn detect(&self, doc: &SourceDocument) -> Result<Detection, String> {
+        if doc.format() != "pdf" {
+            return Ok(Detection::default());
+        }
+        let c = squeezed(doc)?;
+        // the document names BNP Paribas as the provider: it is Hello bank's by the offers it prices
+        let hello =
+            c.contains("hellobank") || c.contains("[helloone]") || c.contains("[helloprime");
+        Ok(detection(
+            &[
+                (hello, 0.25, "offres Hello bank!"),
+                (
+                    c.starts_with("documentd'informationtarifaire"),
+                    0.4,
+                    "« Document d'information tarifaire »",
+                ),
+                (
+                    c.contains("nomduprestatairedecompte"),
+                    0.2,
+                    "« Nom du prestataire de compte »",
+                ),
+                (
+                    c.contains("intituleducompte"),
+                    0.15,
+                    "« Intitulé du compte »",
+                ),
+            ],
+            hello,
+        ))
+    }
+
+    fn parse(&self, doc: &SourceDocument) -> ParseResult {
+        let mut st = info(self);
+        let text = rows_text(doc)?;
+        // "Date : 1er août 2022"
+        let date = text
+            .lines()
+            .take(12)
+            .map(py::strip)
+            .find(|l| norm(l).starts_with("date"))
+            .and_then(|l| french_date(Some(l)));
+        issued(&mut st, date);
+        st.set_extra(
+            "title",
+            match date {
+                Some(d) => format!("Document d'information tarifaire · {}", d.format("%m/%Y")),
+                None => "Document d'information tarifaire".to_string(),
+            },
+        );
+        st.set_extra("category", "Tarifs");
+        Ok(vec![st])
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+/// The personal data notice ("Protection des données personnelles — notice d'information").
+pub struct HelloBankPrivacyNoticePdf;
+
+impl Adapter for HelloBankPrivacyNoticePdf {
+    fn id(&self) -> &'static str {
+        "hellobank.privacy_notice_pdf"
+    }
+    fn institution(&self) -> Option<&'static str> {
+        Some(INSTITUTION)
+    }
+    fn kind(&self) -> &'static str {
+        "info"
+    }
+    fn label(&self) -> &'static str {
+        "Hello bank! · notice de protection des données personnelles (PDF)"
+    }
+    fn description(&self) -> &'static str {
+        "La notice d'information sur la protection des données personnelles remise avec un contrat : à classer, elle ne concerne pas un compte en particulier."
+    }
+    fn formats(&self) -> &'static [&'static str] {
+        &["pdf"]
+    }
+
+    fn detect(&self, doc: &SourceDocument) -> Result<Detection, String> {
+        if doc.format() != "pdf" {
+            return Ok(Detection::default());
+        }
+        let c = squeezed(doc)?;
+        let hello = c.contains("hellobank");
+        Ok(detection(
+            &[
+                (hello, 0.25, "mentionne Hello bank!"),
+                (
+                    c.starts_with("protectiondesdonneespersonnelles"),
+                    0.4,
+                    "« Protection des données personnelles »",
+                ),
+                (
+                    c.chars()
+                        .take(80)
+                        .collect::<String>()
+                        .contains("noticed'information"),
+                    0.2,
+                    "« Notice d'information »",
+                ),
+                (
+                    c.contains("responsabledutraitement"),
+                    0.15,
+                    "responsable du traitement",
+                ),
+            ],
+            hello,
+        ))
+    }
+
+    fn parse(&self, doc: &SourceDocument) -> ParseResult {
+        let mut st = info(self);
+        let text = rows_text(doc)?;
+        // "Edition mai 2022"
+        let edition = text.lines().take(8).map(py::strip).find_map(|l| {
+            let m = search(r"(?i)^[ée]dition\s+(\S+)\s+(\d{4})$", l)?;
+            Some((month_of(&norm(&m[1]))?, m[2].parse::<i64>().ok()?))
+        });
+        let mut title = "Protection des données personnelles".to_string();
+        if let Some((m, y)) = edition {
+            issued(&mut st, ymd(y, i64::from(m), 1));
+            title = format!("Protection des données personnelles · {m:02}/{y}");
+        }
+        st.set_extra("title", title);
+        st.set_extra("category", "Information");
         Ok(vec![st])
     }
 }
