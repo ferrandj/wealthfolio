@@ -795,23 +795,35 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       setSelectedRowIds(new Set());
     }, []);
 
+    // What a row is handed must stay the same from one render to the next: the
+    // list re-renders on every scroll step, and a row given a new function is
+    // drawn again each time. A mutation is a new object on every render; its
+    // `mutate` is not.
+    const assignCategory = assignMutation.mutate;
     const handleAssignCategory = useCallback(
       (activityId: string, taxonomyId: string, categoryId: string) => {
-        assignMutation.mutate({ activityId, taxonomyId, categoryId });
+        assignCategory({ activityId, taxonomyId, categoryId });
       },
-      [assignMutation],
+      [assignCategory],
     );
+    const unassignCategory = unassignMutation.mutate;
     const handleClearCategory = useCallback(
       (activityId: string, taxonomyId: string) => {
-        unassignMutation.mutate({ activityId, taxonomyId });
+        unassignCategory({ activityId, taxonomyId });
       },
-      [unassignMutation],
+      [unassignCategory],
     );
+    const setActivityEvent = setEventMutation.mutate;
     const handleSetEvent = useCallback(
       (activityId: string, eventId: string | null) => {
-        setEventMutation.mutate({ activityId, eventId });
+        setActivityEvent({ activityId, eventId });
       },
-      [setEventMutation],
+      [setActivityEvent],
+    );
+    const markReimbursement = markReimbursementMutation.mutate;
+    const handleMarkReimbursement = useCallback(
+      (row: TransactionRowVM) => markReimbursement(row),
+      [markReimbursement],
     );
     const handleSaveSplits = useCallback(
       async (activityId: string, splits: NewActivitySplit[]) => {
@@ -1073,7 +1085,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         onAssignCategory: handleAssignCategory,
         onClearCategory: handleClearCategory,
         onSetEvent: handleSetEvent,
-        onMarkReimbursement: (row: TransactionRowVM) => markReimbursementMutation.mutate(row),
+        onMarkReimbursement: handleMarkReimbursement,
         onEditSplits: setSplittingActivity,
         onEdit: handleEditRow,
         onDuplicate: handleDuplicate,

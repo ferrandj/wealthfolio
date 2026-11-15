@@ -81,14 +81,19 @@ const mocks = vi.hoisted(() => {
           subcategoryOptions: FilterOption[];
           viewToggle?: React.ReactNode;
           selectedNet: { byCurrency: unknown[] };
+          onSearchInputChange: (value: string) => void;
         }
       | undefined,
+    rowProps: [] as Record<string, unknown>[],
     compactViewport: false,
     gridProps: undefined as
       | undefined
       | { pageIndex: number; onPageChange: (index: number) => void },
     accounts,
     transferOut,
+    // As the real hooks: the same list from one render to the next.
+    items: [transferOut],
+    spendingAccountIds: ["acct-usd", "acct-eur"],
     mutation,
     getTransferPairForActivity: vi.fn(),
     invalidateQueries: vi.fn(),
@@ -174,7 +179,7 @@ vi.mock("@/lib/settings-provider", () => ({
 
 vi.mock("../hooks/use-cash-activity-search", () => ({
   useCashActivityPage: () => ({
-    items: [mocks.transferOut],
+    items: mocks.items,
     totalCount: 1,
     pageCount: 1,
     net: null,
@@ -186,7 +191,7 @@ vi.mock("../hooks/use-cash-activity-search", () => ({
     refetch: vi.fn(),
   }),
   useCashActivitySearch: () => ({
-    items: [mocks.transferOut],
+    items: mocks.items,
     totalCount: 1,
     net: [],
     baseCurrency: "EUR",
@@ -203,19 +208,20 @@ vi.mock("../hooks/use-cash-activity-search", () => ({
 }));
 
 vi.mock("../hooks/use-cash-activities", () => ({
-  useAssignActivityCategory: () => mocks.mutation,
-  useBulkAssignCategories: () => mocks.mutation,
-  useUnassignActivityCategory: () => mocks.mutation,
-  useReplaceActivitySplits: () => mocks.mutation,
-  useClearActivitySplits: () => mocks.mutation,
-  useSetActivityEvent: () => mocks.mutation,
+  // As the real ones: a new object on every render around the same `mutate`.
+  useAssignActivityCategory: () => ({ ...mocks.mutation }),
+  useBulkAssignCategories: () => ({ ...mocks.mutation }),
+  useUnassignActivityCategory: () => ({ ...mocks.mutation }),
+  useReplaceActivitySplits: () => ({ ...mocks.mutation }),
+  useClearActivitySplits: () => ({ ...mocks.mutation }),
+  useSetActivityEvent: () => ({ ...mocks.mutation }),
 }));
 vi.mock("../hooks/use-spending-events", () => ({
   useSpendingEvents: () => ({ data: [] }),
   useEventTypes: () => ({ data: [] }),
 }));
 vi.mock("../hooks/use-spending-settings", () => ({
-  useSpendingSettings: () => ({ accountIds: [USD_ACCOUNT, EUR_ACCOUNT] }),
+  useSpendingSettings: () => ({ accountIds: mocks.spendingAccountIds }),
 }));
 
 vi.mock("./cash-activity-form", () => ({ CashActivityForm: () => null }));
@@ -264,26 +270,29 @@ vi.mock("./transaction-row", async () => {
         onToggleSelect: (id: string) => void;
       },
       _ref: unknown,
-    ) => (
-      <tr>
-        <td>
-          <button
-            type="button"
-            data-testid={`edit-${props.row.activity.id}`}
-            onClick={() => props.onEdit(props.row)}
-          >
-            edit
-          </button>
-          <button
-            type="button"
-            data-testid={`select-${props.row.activity.id}`}
-            onClick={() => props.onToggleSelect(props.row.activity.id)}
-          >
-            select
-          </button>
-        </td>
-      </tr>
-    ),
+    ) => {
+      mocks.rowProps.push(props as unknown as Record<string, unknown>);
+      return (
+        <tr>
+          <td>
+            <button
+              type="button"
+              data-testid={`edit-${props.row.activity.id}`}
+              onClick={() => props.onEdit(props.row)}
+            >
+              edit
+            </button>
+            <button
+              type="button"
+              data-testid={`select-${props.row.activity.id}`}
+              onClick={() => props.onToggleSelect(props.row.activity.id)}
+            >
+              select
+            </button>
+          </td>
+        </tr>
+      );
+    },
   );
   TransactionRow.displayName = "TransactionRow";
   return { TransactionRow };
@@ -481,6 +490,22 @@ describe("SpendingTransactionsTab selection", () => {
     select.click();
     await waitFor(() => expect(list).not.toHaveAttribute("data-selecting"));
   });
+});
+
+// The list re-renders on every scroll step. A row is only left alone if what it
+// is handed is the very same from one render to the next.
+it("hands a row the same props when the list re-renders around it", async () => {
+  mocks.useMutation.mockReset().mockImplementation(() => ({ ...mocks.mutation }));
+  render(<SpendingTransactionsTab />);
+  await screen.findByTestId("select-out-1");
+  const before = mocks.rowProps.at(-1)!;
+
+  act(() => mocks.filterProps?.onSearchInputChange("x"));
+  const after = mocks.rowProps.at(-1)!;
+
+  expect(after).not.toBe(before);
+  const changed = Object.keys(before).filter((key) => !Object.is(before[key], after[key]));
+  expect(changed).toEqual([]);
 });
 
 it("localizes category filter options but keeps IDs and renamed labels raw", async () => {

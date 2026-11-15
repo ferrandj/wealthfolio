@@ -74,6 +74,8 @@ export function flattenTaxonomy(
   return walk(null);
 }
 
+const NO_OPTIONS: FlatOption[] = [];
+
 export function QuickCategorizePopover({
   trigger,
   selectedCategoryId,
@@ -93,12 +95,17 @@ export function QuickCategorizePopover({
   const inSheetNavigation = useInSheetNavigation();
   const fillsSheet = isMobile || inSheetNavigation;
   const [open, setOpen] = useState(false);
+  // A list shows one of these per row, and almost none is ever opened: the
+  // choices are only worked out, and drawn, once it has been. They stay after
+  // that so the list is still there while it closes.
+  const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState("");
   const spending = useTaxonomy(SPENDING_TAXONOMY);
   const income = useTaxonomy(INCOME_TAXONOMY);
   const savings = useTaxonomy(SAVINGS_TAXONOMY);
 
   const options = useMemo<FlatOption[]>(() => {
+    if (!opened) return NO_OPTIONS;
     const out: FlatOption[] = [];
     if (scope === "expense" || scope === "both" || scope === "all") {
       out.push(...flattenTaxonomy(SPENDING_TAXONOMY, spending.data?.categories ?? [], "Expense"));
@@ -110,7 +117,7 @@ export function QuickCategorizePopover({
       out.push(...flattenTaxonomy(INCOME_TAXONOMY, income.data?.categories ?? [], "Income"));
     }
     return out;
-  }, [spending.data?.categories, savings.data?.categories, income.data?.categories, scope]);
+  }, [opened, spending.data?.categories, savings.data?.categories, income.data?.categories, scope]);
 
   // cmdk's own filter ranks rows by score, which breaks the tree and hides the
   // parent of a matching child. Keep tree order and show each match with its
@@ -158,6 +165,7 @@ export function QuickCategorizePopover({
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
+    if (next) setOpened(true);
     if (!next) setSearch("");
   };
 
@@ -171,7 +179,7 @@ export function QuickCategorizePopover({
     handleOpenChange(false);
   };
 
-  const commandContent = (
+  const commandContent = !opened ? null : (
     <Command
       shouldFilter={false}
       className={cn(
