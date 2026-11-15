@@ -106,7 +106,8 @@
     "label_activities": "활동 보기",
     "label_goals": "목표",
     "label_assistant": "AI 어시스턴트",
-    "label_todo": "Show what is left to do"
+    "label_todo": "Show what is left to do",
+    "label_reminders": "Show the reminders"
   },
   "layout": {
     "search": "검색...",
@@ -721,5 +722,50 @@
     "later": "Later",
     "typed_source": "Typed by hand"
   },
-  "todo": "To do"
+  "todo": "To do",
+  "reminders": {
+    "nav": "Reminders",
+    "heading": "Reminders",
+    "text": "What there is to do, each on its day and hour: the documents to bring back and the rates to check.",
+    "today": "Today",
+    "previous_month": "Previous month",
+    "next_month": "Next month",
+    "list_title": "To do, by date",
+    "show_all": "Show all",
+    "none": "Nothing to do for now. As soon as a document is imported, its next reminder shows here.",
+    "none_that_day": "Nothing that day.",
+    "due_now": "To do now",
+    "drop": "Drop",
+    "edit": "Edit",
+    "edit_title": "Edit the reminder",
+    "open_rates": "Check the rates",
+    "rates_title": "Check the regulated rates",
+    "rates_text": "The regulated rates are revised on 1 February and 1 August: confirm them.",
+    "document_title": "Document to import",
+    "toast_open": "Open the Reminders tab to see them.",
+    "count_other": "{{count}} reminders",
+    "due_count_other": "{{count}} to do now",
+    "later_other": "Put off {{count}} days",
+    "every_days_other": "Every {{count}} days",
+    "toast_many_other": "{{count}} reminders came due",
+    "push": {
+      "title": "Notifications on this device",
+      "text": "Reminders are checked three times a day, at {{hours}}. Turn notifications on to be told on this browser or phone, even when the app is closed.",
+      "state_on": "On",
+      "state_off": "Off",
+      "state_denied": "Refused",
+      "enable": "Turn on for this device",
+      "disable": "Turn off for this device",
+      "test": "Send a test",
+      "check_now": "Check now",
+      "denied": "Notifications are refused for this site: allow them in the browser's settings, then try again.",
+      "unavailable_browser": "This browser cannot receive notifications here. The app must be opened over https; on an iPhone or iPad, add it to the home screen first (Share > Add to Home Screen), then open it from its icon.",
+      "unavailable_desktop": "Notifications outside the app are sent by the web version (server). Here, reminders show in the app when it is open.",
+      "failed": "Notifications: the operation failed",
+      "devices_other": "{{count}} devices receive notifications",
+      "test_sent_other": "Test sent to {{count}} devices",
+      "test_failed_other": "{{count}} sendings failed",
+      "checked_other": "{{count}} reminders came due"
+    }
+  }
 }

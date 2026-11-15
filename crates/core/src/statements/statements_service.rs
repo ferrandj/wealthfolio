@@ -602,6 +602,21 @@ impl StatementService {
         let _ = self.settings.set(settings);
     }
 
+    /// Now, in the person's time (the time zone of the settings).
+    fn local_now(&self) -> chrono::NaiveDateTime {
+        let zone = self
+            .settings
+            .get()
+            .and_then(|s| s.get_settings().ok())
+            .map(|s| s.timezone)
+            .unwrap_or_default();
+        Utc::now()
+            .with_timezone(&crate::utils::time_utils::parse_user_timezone_or_default(
+                &zone,
+            ))
+            .naive_local()
+    }
+
     fn source_settings(&self) -> HashMap<String, super::DocumentSourceSettings> {
         self.settings
             .get()
@@ -3060,7 +3075,7 @@ impl StatementServiceTrait for StatementService {
             &self.repository.list_documents()?,
             &self.source_settings(),
             &wealthfolio_statement_import::supported_documents(),
-            Utc::now().date_naive(),
+            self.local_now(),
         ))
     }
 
@@ -3069,6 +3084,12 @@ impl StatementServiceTrait for StatementService {
         key: &str,
         settings: super::DocumentSourceSettings,
     ) -> Result<Vec<super::DocumentSource>> {
+        if settings
+            .hour
+            .is_some_and(|h| !super::REMINDER_HOURS.contains(&h))
+        {
+            return Err(invalid("A reminder is set at 10:00, 15:00 or 20:00"));
+        }
         let mut all = self.source_settings();
         all.insert(key.to_string(), settings);
         self.save_source_settings(&all).await?;

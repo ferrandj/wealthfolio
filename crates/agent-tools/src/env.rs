@@ -171,6 +171,14 @@ pub trait AgentEnvironment: Send + Sync {
         None
     }
 
+    /// What the person has to do, each on its day and hour (documents to
+    /// bring back, rate tables to confirm). The default has none.
+    fn reminders_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>> {
+        None
+    }
+
     /// Run the Health Center's full checks, as its "run checks" does, and
     /// cache the result. Hosts implement it with the services the checks
     /// read; the default reports that this environment cannot run them.

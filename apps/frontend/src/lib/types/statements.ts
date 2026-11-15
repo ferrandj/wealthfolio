@@ -597,6 +597,10 @@ export interface DocumentSourceSettings {
   everyDays?: number | null;
   /** Not asked before this day (YYYY-MM-DD). */
   snoozedUntil?: string | null;
+  /** The exact day to ask next (YYYY-MM-DD), whatever the rhythm. */
+  nextOn?: string | null;
+  /** The hour of the reminder: 10, 15 or 20 (10 when not said). */
+  hour?: number | null;
 }
 
 /** A document brought back regularly: one per account and kind of reading. */
@@ -616,4 +620,10 @@ export interface DocumentSource {
   needsSetup: boolean;
   due: boolean;
   nextDue?: string | null;
+  /** The exact day chosen, while it still holds. */
+  nextOn?: string | null;
+  /** The hour it is asked at (10, 15 or 20). */
+  hour: number;
+  /** The day and hour it is expected (`YYYY-MM-DDTHH:mm:ss`, the person's time). */
+  nextDueAt?: string | null;
 }

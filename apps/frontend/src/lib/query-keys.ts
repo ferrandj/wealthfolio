@@ -20,6 +20,8 @@ export const QueryKeys = {
   STATEMENT_REVIEW_QUEUE: "statement_review_queue",
   STATEMENT_COVERAGE: "statement_coverage",
   STATEMENT_DOCUMENT_SOURCES: "statement_document_sources",
+  REMINDERS: "reminders",
+  PUSH_STATUS: "push_status",
   STATEMENT_OUTDATED: "statement_outdated",
   STATEMENT_LOANS: "statement_loans",
   STATEMENT_REVIEW: "statement_review",

@@ -5,6 +5,7 @@ import AppLauncher from "@/components/app-launcher";
 import { MobileLoadingIndicator } from "@/components/mobile-loading-indicator";
 import { RatesReviewDialog } from "@/components/rates-review-dialog";
 import { UpdateDialog } from "@/components/update-dialog";
+import { ReminderWatcher } from "@/pages/reminders/reminder-watcher";
 import { DocumentSourcesReminder } from "@/pages/settings/documents/sources/document-sources-dialogs";
 import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
 import { useActiveAppSyncTrigger } from "@/features/devices-sync/hooks/use-active-app-sync-trigger";
@@ -156,6 +157,7 @@ const AppLayoutContent = () => {
         <RatesReviewDialog />
         <UpdateDialog />
         <DocumentSourcesReminder />
+        <ReminderWatcher />
       </ApplicationShell>
     </ErrorBoundary>
   );

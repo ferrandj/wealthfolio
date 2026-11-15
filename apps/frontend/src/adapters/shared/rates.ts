@@ -1,5 +1,6 @@
 // Regulated savings rates, tax table and the rate of each account
 import type { RateInput, RatesReview, RateView } from "@/lib/types/rates";
+import type { Reminder } from "@/lib/types/reminders";
 
 import { invoke } from "./platform";
 
@@ -21,4 +22,9 @@ export const getRatesReview = async (): Promise<RatesReview> => {
 
 export const confirmRates = async (): Promise<RatesReview> => {
   return invoke<RatesReview>("confirm_rates");
+};
+
+/** The things to do, each on its day and hour, the earliest first. */
+export const getReminders = async (): Promise<Reminder[]> => {
+  return invoke<Reminder[]>("get_reminders");
 };

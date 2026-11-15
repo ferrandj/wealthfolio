@@ -17,7 +17,7 @@ mod statements_traits;
 pub use contract_holdings::{holding_symbol, ContractHoldings, ContractHoldingsTrait};
 pub use document_sources::{
     document_sources, source_key, DocumentSource, DocumentSourceSettings, DEFAULT_EVERY_DAYS,
-    DOCUMENT_SOURCES_KEY,
+    DEFAULT_REMINDER_HOUR, DOCUMENT_SOURCES_KEY, REMINDER_HOURS,
 };
 pub use loans::{
     assemble_loans, document_problems, is_loan_kind, LoanDocumentData, LoanDocumentRef, LoanView,

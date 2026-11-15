@@ -57,3 +57,16 @@ pub async fn confirm_rates(state: ProfileAccess) -> Result<RatesReview, String> 
         .await
         .map_err(|e| e.to_string())
 }
+
+/// The things to do, each on its day and hour, the earliest first.
+#[tauri::command]
+pub async fn get_reminders(
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::reminders::Reminder>, String> {
+    let context = state.context()?;
+    context
+        .reminders_service()
+        .list()
+        .await
+        .map_err(|e| e.to_string())
+}

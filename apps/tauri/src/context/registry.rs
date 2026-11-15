@@ -79,6 +79,7 @@ pub struct ServiceContext {
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait>,
     pub asset_logo_service: Arc<dyn AssetLogoServiceTrait>,
     pub asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>,
+    pub reminders_service: Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>,
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
     pub connect_service: Arc<ConnectService>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
@@ -279,6 +280,10 @@ impl ServiceContext {
 
     pub fn asset_logo_finder(&self) -> Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait> {
         Arc::clone(&self.asset_logo_finder)
+    }
+
+    pub fn reminders_service(&self) -> Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait> {
+        Arc::clone(&self.reminders_service)
     }
 
     pub fn taxonomy_service(&self) -> Arc<dyn taxonomies::TaxonomyServiceTrait> {

@@ -715,6 +715,14 @@ async fn build_context(
             settings_service.clone(),
             Arc::new(wealthfolio_core::assets::WebLogoSource::new()),
         ));
+    // What is to do and when (the documents to bring back, the rate tables to confirm)
+    let reminders_service: Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait> =
+        Arc::new(wealthfolio_core::reminders::RemindersService::new(
+            statement_service.clone(),
+            rates_service.clone(),
+            account_service.clone(),
+            settings_service.clone(),
+        ));
 
     let sync_service = Arc::new(
         BrokerSyncService::new(
@@ -799,6 +807,7 @@ async fn build_context(
         rates_service.clone(),
     ));
     ai_environment.attach_asset_logo_finder(asset_logo_finder.clone());
+    ai_environment.attach_reminders_service(reminders_service.clone());
     let agent_environment: Arc<dyn wealthfolio_agent_tools::AgentEnvironment> =
         ai_environment.clone();
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
@@ -921,6 +930,7 @@ async fn build_context(
             alternative_asset_service,
             asset_logo_service,
             asset_logo_finder,
+            reminders_service,
             taxonomy_service,
             connect_service,
             ai_provider_service,

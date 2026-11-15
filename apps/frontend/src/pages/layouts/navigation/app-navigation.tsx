@@ -63,6 +63,13 @@ function buildStaticNavigation(t: TFunction): NavigationProps {
         label: t("common:nav.label_todo"),
       },
       {
+        icon: <Icons.Calendar className="size-6" />,
+        title: t("common:reminders.nav"),
+        href: "/reminders",
+        keywords: ["reminders", "rappels", "calendar", "calendrier", "notifications", "agenda"],
+        label: t("common:nav.label_reminders"),
+      },
+      {
         icon: <Icons.Goals className="size-6" />,
         title: t("common:goals"),
         href: "/goals",

@@ -180,7 +180,7 @@ async fn a_source_remembers_how_the_document_is_obtained() {
             wealthfolio_core::statements::DocumentSourceSettings {
                 how_to: Some("Banque > Relevés > OFX".into()),
                 every_days: Some(7),
-                snoozed_until: None,
+                ..Default::default()
             },
         )
         .await
@@ -188,4 +188,57 @@ async fn a_source_remembers_how_the_document_is_obtained() {
     assert_eq!(after[0].how_to.as_deref(), Some("Banque > Relevés > OFX"));
     assert_eq!(after[0].every_days, 7);
     assert!(!after[0].needs_setup);
+
+    // an exact day and hour: the source is a reminder on that day, at that hour
+    let exact = |day: &str, hour: u32| wealthfolio_core::statements::DocumentSourceSettings {
+        how_to: Some("Banque > Relevés > OFX".into()),
+        every_days: Some(365),
+        next_on: Some(day.parse().unwrap()),
+        hour: Some(hour),
+        ..Default::default()
+    };
+    state
+        .statement_service
+        .set_document_source(&key, exact("2999-01-05", 15))
+        .await
+        .unwrap();
+    let reminders = state.reminders_service.list().await.unwrap();
+    let document = reminders
+        .iter()
+        .find(|r| r.kind == "document")
+        .expect("the source is a reminder");
+    assert_eq!(document.id, format!("document:{key}"));
+    assert_eq!(document.due_at.to_string(), "2999-01-05 15:00:00");
+    assert!(!document.due);
+    assert_eq!(document.how_to.as_deref(), Some("Banque > Relevés > OFX"));
+    assert!(document.account_name.is_some());
+    // the rate tables are one too, and the list goes by date
+    assert!(reminders.iter().any(|r| r.kind == "rates"));
+    assert!(reminders.windows(2).all(|w| w[0].due_at <= w[1].due_at));
+    // nothing is due yet: nothing to tell
+    assert!(state
+        .reminders_service
+        .take_due()
+        .await
+        .unwrap()
+        .iter()
+        .all(|r| r.kind != "document"));
+
+    // an exact day already behind the last document no longer holds: the rhythm (a year) takes over
+    state
+        .statement_service
+        .set_document_source(&key, exact("2020-01-05", 10))
+        .await
+        .unwrap();
+    let reminders = state.reminders_service.list().await.unwrap();
+    let document = reminders.iter().find(|r| r.kind == "document").unwrap();
+    assert!(!document.due);
+    assert!(document.due_at.date() > chrono::Utc::now().date_naive() + chrono::Duration::days(360));
+
+    // a reminder is set at one of the three hours it is looked at
+    assert!(state
+        .statement_service
+        .set_document_source(&key, exact("2999-01-05", 9))
+        .await
+        .is_err());
 }

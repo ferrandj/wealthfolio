@@ -451,6 +451,7 @@ pub fn run() {
             commands::contacts::get_person_overview,
             commands::contacts::list_missing_own_accounts,
             commands::rates::list_rates,
+            commands::rates::get_reminders,
             commands::rates::save_rate,
             commands::rates::delete_rate,
             commands::rates::get_rates_review,

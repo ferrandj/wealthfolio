@@ -277,7 +277,15 @@ export {
 } from "../shared/contacts";
 
 // Regulated rates, tax table, account rates
-export { listRates, saveRate, deleteRate, getRatesReview, confirmRates } from "../shared/rates";
+export {
+  listRates,
+  saveRate,
+  deleteRate,
+  getRatesReview,
+  confirmRates,
+  getReminders,
+} from "../shared/rates";
+export * from "./push";
 
 // Bank statements & account documents
 export {

@@ -8957,6 +8957,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
+ "aws-lc-rs",
  "axum",
  "base64 0.22.1",
  "chacha20poly1305",

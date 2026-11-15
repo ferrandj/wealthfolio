@@ -196,6 +196,13 @@ export const COMMANDS: CommandMap = {
   invalidate_statement_documents: { method: "POST", path: "/statements/documents/invalidate" },
   purge_statement_documents: { method: "POST", path: "/statements/documents/purge" },
   get_statement_document_sources: { method: "GET", path: "/statements/sources" },
+  // Reminders and the devices told about them
+  get_reminders: { method: "GET", path: "/reminders" },
+  check_reminders: { method: "POST", path: "/reminders/check" },
+  get_push_status: { method: "GET", path: "/notifications/push" },
+  subscribe_push: { method: "POST", path: "/notifications/push/subscribe" },
+  unsubscribe_push: { method: "POST", path: "/notifications/push/unsubscribe" },
+  send_test_push: { method: "POST", path: "/notifications/push/test" },
   set_statement_document_source: { method: "PUT", path: "/statements/sources" },
   snooze_statement_document_sources: { method: "POST", path: "/statements/sources/snooze" },
   list_account_identities: { method: "GET", path: "/statements/identities" },
@@ -1226,6 +1233,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "set_statement_document_source": {
       const { key, settings } = payload as { key: string; settings: unknown };
       body = JSON.stringify({ key, settings });
+      break;
+    }
+    case "subscribe_push": {
+      const { subscription } = payload as { subscription: Record<string, unknown> };
+      body = JSON.stringify(subscription);
+      break;
+    }
+    case "unsubscribe_push": {
+      const { endpoint } = payload as { endpoint: string };
+      body = JSON.stringify({ endpoint });
       break;
     }
     case "snooze_statement_document_sources": {

@@ -40,6 +40,7 @@ vi.mock("./mobile-navigation-container", () => ({ MobileNavigationContainer: () 
 vi.mock("@/pages/settings/documents/sources/document-sources-dialogs", () => ({
   DocumentSourcesReminder: () => null,
 }));
+vi.mock("@/pages/reminders/reminder-watcher", () => ({ ReminderWatcher: () => null }));
 vi.mock("@/components/app-launcher", () => ({ default: () => null }));
 vi.mock("@/components/update-dialog", () => ({ UpdateDialog: () => null }));
 vi.mock("@/components/rates-review-dialog", () => ({ RatesReviewDialog: () => null }));

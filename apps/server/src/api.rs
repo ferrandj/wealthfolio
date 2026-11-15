@@ -60,6 +60,7 @@ pub(crate) mod portable_backups;
 mod portfolio;
 mod portfolios;
 mod rates;
+pub mod reminders;
 mod secrets;
 mod settings;
 pub mod shared;
@@ -234,6 +235,7 @@ fn app_router_with_profiles(
         .merge(spending::router())
         .merge(contacts::router())
         .merge(rates::router())
+        .merge(reminders::router())
         .merge(statements::router())
         .merge(allocation_targets::router())
         .merge(agent_access::router());

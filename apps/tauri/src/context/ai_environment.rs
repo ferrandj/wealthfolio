@@ -86,6 +86,9 @@ pub struct TauriAiEnvironment {
     rates_service: Arc<dyn wealthfolio_core::rates::RatesServiceTrait>,
     /// Finds the pictures of the assets; attached once the environment is built.
     asset_logo_finder: std::sync::OnceLock<Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>>,
+    /// What is to do and when; attached once the environment is built.
+    reminders_service:
+        std::sync::OnceLock<Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>>,
 }
 
 impl TauriAiEnvironment {
@@ -167,7 +170,15 @@ impl TauriAiEnvironment {
             contacts_service,
             rates_service,
             asset_logo_finder: std::sync::OnceLock::new(),
+            reminders_service: std::sync::OnceLock::new(),
         }
+    }
+
+    pub fn attach_reminders_service(
+        &self,
+        service: Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>,
+    ) {
+        let _ = self.reminders_service.set(service);
     }
 
     pub fn attach_asset_logo_finder(
@@ -325,6 +336,12 @@ impl AgentEnvironment for TauriAiEnvironment {
 
     fn asset_logo_finder(&self) -> Option<Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>> {
         self.asset_logo_finder.get().cloned()
+    }
+
+    fn reminders_service(
+        &self,
+    ) -> Option<Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>> {
+        self.reminders_service.get().cloned()
     }
 
     async fn run_health_checks(&self) -> wealthfolio_core::Result<HealthStatus> {

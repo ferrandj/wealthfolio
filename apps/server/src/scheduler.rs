@@ -52,6 +52,35 @@ pub fn start_broker_sync_scheduler(state: Arc<AppState>) {
         .push(worker);
 }
 
+/// Looks at the reminders at 10:00, 15:00 and 20:00 of the person's time, and tells their devices about those
+/// that came due. It sleeps in between: nothing runs outside those three moments.
+pub fn start_reminders_scheduler(state: Arc<AppState>) {
+    let runtime = state.clone();
+    let worker = tokio::spawn(async move {
+        loop {
+            // a few seconds past the hour, so that a reminder set at that hour is due
+            let wait =
+                runtime.reminders_service.until_next_check() + std::time::Duration::from_secs(5);
+            tokio::time::sleep(wait).await;
+            match crate::api::reminders::check_reminders(&runtime).await {
+                Ok(check) if !check.reminders.is_empty() => tracing::info!(
+                    "Reminders: {} came due, {} notification(s) sent, {} failed",
+                    check.reminders.len(),
+                    check.delivery.sent,
+                    check.delivery.failed
+                ),
+                Ok(_) => {}
+                Err(e) => tracing::warn!("The reminders could not be checked: {e}"),
+            }
+        }
+    });
+    state
+        .workers
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push(worker);
+}
+
 /// Starts the background broker sync scheduler.
 #[cfg(not(feature = "connect-sync"))]
 pub fn start_broker_sync_scheduler(_state: Arc<AppState>) {
@@ -179,6 +208,9 @@ pub fn start_background_workers(state: Arc<AppState>) {
 
     // Start background broker sync scheduler (4-hour interval)
     start_broker_sync_scheduler(state.clone());
+
+    // The reminders are looked at three times a day
+    start_reminders_scheduler(state.clone());
 
     // Periodic market data sync plus portfolio update (6h interval, 2min
     // initial delay): the coordinator rebuilds whatever the sync made stale.

@@ -862,11 +862,13 @@ service_tool!(
 service_tool!(
     SetDocumentSource, "set_document_source", Write, additive = false,
     scopes = [DocumentsWrite],
-    description = "Record what the user says about a source of documents (key from get_document_sources): howTo (how they get it, e.g. 'Fortuneo > Assurance-vie > Positions, copy the table into a CSV'), everyDays (how often to ask, 0 never), snoozedUntil (YYYY-MM-DD, not asked before). Replaces the source's settings. Returns the sources.",
+    description = "Record what the user says about a source of documents (key from get_document_sources): howTo (how they get it, e.g. 'Fortuneo > Assurance-vie > Positions, copy the table into a CSV'), everyDays (how often to ask: 7, 14, 30, 90, 365…; 0 never), nextOn (YYYY-MM-DD: the exact day to ask next, whatever the rhythm), hour (10, 15 or 20: the hour of the reminder, 10 by default), snoozedUntil (YYYY-MM-DD, not asked before). Replaces the source's settings. Returns the sources.",
     schema = object(json!({
         "key": {"type": "string"},
         "howTo": {"type": ["string", "null"]},
         "everyDays": {"type": ["integer", "null"], "minimum": 0},
+        "nextOn": {"type": ["string", "null"], "description": "YYYY-MM-DD"},
+        "hour": {"type": ["integer", "null"], "enum": [10, 15, 20, null]},
         "snoozedUntil": {"type": ["string", "null"], "description": "YYYY-MM-DD"}
     }), &["key"]),
     |env, args| {
@@ -893,5 +895,15 @@ service_tool!(
     |env, args| {
         let request: wealthfolio_core::assets::FindLogosRequest = serde_json::from_value(args)?;
         reply(&need(env.asset_logo_finder(), "Asset pictures")?.find_logos(request).await.map_err(fail)?)
+    }
+);
+
+service_tool!(
+    GetReminders, "get_reminders", Read, additive = false,
+    scopes = [DocumentsRead],
+    description = "What the user has to do, each on its exact day and hour, the earliest first (the app's Rappels page): the documents to bring back (kind document: label, account, how they get it, every how many days) and the rate tables to confirm (kind rates). dueAt is in the user's time; due says its day and hour have come.",
+    schema = no_args(),
+    |env, _args| {
+        reply(&need(env.reminders_service(), "Reminders")?.list().await.map_err(fail)?)
     }
 );

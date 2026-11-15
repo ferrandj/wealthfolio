@@ -126,6 +126,8 @@ pub struct AppState {
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
     pub asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync>,
     pub asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>,
+    pub reminders_service: Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait>,
+    pub push_service: Arc<crate::push::PushService>,
     pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
@@ -1036,6 +1038,19 @@ async fn initialize_profile_state(
             Arc::new(wealthfolio_core::assets::WebLogoSource::new()),
         ));
 
+    // What is to do and when, and the devices that are told about it
+    let reminders_service: Arc<dyn wealthfolio_core::reminders::RemindersServiceTrait> =
+        Arc::new(wealthfolio_core::reminders::RemindersService::new(
+            statement_service.clone(),
+            rates_service.clone(),
+            account_service.clone(),
+            settings_service.clone(),
+        ));
+    let push_service = Arc::new(crate::push::PushService::new(
+        settings_service.clone(),
+        secret_store.clone(),
+    ));
+
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> = Arc::new(
@@ -1122,6 +1137,7 @@ async fn initialize_profile_state(
         rates_service.clone(),
     ));
     ai_environment.attach_asset_logo_finder(asset_logo_finder.clone());
+    ai_environment.attach_reminders_service(reminders_service.clone());
     let agent_environment: Arc<dyn wealthfolio_agent_tools::AgentEnvironment> =
         ai_environment.clone();
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
@@ -1284,6 +1300,8 @@ async fn initialize_profile_state(
         alternative_asset_service,
         asset_logo_service,
         asset_logo_finder,
+        reminders_service,
+        push_service,
         addon_service,
         connect_sync_service,
         ai_provider_service,

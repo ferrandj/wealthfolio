@@ -961,6 +961,25 @@ describe("bank statements and account documents", () => {
     expect(JSON.parse(lastCall(mock).body as string)).toEqual({ again: true });
   });
 
+  it("subscribes a browser to notifications with its subscription as the body", async () => {
+    const mock = stubFetch({ publicKey: "k", endpoints: [] });
+    const subscription = { endpoint: "https://push.example/abc", p256dh: "p", auth: "a" };
+    await invoke("subscribe_push", { subscription });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/notifications/push/subscribe",
+      method: "POST",
+    });
+    expect(JSON.parse(lastCall(mock).body as string)).toEqual(subscription);
+
+    const gone = stubFetch({ publicKey: "k", endpoints: [] });
+    await invoke("unsubscribe_push", { endpoint: subscription.endpoint });
+    expect(JSON.parse(lastCall(gone).body as string)).toEqual({ endpoint: subscription.endpoint });
+
+    const list = stubFetch([]);
+    await invoke("get_reminders");
+    expect(lastCall(list)).toMatchObject({ url: "/api/v1/reminders", method: "GET" });
+  });
+
   it("asks how far the re-reading is", async () => {
     const mock = stubFetch({});
     await invoke("get_statement_revalidation_progress");
