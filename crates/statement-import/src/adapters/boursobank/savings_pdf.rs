@@ -15,7 +15,18 @@ use crate::adapters::re::{search, sub};
 use crate::py;
 
 const ACCOUNT_ROW_RE: &str = r"\b(\d{1,2}/\d{1,2}/\d{4})\s+([0-9A-Z]{8,})\s+([A-Z]{3})\b";
-const SAVINGS_WORDS: &[&str] = &["epargne", "livret", "pel", "ldds", "lep", "cel", "plan"];
+const SAVINGS_WORDS: &[&str] = &[
+    "epargne",
+    "livret",
+    "pel",
+    "ldds",
+    "lep",
+    "cel",
+    "plan",
+    // "Extrait de votre Compte Epargne Logement"
+    "compteepargne",
+    "compted'epargne",
+];
 
 pub struct BoursoBankSavingsPdf;
 
@@ -76,10 +87,10 @@ impl Adapter for BoursoBankSavingsPdf {
         "savings_statement"
     }
     fn label(&self) -> &'static str {
-        "BoursoBank · extrait d'épargne : PEL, livret… (PDF)"
+        "BoursoBank · extrait d'épargne : PEL, CEL… (PDF)"
     }
     fn description(&self) -> &'static str {
-        "Le PDF « Extrait de votre Plan Epargne Logement » (ou d'un autre produit d'épargne) : numéro de compte, pas de RIB."
+        "Le PDF « Extrait de votre Plan Epargne Logement », « … Compte Epargne Logement » (ou d'un autre produit d'épargne) : numéro de compte, pas de RIB."
     }
     fn formats(&self) -> &'static [&'static str] {
         &["pdf"]
@@ -123,7 +134,8 @@ impl Adapter for BoursoBankSavingsPdf {
                 "produit d'épargne dans le titre",
             ),
         ]);
-        if c.contains("clerib") || c.contains("extraitdevotrecompte") {
+        // "Extrait de votre compte en EUR" is the current account's title; "… Compte Epargne Logement" is not
+        if c.contains("clerib") || c.contains("extraitdevotrecompteen") {
             // The current-account layout (RIB banner): that is the other adapter's document.
             s = s.min(0.3);
             reasons.push("bandeau RIB : plutôt un compte courant".into());

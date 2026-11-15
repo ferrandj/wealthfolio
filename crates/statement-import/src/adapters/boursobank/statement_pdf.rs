@@ -60,6 +60,26 @@ impl Header for BoursoBankStatementPdf {
             .iter()
             .find(|t| norm(t).starts_with("compte d") && t.contains("pargne") && t.contains(':'))
             .map(|t| py::strip(t.split_once(':').unwrap().1).to_string());
+        // A regulated savings account (LDDS, Livret A…) prints its name alone under the title, where the current
+        // account prints the bank's: "LIVRET DEVELOPPEMENT DURABLE ET SOLIDAIRE".
+        let product = product.or_else(|| {
+            let title = texts
+                .iter()
+                .position(|t| norm(t).contains("extrait de votre"))?;
+            let mut end = title;
+            while end + 1 < rows.len() && rows[end + 1][0].top - rows[end][0].top < 20.0 {
+                end += 1;
+            }
+            texts[title + 1..=end].iter().find_map(|t| {
+                let line = py::strip(t);
+                let kind = guess_account_type(line, "");
+                let names_savings = !line.starts_with('(')
+                    && !line.contains(':')
+                    && !kind.is_empty()
+                    && kind != "checking";
+                names_savings.then(|| sentence_case(line))
+            })
+        });
         if let Some(p) = &product {
             st.set_extra("product", p.clone());
             st.account_type = Some(guess_account_type(p, "savings"));
@@ -104,6 +124,19 @@ impl Header for BoursoBankStatementPdf {
             }
         }
     }
+}
+
+/// "LIVRET DEVELOPPEMENT DURABLE" → "Livret developpement durable"; a line with lower case is kept as printed.
+fn sentence_case(line: &str) -> String {
+    if line.chars().any(char::is_lowercase) {
+        return line.to_string();
+    }
+    let lower = line.to_lowercase();
+    let mut chars = lower.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+        .unwrap_or_default()
 }
 
 pub fn last4(s: &str) -> String {

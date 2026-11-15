@@ -91,6 +91,8 @@ pub fn parse_table(
     let mut current: Option<usize> = None;
     let (mut boundary, mut value_x) = (DEFAULT_BOUNDARY, 381.0);
     let mut closing_seen = false;
+    // "Nouveau solde" was read without its amount: it is printed a little lower, on the next row
+    let mut closing_awaited = false;
 
     for (page_no, words) in pages.iter().enumerate() {
         let rows = pdftools::lines(words, 3.0, false);
@@ -117,10 +119,17 @@ pub fn parse_table(
                 .iter()
                 .filter(|w| is_amount(&w.text) && w.x0 > value_x + 20.0)
                 .collect();
-            if compact.contains("nouveausolde") {
-                if let Some(a) = amounts.last() {
-                    st.balance = Some(signed(a, boundary));
+            if compact.contains("nouveausolde") || closing_awaited {
+                match amounts.last() {
+                    Some(a) => st.balance = Some(signed(a, boundary)),
+                    // only the row right under the words can carry their amount
+                    None if !closing_awaited => {
+                        closing_awaited = true;
+                        continue;
+                    }
+                    None => {}
                 }
+                closing_awaited = false;
                 st.balance_date = st.period_end;
                 closing_seen = true;
                 in_table = false;

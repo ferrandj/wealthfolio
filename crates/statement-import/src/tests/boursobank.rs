@@ -400,6 +400,42 @@ fn test_savings_debits_are_read_from_the_debit_column() {
     assert_eq!(st.confidence, "high");
 }
 
+#[test]
+fn test_a_home_savings_account_with_no_movement_is_read_with_its_balance_under_the_words() {
+    // "Extrait de votre Compte Epargne Logement": the title starts like the current account's
+    let spec = SavingsSpec {
+        product: "Compte Epargne Logement".into(),
+        closing_below: true,
+        ..SavingsSpec::new(vec![])
+    };
+    let found = identify(&SourceDocument::new(
+        "cel.pdf",
+        boursobank_savings_pdf(&spec),
+    ));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(found.chosen.as_ref().unwrap().adapter.id(), SAVINGS);
+    let st = parse_pel(&spec);
+    assert_eq!(st.account_type, s("cel"));
+    assert_eq!(
+        st.account_label,
+        s("Compte Epargne Logement BoursoBank …9999")
+    );
+    assert!(st.transactions.is_empty());
+    assert_eq!(st.opening_balance, Some(dec("3000.00")));
+    assert_eq!(st.balance, Some(dec("3000.00")));
+    assert_eq!(st.confidence, "high");
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+
+    // with movements too, the balance under the words closes the statement
+    let with = SavingsSpec {
+        closing_below: true,
+        ..pel_spec()
+    };
+    let st = parse_pel(&with);
+    assert_eq!(st.balance, Some(with.closing()));
+    assert_eq!(st.confidence, "high");
+}
+
 // --------------------------------------------------------------- savings account and joint account (same layout)
 #[test]
 fn test_a_savings_account_in_the_current_account_layout_is_typed_from_its_product_line() {
@@ -422,6 +458,36 @@ fn test_a_savings_account_in_the_current_account_layout_is_typed_from_its_produc
     assert_eq!(st.iban, Some(iban()));
     assert_eq!(st.confidence, "high");
     assert_eq!(parse(&Spec::new(three)).account_type, s("checking"));
+}
+
+#[test]
+fn test_a_regulated_savings_account_is_typed_from_its_name_printed_under_the_title() {
+    let three = sample_entries()[..3].to_vec();
+    let spec = Spec {
+        product_line: "LIVRET DEVELOPPEMENT DURABLE ET SOLIDAIRE".into(),
+        ..Spec::new(three)
+    };
+    let found = identify(&SourceDocument::new(
+        "ldds.pdf",
+        boursobank_statement_pdf(&spec),
+    ));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(found.chosen.as_ref().unwrap().adapter.id(), ADAPTER);
+    let st = parse(&spec);
+    assert_eq!(st.account_type, s("ldds"));
+    assert_eq!(
+        st.extra_str("product"),
+        s("Livret developpement durable et solidaire")
+    );
+    assert_eq!(
+        st.account_label,
+        s("Livret developpement durable et solidaire BoursoBank …5678")
+    );
+    // the product's name is not the holder's
+    assert_eq!(st.holder_name, s("M DUPONT JEAN"));
+    assert_eq!(st.holder_address, Some(address().join("\n")));
+    assert_eq!(st.iban, Some(iban()));
+    assert_eq!(st.confidence, "high");
 }
 
 #[test]

@@ -109,6 +109,7 @@ pub struct Spec {
     pub wrong_closing: Option<Decimal>, // a closing balance that does not match, to test the consistency check
     pub title: String, // document metadata only: gives the same statement a different file hash
     pub product: String, // savings accounts print "Compte d'épargne : <product>" under the title
+    pub product_line: String, // regulated savings print their name alone, where the bank's name stands
 }
 
 impl Spec {
@@ -127,6 +128,7 @@ impl Spec {
             wrong_closing: None,
             title: String::new(),
             product: String::new(),
+            product_line: String::new(),
         }
     }
 
@@ -206,7 +208,16 @@ pub fn boursobank_statement_pdf(spec: &Spec) -> Vec<u8> {
                 52.0,
                 "(Protégé par la Garantie des Dépôts www.garantiedesdepots.fr)",
             );
-            txt(pdf, 322.0, 62.0, "BOURSOBANK");
+            txt(
+                pdf,
+                322.0,
+                62.0,
+                if spec.product_line.is_empty() {
+                    "BOURSOBANK"
+                } else {
+                    &spec.product_line
+                },
+            );
             if !spec.product.is_empty() {
                 txt(
                     pdf,
@@ -480,6 +491,7 @@ pub struct SavingsSpec {
     pub account: String,
     pub product: String,
     pub title: String,
+    pub closing_below: bool, // the new balance printed a little under its words, the page number beside them
 }
 
 impl SavingsSpec {
@@ -493,6 +505,7 @@ impl SavingsSpec {
             account: "00099999999".into(),
             product: "Plan Epargne Logement".into(),
             title: String::new(),
+            closing_below: false,
         }
     }
 
@@ -569,7 +582,12 @@ pub fn boursobank_savings_pdf(spec: &SavingsSpec) -> Vec<u8> {
         y += 14.0;
     }
     pdf.text(204.0, 677.0, "Nouveau solde en EUR");
-    pdf.right(545.0, 677.0, &fr(spec.closing()));
+    if spec.closing_below {
+        pdf.text(354.0, 677.0, "1");
+        pdf.right(545.0, 682.0, &fr(spec.closing()));
+    } else {
+        pdf.right(545.0, 677.0, &fr(spec.closing()));
+    }
     pdf.text(100.0, 748.0, "A réception d'un extrait de compte vous disposez d'un délai d'un mois pour formuler toute réclamation");
     pdf.text(
         85.0,
