@@ -482,6 +482,17 @@ async fn build_context(
     ));
     let statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait> =
         statement_concrete.clone();
+    // The originals kept from before compression existed are compressed, once, in the background
+    {
+        let documents = statement_service.clone();
+        tauri::async_runtime::spawn(async move {
+            match documents.compress_documents().await {
+                Ok(0) => {}
+                Ok(n) => log::info!("{n} kept document(s) compressed"),
+                Err(e) => log::warn!("The kept documents could not be compressed: {e}"),
+            }
+        });
+    }
     let final_cash_migration = run_final_cash_migration(
         settings_service.as_ref(),
         activity_repository.as_ref(),

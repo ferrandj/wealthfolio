@@ -144,6 +144,16 @@ async fn a_document_reviewed_again_says_the_same() {
         serde_json::to_value(&second).unwrap()
     );
 
+    // the originals are kept compressed, and nothing older is left to compress
+    let storage = state.statement_service.document_storage().unwrap();
+    assert_eq!(storage.documents, 36);
+    assert!(storage.stored_bytes < storage.original_bytes);
+    assert_eq!(storage.to_compress, 0);
+    assert_eq!(
+        state.statement_service.compress_documents().await.unwrap(),
+        0
+    );
+
     // reading everything again counts the documents as it goes, and says when it is over
     let before = state.statement_service.revalidation_progress();
     assert!(!before.running);

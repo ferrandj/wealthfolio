@@ -166,6 +166,12 @@ async fn revalidate_document(
     Ok(Json(document))
 }
 
+async fn document_storage(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<wealthfolio_core::statements::DocumentStorage>> {
+    Ok(Json(state.statement_service.document_storage()?))
+}
+
 async fn revalidation_progress(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> Json<wealthfolio_core::statements::RevalidationProgress> {
@@ -496,6 +502,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
             "/statements/revalidate/progress",
             get(revalidation_progress),
         )
+        .route("/statements/storage", get(document_storage))
         .route("/statements/invalidate", post(invalidate_all))
         .route(
             "/statements/documents/invalidate",

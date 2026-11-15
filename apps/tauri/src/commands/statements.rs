@@ -168,6 +168,17 @@ pub async fn revalidate_statement_document(
 }
 
 #[tauri::command]
+pub async fn get_statement_document_storage(
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::statements::DocumentStorage, String> {
+    state
+        .context()?
+        .statement_service()
+        .document_storage()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_statement_revalidation_progress(
     state: ProfileAccess,
 ) -> Result<wealthfolio_core::statements::RevalidationProgress, String> {

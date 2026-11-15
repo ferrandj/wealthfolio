@@ -212,6 +212,16 @@ pub fn start_background_workers(state: Arc<AppState>) {
     // The reminders are looked at three times a day
     start_reminders_scheduler(state.clone());
 
+    // The originals kept from before compression existed are compressed, once, in the background
+    let documents = state.statement_service.clone();
+    tokio::spawn(async move {
+        match documents.compress_documents().await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!("{n} kept document(s) compressed"),
+            Err(e) => tracing::warn!("The kept documents could not be compressed: {e}"),
+        }
+    });
+
     // Periodic market data sync plus portfolio update (6h interval, 2min
     // initial delay): the coordinator rebuilds whatever the sync made stale.
     let worker = crate::api::shared::spawn_periodic_update(state.clone());

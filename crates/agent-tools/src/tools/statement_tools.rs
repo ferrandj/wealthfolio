@@ -907,3 +907,13 @@ service_tool!(
         reply(&need(env.reminders_service(), "Reminders")?.list().await.map_err(fail)?)
     }
 );
+
+service_tool!(
+    GetStatementDocumentStorage, "get_statement_document_storage", Read, additive = false,
+    scopes = [DocumentsRead],
+    description = "The room the kept documents take: how many there are, their size as they were brought (originalBytes) and as they are stored, compressed without loss (storedBytes), and how many older ones are still to compress (toCompress).",
+    schema = no_args(),
+    |env, _args| {
+        reply(&need(env.statement_service(), "Statements")?.document_storage().map_err(fail)?)
+    }
+);

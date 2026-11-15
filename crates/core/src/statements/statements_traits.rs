@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use super::loans::LoanDocumentData;
 use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
-    AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview,
+    AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview, DocumentStorage,
     NewStatementDocument, OutdatedDocuments, RevalidationProgress, RevalidationResult,
     ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
     StatementImportResult,
@@ -35,6 +35,15 @@ pub trait StatementRepositoryTrait: Send + Sync {
     /// Replace what changes over a document's life (account, reading, counts, import run, status, review).
     async fn update_document(&self, document: StatementDocument) -> Result<StatementDocument>;
     async fn delete_document(&self, id: &str) -> Result<()>;
+    /// The room the kept originals take. A store that does not compress says nothing.
+    fn document_storage(&self) -> Result<DocumentStorage> {
+        Ok(DocumentStorage::default())
+    }
+    /// Compress the originals stored before compression existed; returns how many were. They are read back
+    /// byte for byte the same.
+    async fn compress_documents(&self) -> Result<usize> {
+        Ok(0)
+    }
 
     /// Months (account, "YYYY-MM") without a statement that the person called normal.
     fn list_gap_marks(&self) -> Result<Vec<(String, String)>>;
@@ -132,6 +141,10 @@ pub trait StatementServiceTrait: Send + Sync {
     async fn revalidate_all(&self) -> Result<RevalidationResult>;
     /// How far a running `revalidate_all` is (not running: the last one's end, or nothing).
     fn revalidation_progress(&self) -> RevalidationProgress;
+    /// The room the kept originals take: as they were brought, and as stored.
+    fn document_storage(&self) -> Result<DocumentStorage>;
+    /// Compress the originals not compressed yet (those stored before compression existed).
+    async fn compress_documents(&self) -> Result<usize>;
 
     fn list_identities(&self) -> Result<Vec<AccountIdentity>>;
     fn get_identity(&self, account_id: &str) -> Result<Option<AccountIdentity>>;

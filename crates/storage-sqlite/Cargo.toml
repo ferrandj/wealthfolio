@@ -10,6 +10,8 @@ license = "AGPL-3.0"
 default = []
 
 [dependencies]
+# Already in the build (through the HTTP client): the kept documents are stored compressed
+zstd = "0.14"
 # Internal crates
 wealthfolio-core = { workspace = true }
 wealthfolio-ai = { workspace = true }

@@ -301,6 +301,7 @@ export {
   revalidateStatementDocument,
   revalidateAllStatementDocuments,
   getStatementRevalidationProgress,
+  getStatementDocumentStorage,
   invalidateAllStatementDocuments,
   invalidateStatementDocuments,
   purgeStatementDocuments,

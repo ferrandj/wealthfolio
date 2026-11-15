@@ -5,12 +5,13 @@ use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
 use wealthfolio_core::statements::{
-    AccountIdentity, LoanAnswers, LoanDocumentData, NewStatementDocument, StatementDocument,
-    StatementRepositoryTrait,
+    AccountIdentity, DocumentStorage, LoanAnswers, LoanDocumentData, NewStatementDocument,
+    StatementDocument, StatementRepositoryTrait,
 };
-use wealthfolio_core::Result;
+use wealthfolio_core::{Error, Result};
 
 use super::model::{AccountIdentityDB, NewStatementDocumentRow, StatementDocumentRow};
+use super::packing;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{
@@ -25,6 +26,19 @@ pub struct StatementRepository {
 impl StatementRepository {
     pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
         Self { pool, writer }
+    }
+
+    /// The documents whose original is stored as it was brought, from before compression existed.
+    fn unpacked_ids(&self, conn: &mut SqliteConnection) -> Result<Vec<String>> {
+        Ok(statement_documents::table
+            .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "substr(content, 1, 3) <> X'{}'",
+                packing::MARK_HEX
+            )))
+            .select(statement_documents::id)
+            .order(statement_documents::created_at.asc())
+            .load::<String>(conn)
+            .map_err(StorageError::from)?)
     }
 }
 
@@ -109,12 +123,75 @@ impl StatementRepositoryTrait for StatementRepository {
         else {
             return Ok(None);
         };
-        let content = statement_documents::table
+        let stored = statement_documents::table
             .find(id)
             .select(statement_documents::content)
             .first::<Vec<u8>>(&mut conn)
             .map_err(StorageError::from)?;
+        let content = packing::unpack(stored).map_err(|e| {
+            Error::Unexpected(format!("The stored document could not be read back: {e}"))
+        })?;
         Ok(Some((StatementDocument::from(row), content)))
+    }
+
+    fn document_storage(&self) -> Result<DocumentStorage> {
+        let mut conn = get_connection(&self.pool)?;
+        let (documents, original_bytes, stored_bytes) = statement_documents::table
+            .select((
+                diesel::dsl::count_star(),
+                diesel::dsl::sql::<diesel::sql_types::BigInt>("COALESCE(SUM(size_bytes), 0)"),
+                diesel::dsl::sql::<diesel::sql_types::BigInt>("COALESCE(SUM(LENGTH(content)), 0)"),
+            ))
+            .first::<(i64, i64, i64)>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(DocumentStorage {
+            documents: documents as usize,
+            original_bytes,
+            stored_bytes,
+            to_compress: self.unpacked_ids(&mut conn)?.len(),
+        })
+    }
+
+    async fn compress_documents(&self) -> Result<usize> {
+        let ids = {
+            let mut conn = get_connection(&self.pool)?;
+            self.unpacked_ids(&mut conn)?
+        };
+        let mut compressed = 0;
+        // one document at a time: one original in memory, and the other writes pass in between
+        for id in ids {
+            let done = self
+                .writer
+                .exec(move |conn| -> Result<bool> {
+                    let Some(stored) = statement_documents::table
+                        .find(&id)
+                        .select(statement_documents::content)
+                        .first::<Vec<u8>>(conn)
+                        .optional()
+                        .map_err(StorageError::from)?
+                    else {
+                        return Ok(false);
+                    };
+                    if packing::is_packed(&stored) {
+                        return Ok(false);
+                    }
+                    let packed = packing::pack(&stored);
+                    // never replace an original by something that does not give it back
+                    if packing::unpack(packed.clone()).ok().as_deref() != Some(stored.as_slice()) {
+                        return Ok(false);
+                    }
+                    diesel::update(statement_documents::table.find(&id))
+                        .set(statement_documents::content.eq(packed))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                    Ok(true)
+                })
+                .await?;
+            if done {
+                compressed += 1;
+            }
+        }
+        Ok(compressed)
     }
 
     async fn insert_document(
@@ -122,7 +199,11 @@ impl StatementRepositoryTrait for StatementRepository {
         new_document: NewStatementDocument,
     ) -> Result<StatementDocument> {
         let document = new_document.document.clone();
-        let row = NewStatementDocumentRow::new(new_document.document, new_document.content);
+        // stored compressed; `size_bytes` stays the size of the original
+        let row = NewStatementDocumentRow::new(
+            new_document.document,
+            packing::pack(&new_document.content),
+        );
         self.writer
             .exec(move |conn| -> Result<StatementDocument> {
                 diesel::insert_into(statement_documents::table)

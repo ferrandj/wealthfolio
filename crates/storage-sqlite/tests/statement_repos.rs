@@ -242,3 +242,76 @@ async fn a_document_is_updated_after_a_review_without_touching_its_bytes() {
     let missing = document("nope", None, "sha-x");
     assert!(repo.update_document(missing).await.is_err());
 }
+
+#[tokio::test]
+async fn an_original_is_stored_compressed_and_read_back_byte_for_byte() {
+    let (_dir, pool, writer) = setup();
+    let repo = StatementRepository::new(pool.clone(), writer);
+    let original = "05/01/2026;PRLV SEPA ELECTRICITE DE FRANCE;-104,00;EUR\n"
+        .repeat(500)
+        .into_bytes();
+    let mut doc = document("d1", None, "sha-1");
+    doc.size_bytes = original.len() as i64;
+    repo.insert_document(NewStatementDocument {
+        document: doc,
+        content: original.clone(),
+    })
+    .await
+    .unwrap();
+
+    // what is read is the original; what is stored is much smaller
+    let (read, content) = repo.get_document_content("d1").unwrap().unwrap();
+    assert_eq!(content, original);
+    assert_eq!(read.size_bytes, original.len() as i64);
+    let storage = repo.document_storage().unwrap();
+    assert_eq!(storage.documents, 1);
+    assert_eq!(storage.original_bytes, original.len() as i64);
+    assert!(storage.stored_bytes * 10 < storage.original_bytes);
+    assert_eq!(storage.to_compress, 0);
+}
+
+#[tokio::test]
+async fn the_originals_stored_before_are_compressed_once_and_stay_the_same() {
+    let (_dir, pool, writer) = setup();
+    let repo = StatementRepository::new(pool.clone(), writer);
+    let original = "%PDF-1.4 un relevé d'avant, ligne après ligne, ligne après ligne\n"
+        .repeat(300)
+        .into_bytes();
+    for (id, sha) in [("old-1", "sha-1"), ("old-2", "sha-2")] {
+        let mut doc = document(id, None, sha);
+        doc.size_bytes = original.len() as i64;
+        repo.insert_document(NewStatementDocument {
+            document: doc,
+            content: original.clone(),
+        })
+        .await
+        .unwrap();
+    }
+    // as a version without compression left them: the original, as it is
+    {
+        use wealthfolio_storage_sqlite::schema::statement_documents;
+        let mut conn = pool.get().unwrap();
+        diesel::update(statement_documents::table)
+            .set(statement_documents::content.eq(original.clone()))
+            .execute(&mut conn)
+            .unwrap();
+    }
+    let before = repo.document_storage().unwrap();
+    assert_eq!(before.to_compress, 2);
+    assert_eq!(before.stored_bytes, before.original_bytes);
+    // still read as they are
+    assert_eq!(
+        repo.get_document_content("old-1").unwrap().unwrap().1,
+        original
+    );
+
+    assert_eq!(repo.compress_documents().await.unwrap(), 2);
+    let after = repo.document_storage().unwrap();
+    assert_eq!(after.to_compress, 0);
+    assert!(after.stored_bytes * 10 < after.original_bytes);
+    for id in ["old-1", "old-2"] {
+        assert_eq!(repo.get_document_content(id).unwrap().unwrap().1, original);
+    }
+    // nothing left to do the second time
+    assert_eq!(repo.compress_documents().await.unwrap(), 0);
+}

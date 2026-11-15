@@ -1,3 +1,4 @@
+import { DocumentStorageLine } from "./components/document-storage-line";
 import { findMissingAssetLogos } from "@/hooks/use-asset-logos";
 import { analyzeStatement, importStatement, logger, purgeStatementDocuments } from "@/adapters";
 import { LoanAccountDialog } from "../loans/loan-account-dialog";
@@ -284,7 +285,10 @@ export default function DocumentsPage() {
 
       <Separator />
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">{t("settings:documents.library_title")}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="text-lg font-semibold">{t("settings:documents.library_title")}</h2>
+          <DocumentStorageLine />
+        </div>
         <DocumentsLibrary />
       </div>
       <LoanAccountDialog

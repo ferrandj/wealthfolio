@@ -9080,6 +9080,7 @@ dependencies = [
  "wealthfolio-market-data",
  "wealthfolio-spending",
  "zeroize",
+ "zstd",
 ]
 
 [[package]]

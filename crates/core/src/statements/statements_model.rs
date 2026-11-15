@@ -141,6 +141,17 @@ pub struct StatementDocument {
     pub closing_balance: Option<String>,
 }
 
+/// The room the kept originals take: as they were brought, and as they are stored (compressed).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentStorage {
+    pub documents: usize,
+    pub original_bytes: i64,
+    pub stored_bytes: i64,
+    /// Originals stored before compression existed and not compressed yet.
+    pub to_compress: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct NewStatementDocument {
     pub document: StatementDocument,

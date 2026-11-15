@@ -20,10 +20,11 @@ use wealthfolio_statement_import::{
 
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationProgress,
-    RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
-    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
-    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
+    DocumentStorage, ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome,
+    RevalidationProgress, RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis,
+    StatementDocument, StatementImportOutcome, StatementImportRequest, StatementImportResult,
+    StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
+    DOCUMENT_STATUS_VALIDATED,
 };
 use super::statements_review::{
     apply_reason, assess, balance_gap, is_own_transfer_category, logical_order, operations_sum,
@@ -3144,6 +3145,14 @@ impl StatementServiceTrait for StatementService {
             warn!("could not update the loan documents: {e}");
         }
         Ok(invalidated)
+    }
+
+    fn document_storage(&self) -> Result<DocumentStorage> {
+        self.repository.document_storage()
+    }
+
+    async fn compress_documents(&self) -> Result<usize> {
+        self.repository.compress_documents().await
     }
 
     fn revalidation_progress(&self) -> RevalidationProgress {

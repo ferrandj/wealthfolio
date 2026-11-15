@@ -38,11 +38,12 @@ pub use loans_reconcile::{
 pub use statements_coverage::{compute_coverage, AccountCoverage, BalanceBreak, MissingMonth};
 pub use statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    ImportMode, MatchedAccount, NewStatementDocument, OperationToReview, OutdatedDocuments,
-    PurgeReport, RevalidationOutcome, RevalidationProgress, RevalidationResult, ReviewDecision,
-    ReviewedOperation, StatementAnalysis, StatementDocument, StatementImportOutcome,
-    StatementImportRequest, StatementImportResult, StatementOverlap, StatementOverride,
-    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
+    DocumentStorage, ImportMode, MatchedAccount, NewStatementDocument, OperationToReview,
+    OutdatedDocuments, PurgeReport, RevalidationOutcome, RevalidationProgress, RevalidationResult,
+    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverlap,
+    StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
+    DOCUMENT_STATUS_VALIDATED,
 };
 pub use statements_review::{
     balance_gap, is_generic_category, is_own_transfer_category, logical_order,

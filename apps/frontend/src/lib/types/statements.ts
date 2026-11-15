@@ -353,6 +353,15 @@ export interface RevalidationOutcome {
   error?: string | null;
 }
 
+/** The room the kept originals take: as they were brought, and as they are stored (compressed without loss). */
+export interface DocumentStorage {
+  documents: number;
+  originalBytes: number;
+  storedBytes: number;
+  /** Older originals not compressed yet. */
+  toCompress: number;
+}
+
 /** How far the re-reading of all the documents is. */
 export interface RevalidationProgress {
   running: boolean;
