@@ -143,4 +143,14 @@ async fn a_document_reviewed_again_says_the_same() {
         serde_json::to_value(&first).unwrap(),
         serde_json::to_value(&second).unwrap()
     );
+
+    // reading everything again counts the documents as it goes, and says when it is over
+    let before = state.statement_service.revalidation_progress();
+    assert!(!before.running);
+    let result = state.statement_service.revalidate_all().await.unwrap();
+    let after = state.statement_service.revalidation_progress();
+    assert!(!after.running);
+    assert_eq!((after.done, after.total), (36, 36));
+    assert_eq!(after.file_name, None);
+    assert_eq!(result.total, 36);
 }

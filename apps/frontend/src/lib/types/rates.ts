@@ -15,6 +15,8 @@ export interface RateView {
   updatedAt: string;
   grossRate: number | string;
   netRate: number | string;
+  /** Account rates: the regulated rate (`regulated.*`) the account follows; its rate cannot be entered. */
+  follows?: string | null;
 }
 
 export interface RateInput {

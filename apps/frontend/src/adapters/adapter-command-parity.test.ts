@@ -954,6 +954,15 @@ describe("bank statements and account documents", () => {
     });
   });
 
+  it("asks how far the re-reading is", async () => {
+    const mock = stubFetch({});
+    await invoke("get_statement_revalidation_progress");
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/revalidate/progress",
+      method: "GET",
+    });
+  });
+
   it("reads every document again", async () => {
     const mock = stubFetch({});
     await invoke("revalidate_all_statement_documents");

@@ -292,6 +292,7 @@ export {
   validateStatementDocument,
   revalidateStatementDocument,
   revalidateAllStatementDocuments,
+  getStatementRevalidationProgress,
   invalidateAllStatementDocuments,
   invalidateStatementDocuments,
   purgeStatementDocuments,

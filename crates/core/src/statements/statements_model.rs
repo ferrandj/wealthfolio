@@ -425,6 +425,18 @@ pub struct RevalidationResult {
     pub outcomes: Vec<RevalidationOutcome>,
 }
 
+/// How far the re-reading of all the documents is, for whoever waits for it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevalidationProgress {
+    pub running: bool,
+    /// The documents dealt with so far (read again, or found unreadable).
+    pub done: usize,
+    pub total: usize,
+    /// The document being read.
+    pub file_name: Option<String>,
+}
+
 /// The documents that were read by an older version of the reader than the current one.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

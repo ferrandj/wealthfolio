@@ -166,6 +166,12 @@ async fn revalidate_document(
     Ok(Json(document))
 }
 
+async fn revalidation_progress(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> Json<wealthfolio_core::statements::RevalidationProgress> {
+    Json(state.statement_service.revalidation_progress())
+}
+
 async fn revalidate_all(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<RevalidationResult>> {
@@ -486,6 +492,10 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         )
         .route("/statements/review-queue", get(review_queue))
         .route("/statements/revalidate", post(revalidate_all))
+        .route(
+            "/statements/revalidate/progress",
+            get(revalidation_progress),
+        )
         .route("/statements/invalidate", post(invalidate_all))
         .route(
             "/statements/documents/invalidate",

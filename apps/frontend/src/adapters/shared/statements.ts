@@ -14,6 +14,7 @@ import type {
   OperationToReview,
   LoanAnswers,
   DocumentReview,
+  RevalidationProgress,
   RevalidationResult,
   ReviewDecision,
   StatementAnalysis,
@@ -104,6 +105,10 @@ export const validateStatementDocument = async (
 
 export const revalidateStatementDocument = async (id: string): Promise<StatementDocument> => {
   return invoke<StatementDocument>("revalidate_statement_document", { id });
+};
+
+export const getStatementRevalidationProgress = async (): Promise<RevalidationProgress> => {
+  return invoke<RevalidationProgress>("get_statement_revalidation_progress");
 };
 
 export const revalidateAllStatementDocuments = async (): Promise<RevalidationResult> => {

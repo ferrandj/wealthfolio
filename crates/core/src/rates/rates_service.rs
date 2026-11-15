@@ -37,6 +37,36 @@ type Default = (
     &'static str,
 );
 
+/// The regulated product an account is, told by its name ("Hello bank! - Livret A ••2628"): the id of its rate
+/// and whether its interest is free of tax. A bank's own savings account ("Livret", "Livret +") is none.
+pub fn regulated_product(account_name: &str) -> Option<(&'static str, bool)> {
+    let plain: String = account_name
+        .to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'é' | 'è' | 'ê' => 'e',
+            'à' | 'â' => 'a',
+            c if c.is_alphanumeric() => c,
+            _ => ' ',
+        })
+        .collect();
+    let words: Vec<&str> = plain.split_whitespace().collect();
+    let has = |w: &str| words.contains(&w);
+    let follows = |a: &str, b: &str| words.windows(2).any(|p| p[0] == a && p[1] == b);
+    let text = words.join(" ");
+    if follows("livret", "a") {
+        Some(("regulated.livret_a", true))
+    } else if has("ldds") || has("ldd") || text.contains("developpement durable") {
+        Some(("regulated.ldds", true))
+    } else if has("lep") || text.contains("epargne populaire") {
+        Some(("regulated.lep", true))
+    } else if has("cel") || text.contains("compte epargne logement") {
+        Some(("regulated.cel", false))
+    } else {
+        None
+    }
+}
+
 fn defaults() -> Vec<Default> {
     vec![
         (
@@ -250,6 +280,7 @@ impl RatesService {
             rate,
             gross_rate,
             net_rate,
+            follows: None,
         }
     }
 
@@ -289,6 +320,36 @@ impl RatesService {
         }
     }
 
+    /// The rate of each account that is a regulated product: the product's, as it stands in the table.
+    fn following(&self, rates: &[Rate]) -> Result<Vec<RateView>> {
+        let mut accounts = self.repository.account_names()?;
+        accounts.sort();
+        Ok(accounts
+            .into_iter()
+            .filter_map(|(account_id, name)| {
+                let (regulated_id, tax_exempt) = regulated_product(&name)?;
+                let regulated = rates.iter().find(|r| r.id == regulated_id)?;
+                let mut view = Self::view(
+                    Rate {
+                        id: format!("account.{account_id}"),
+                        kind: KIND_ACCOUNT.to_string(),
+                        label: name,
+                        rate: regulated.rate,
+                        gross: true,
+                        tax_exempt,
+                        tax_type: None,
+                        account_id: Some(account_id),
+                        source: regulated.source.clone(),
+                        updated_at: regulated.updated_at.clone(),
+                    },
+                    &Self::tax_table(rates),
+                );
+                view.follows = Some(regulated_id.to_string());
+                Some(view)
+            })
+            .collect())
+    }
+
     fn sorted(mut rates: Vec<Rate>) -> Vec<Rate> {
         let order = |k: &str| match k {
             KIND_REGULATED => 0,
@@ -305,11 +366,36 @@ impl RatesServiceTrait for RatesService {
     async fn list(&self) -> Result<Vec<RateView>> {
         let rates = Self::sorted(self.ensure_defaults().await?);
         let taxes = Self::tax_table(&rates);
-        Ok(rates.into_iter().map(|r| Self::view(r, &taxes)).collect())
+        // an account that is a regulated product has that product's rate, whatever was entered for it
+        let following = self.following(&rates)?;
+        let mut views: Vec<RateView> = rates
+            .into_iter()
+            .filter(|r| {
+                r.account_id.as_ref().is_none_or(|id| {
+                    !following
+                        .iter()
+                        .any(|f| f.rate.account_id.as_ref() == Some(id))
+                })
+            })
+            .map(|r| Self::view(r, &taxes))
+            .collect();
+        views.extend(following);
+        Ok(views)
     }
 
     async fn save(&self, id: &str, input: RateInput) -> Result<RateView> {
-        self.ensure_defaults().await?;
+        let rates = self.ensure_defaults().await?;
+        if let Some(account_id) = id.strip_prefix("account.") {
+            if self
+                .following(&rates)?
+                .iter()
+                .any(|f| f.rate.account_id.as_deref() == Some(account_id))
+            {
+                return Err(invalid(
+                    "This account follows a regulated rate: change that rate instead",
+                ));
+            }
+        }
         if let Some(rate) = input.rate {
             if rate < Decimal::ZERO || rate > Decimal::from(100) {
                 return Err(invalid("A rate is between 0 and 100 %"));
@@ -426,6 +512,27 @@ mod tests {
             source: None,
             updated_at: String::new(),
         }
+    }
+
+    #[test]
+    fn an_account_is_a_regulated_product_by_its_name() {
+        let id = |name: &str| regulated_product(name).map(|(id, _)| id);
+        assert_eq!(
+            id("Hello bank! - Livret A ••2628"),
+            Some("regulated.livret_a")
+        );
+        assert_eq!(id("Hello bank! - LDDS ••1234"), Some("regulated.ldds"));
+        assert_eq!(
+            id("Livret de développement durable et solidaire"),
+            Some("regulated.ldds")
+        );
+        assert_eq!(id("LEP"), Some("regulated.lep"));
+        assert_eq!(regulated_product("Mon CEL"), Some(("regulated.cel", false)));
+        // a bank's own savings account is not one
+        assert_eq!(id("Hello bank! - Livret ••4128"), None);
+        assert_eq!(id("Fortuneo - Livret ••4201"), None);
+        assert_eq!(id("Livret Avenir"), None);
+        assert_eq!(id("Fortuneo - Compte courant ••4025"), None);
     }
 
     #[test]

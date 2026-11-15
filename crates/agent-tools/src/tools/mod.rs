@@ -386,6 +386,7 @@ pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(ValidateStatementDocument),
         Arc::new(RevalidateStatementDocument),
         Arc::new(RevalidateAllStatementDocuments),
+        Arc::new(GetStatementRevalidationProgress),
         Arc::new(InvalidateAllStatementDocuments),
         Arc::new(DeleteStatementDocument),
         Arc::new(LinkStatementDocument),

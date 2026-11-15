@@ -11,6 +11,8 @@ pub trait RatesRepositoryTrait: Send + Sync {
     async fn save(&self, rate: Rate) -> Result<Rate>;
     async fn delete(&self, id: &str) -> Result<()>;
     fn account_exists(&self, account_id: &str) -> Result<bool>;
+    /// Every account: (id, name).
+    fn account_names(&self) -> Result<Vec<(String, String)>>;
     fn get_meta(&self, key: &str) -> Result<Option<String>>;
     async fn set_meta(&self, key: &str, value: &str) -> Result<()>;
 }

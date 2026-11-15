@@ -228,13 +228,14 @@ fn same_account<'a>(
         .collect()
 }
 
-/// How `end` (the last day of a statement) leads to `start` (the first day of the next one).
+/// How `end` (the last day of a statement) leads to `start` (the first day of the next one). A statement may
+/// start on the very day the one before it ends (from the 15th to the 15th): that follows too.
 fn link(
     end: chrono::NaiveDate,
     start: chrono::NaiveDate,
 ) -> (&'static str, Option<(chrono::NaiveDate, chrono::NaiveDate)>) {
     let after = end + chrono::Duration::days(1);
-    if after == start {
+    if after == start || end == start {
         ("follows", None)
     } else if after < start {
         ("gap", Some((after, start - chrono::Duration::days(1))))
@@ -316,12 +317,13 @@ pub fn neighbours_to_reopen(doc: &StatementDocument, all: &[StatementDocument]) 
     let others = same_account(doc, all);
     let mut ids: Vec<String> = others
         .iter()
-        .filter(|(_, s, e)| *s <= end && *e >= start)
+        // the day one ends and the next starts may be the same: that is following, not sharing days
+        .filter(|(_, s, e)| *s < end && *e > start)
         .map(|(d, _, _)| d.id.clone())
         .collect();
     if let Some((d, _, _)) = others
         .iter()
-        .filter(|(_, s, _)| *s > end)
+        .filter(|(_, s, _)| *s >= end)
         .min_by_key(|(_, s, _)| *s)
     {
         ids.push(d.id.clone());
@@ -442,6 +444,41 @@ mod chain_tests {
         assert_eq!(c.balance_follows, Some(true));
         assert!(!c.breaks());
 
+        // from the 15th to the 15th: the next one starts the day this one ends, and that follows too
+        let first = statement(
+            "sep",
+            "2022-09-23",
+            "2022-10-15",
+            "0.00",
+            "10.00",
+            "PENDING",
+        );
+        let second = statement(
+            "oct",
+            "2022-10-15",
+            "2022-11-15",
+            "10.00",
+            "25.00",
+            "PENDING",
+        );
+        let both = [first.clone(), second.clone()];
+        let c = continuity(&second, &both).unwrap();
+        assert_eq!(c.state, "follows");
+        assert!(!c.breaks());
+        let c = continuity(&first, &both).unwrap();
+        assert_eq!(c.next_state.as_deref(), Some("follows"));
+        // one day into the other is overlapping
+        let early = statement(
+            "oct",
+            "2022-10-14",
+            "2022-11-15",
+            "10.00",
+            "25.00",
+            "PENDING",
+        );
+        let c = continuity(&early, &[first, early.clone()]).unwrap();
+        assert_eq!(c.state, "overlap");
+
         // a missing month, and a balance that does not take up the previous one
         let june = statement(
             "jun",
@@ -522,6 +559,10 @@ mod chain_tests {
         let mut ids = neighbours_to_reopen(&late_april, &all);
         ids.sort();
         assert_eq!(ids, vec!["jun".to_string(), "may".to_string()]);
+        // a statement ending the day May starts shares no day with it: May is reopened as the one after it,
+        // and March, which ends the day it starts, is left alone
+        let mid = statement("mid", "2025-03-31", "2025-05-01", "1", "1", "PENDING");
+        assert_eq!(neighbours_to_reopen(&mid, &all), vec!["may".to_string()]);
     }
 }
 

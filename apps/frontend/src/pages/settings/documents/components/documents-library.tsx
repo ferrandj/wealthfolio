@@ -5,6 +5,7 @@ import {
   getStatementLoans,
   linkStatementDocument,
   listStatementDocuments,
+  getStatementRevalidationProgress,
   revalidateAllStatementDocuments,
   revalidateStatementDocument,
 } from "@/adapters";
@@ -63,8 +64,10 @@ export function DocumentsLibrary() {
   const [confirmInvalidate, setConfirmInvalidate] = useState(false);
   const [attaching, setAttaching] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
+  // one document opened from its own row: the review stops after it
+  const [reviewingAlone, setReviewingAlone] = useState(false);
   const [holderFilter, setHolderFilter] = useState<HolderFilter>("all");
-  const [viewMode, setViewMode] = useState<"list" | "tree">("list");
+  const [viewMode, setViewMode] = useState<"list" | "tree">("tree");
   // opened from an account: only its documents
   const [params, setParams] = useSearchParams();
   const accountFilter = params.get("account");
@@ -153,6 +156,23 @@ export function DocumentsLibrary() {
       });
     },
   });
+
+  // How far the re-reading is. It runs on the server: it is also followed when this page is opened (or opened
+  // again) while it runs.
+  const { data: progress } = useQuery({
+    queryKey: [QueryKeys.STATEMENT_DOCUMENTS, "revalidation-progress"],
+    queryFn: getStatementRevalidationProgress,
+    refetchInterval: (query) =>
+      revalidateAll.isPending || query.state.data?.running ? 800 : false,
+  });
+  const rereading = revalidateAll.isPending || !!progress?.running;
+  const progressLabel =
+    progress?.running && progress.total > 0
+      ? t("settings:documents.revalidate_all_progress", {
+          done: progress.done,
+          total: progress.total,
+        })
+      : t("settings:documents.revalidate_all_running");
 
   const invalidateAll = useMutation({
     mutationFn: invalidateAllStatementDocuments,
@@ -332,9 +352,33 @@ export function DocumentsLibrary() {
             {doc.status !== "STORED" && (
               <Button
                 type="button"
+                variant={doc.status === "PENDING" ? "default" : "ghost"}
+                size="icon"
+                disabled={rereading}
+                onClick={() => {
+                  setReviewingAlone(true);
+                  setReviewing(doc.id);
+                }}
+                aria-label={t(
+                  doc.status === "PENDING"
+                    ? "settings:documents.validate_one"
+                    : "settings:documents.review_validated_one",
+                )}
+                title={t(
+                  doc.status === "PENDING"
+                    ? "settings:documents.validate_one"
+                    : "settings:documents.review_validated_one",
+                )}
+              >
+                <Icons.ListChecks className="size-4" />
+              </Button>
+            )}
+            {doc.status !== "STORED" && (
+              <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                disabled={revalidateOne.isPending || revalidateAll.isPending}
+                disabled={revalidateOne.isPending || rereading}
                 onClick={() => onRevalidateClick(doc)}
                 aria-label={t("settings:documents.revalidate_one")}
                 title={revalidateTitle(doc)}
@@ -497,7 +541,10 @@ export function DocumentsLibrary() {
           variant="outline"
           size="sm"
           disabled={pending.length === 0}
-          onClick={() => setReviewing(pending[0]?.id ?? null)}
+          onClick={() => {
+            setReviewingAlone(false);
+            setReviewing(pending[0]?.id ?? null);
+          }}
         >
           <Icons.ListChecks className="mr-1 size-4" />
           {pending.length === 0
@@ -518,14 +565,12 @@ export function DocumentsLibrary() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={revalidateAll.isPending}
+          disabled={rereading}
           onClick={() => setConfirmAll(true)}
         >
-          <Icons.RefreshCw
-            className={`mr-1 size-4 ${revalidateAll.isPending ? "animate-spin" : ""}`}
-          />
-          {revalidateAll.isPending
-            ? t("settings:documents.revalidate_all_running")
+          <Icons.RefreshCw className={`mr-1 size-4 ${rereading ? "animate-spin" : ""}`} />
+          {rereading
+            ? progressLabel
             : outdatedIds.size > 0
               ? t("settings:documents.update_reader", {
                   count: outdatedIds.size,
@@ -560,10 +605,26 @@ export function DocumentsLibrary() {
               {t("settings:documents.revalidate_all_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {rereading && (
+            <div className="space-y-1" role="status" aria-live="polite">
+              <div className="text-sm font-medium tabular-nums">{progressLabel}</div>
+              {progress?.running && progress.total > 0 && (
+                <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                  <div
+                    className="bg-primary h-full transition-[width]"
+                    style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                  />
+                </div>
+              )}
+              {progress?.running && progress.fileName && (
+                <div className="text-muted-foreground text-xs break-all">{progress.fileName}</div>
+              )}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
-            <Button disabled={revalidateAll.isPending} onClick={() => revalidateAll.mutate()}>
-              {t("settings:documents.revalidate_all_confirm")}
+            <Button disabled={rereading} onClick={() => revalidateAll.mutate()}>
+              {rereading ? progressLabel : t("settings:documents.revalidate_all_confirm")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -579,9 +640,10 @@ export function DocumentsLibrary() {
       {reviewing && (
         <DocumentReviewDialog
           startId={reviewing}
-          queue={pending}
+          queue={reviewingAlone ? ordered.filter((d) => d.id === reviewing) : pending}
           onClose={() => {
             setReviewing(null);
+            setReviewingAlone(false);
             void refresh();
           }}
         />

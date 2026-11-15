@@ -141,16 +141,24 @@ export default function RatesPage() {
                     <div key={a.id} className="flex flex-wrap items-center gap-3 py-2">
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{a.name}</div>
-                        {r && (
+                        {r?.follows ? (
                           <div className="text-muted-foreground text-xs">
-                            {t("settings:rates.gross_net", {
-                              gross: pct(r.grossRate),
-                              net: pct(r.netRate),
+                            {t("settings:rates.follows_regulated", {
+                              name: regulated.find((x) => x.id === r.follows)?.label ?? "",
                             })}
                           </div>
+                        ) : (
+                          r && (
+                            <div className="text-muted-foreground text-xs">
+                              {t("settings:rates.gross_net", {
+                                gross: pct(r.grossRate),
+                                net: pct(r.netRate),
+                              })}
+                            </div>
+                          )
                         )}
                       </div>
-                      {r && (
+                      {r && !r.follows && (
                         <>
                           <label className="flex items-center gap-1 text-xs">
                             <input
@@ -197,9 +205,10 @@ export default function RatesPage() {
                       )}
                       <RateField
                         rate={r?.rate ?? 0}
+                        disabled={!!r?.follows}
                         onSave={(rate) => save.mutate({ id, input: { rate, label: a.name } })}
                       />
-                      {r && (
+                      {r && !r.follows && (
                         <Button
                           type="button"
                           variant="ghost"

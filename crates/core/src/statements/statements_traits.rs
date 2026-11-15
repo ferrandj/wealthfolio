@@ -6,8 +6,9 @@ use super::loans::LoanDocumentData;
 use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview,
-    NewStatementDocument, OutdatedDocuments, RevalidationResult, ReviewDecision, StatementAnalysis,
-    StatementDocument, StatementImportRequest, StatementImportResult,
+    NewStatementDocument, OutdatedDocuments, RevalidationProgress, RevalidationResult,
+    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
+    StatementImportResult,
 };
 use crate::errors::Result;
 
@@ -129,6 +130,8 @@ pub trait StatementServiceTrait: Send + Sync {
     /// Undo what every document brought in, then read all the stored originals again, oldest first. Obvious ones
     /// come back validated; the others wait for review with the reason. Categories chosen by hand are kept.
     async fn revalidate_all(&self) -> Result<RevalidationResult>;
+    /// How far a running `revalidate_all` is (not running: the last one's end, or nothing).
+    fn revalidation_progress(&self) -> RevalidationProgress;
 
     fn list_identities(&self) -> Result<Vec<AccountIdentity>>;
     fn get_identity(&self, account_id: &str) -> Result<Option<AccountIdentity>>;

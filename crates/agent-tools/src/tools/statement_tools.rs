@@ -228,6 +228,16 @@ service_tool!(
 );
 
 service_tool!(
+    GetStatementRevalidationProgress, "get_statement_revalidation_progress", Read, additive = false,
+    scopes = [DocumentsRead],
+    description = "How far a running revalidation of every document is: whether it runs, how many documents are done out of how many, and the file being read.",
+    schema = no_args(),
+    |env, _args| {
+        reply(&need(env.statement_service(), "Statements")?.revalidation_progress())
+    }
+);
+
+service_tool!(
     InvalidateAllStatementDocuments, "invalidate_all_statement_documents", Write, additive = false,
     scopes = [DocumentsWrite],
     description = "Put every validated document back in the review queue (the app's 'Tout invalider'). Returns how many were reset. Nothing is deleted.",

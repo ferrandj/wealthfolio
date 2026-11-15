@@ -129,6 +129,14 @@ impl RatesRepositoryTrait for RatesRepository {
         Ok(n > 0)
     }
 
+    fn account_names(&self) -> Result<Vec<(String, String)>> {
+        let mut conn = get_connection(&self.pool)?;
+        Ok(accounts::table
+            .select((accounts::id, accounts::name))
+            .load::<(String, String)>(&mut conn)
+            .map_err(StorageError::from)?)
+    }
+
     fn get_meta(&self, key: &str) -> Result<Option<String>> {
         let mut conn = get_connection(&self.pool)?;
         let value = rates_meta::table

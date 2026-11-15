@@ -353,6 +353,14 @@ export interface RevalidationOutcome {
   error?: string | null;
 }
 
+/** How far the re-reading of all the documents is. */
+export interface RevalidationProgress {
+  running: boolean;
+  done: number;
+  total: number;
+  fileName?: string | null;
+}
+
 export interface RevalidationResult {
   total: number;
   validated: number;

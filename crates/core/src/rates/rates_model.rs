@@ -44,6 +44,10 @@ pub struct RateView {
     pub rate: Rate,
     pub gross_rate: Decimal,
     pub net_rate: Decimal,
+    /// Account rates: the regulated rate (`regulated.*`) the account follows because it is that product (a Livret
+    /// A, an LDDS…). Its rate is that one's and cannot be entered.
+    #[serde(default)]
+    pub follows: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

@@ -20,8 +20,8 @@ use wealthfolio_statement_import::{
 
 use super::statements_model::{
     AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationResult,
-    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome, RevalidationProgress,
+    RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
     StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
     StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };
@@ -339,7 +339,8 @@ fn overlapping(
                 && d.import_run_id.is_some()
         })
         .filter(|d| match (&d.period_start, &d.period_end) {
-            (Some(ds), Some(de)) => ds.as_str() <= end && start <= de.as_str(),
+            // sharing only the day one ends and the other starts is not overlapping (from the 15th to the 15th)
+            (Some(ds), Some(de)) => ds.as_str() < end && start < de.as_str(),
             _ => false,
         })
         .map(|d| super::StatementOverlap {
@@ -542,7 +543,26 @@ struct ReviewContext {
     legs: Option<Arc<TransferLegs>>,
 }
 
+/// Says the re-reading is over when it ends, however it ends.
+struct RevalidationRun<'a>(&'a std::sync::Mutex<RevalidationProgress>);
+
+impl RevalidationRun<'_> {
+    fn set(&self, change: impl FnOnce(&mut RevalidationProgress)) {
+        change(&mut self.0.lock().unwrap_or_else(|p| p.into_inner()));
+    }
+}
+
+impl Drop for RevalidationRun<'_> {
+    fn drop(&mut self) {
+        self.set(|p| {
+            p.running = false;
+            p.file_name = None;
+        });
+    }
+}
+
 pub struct StatementService {
+    revalidation: std::sync::Mutex<RevalidationProgress>,
     readings: std::sync::Mutex<Readings>,
     repository: Arc<dyn StatementRepositoryTrait>,
     account_service: Arc<dyn AccountServiceTrait>,
@@ -564,6 +584,7 @@ impl StatementService {
         counterparties: Arc<dyn CounterpartyRecorderTrait>,
     ) -> Self {
         Self {
+            revalidation: std::sync::Mutex::new(RevalidationProgress::default()),
             readings: std::sync::Mutex::new(Readings::default()),
             repository,
             account_service,
@@ -3104,9 +3125,25 @@ impl StatementServiceTrait for StatementService {
         Ok(invalidated)
     }
 
+    fn revalidation_progress(&self) -> RevalidationProgress {
+        self.revalidation
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
     async fn revalidate_all(&self) -> Result<RevalidationResult> {
         let mut documents = self.repository.list_documents()?;
         documents.sort_by(logical_order);
+        let run = RevalidationRun(&self.revalidation);
+        run.set(|p| {
+            *p = RevalidationProgress {
+                running: true,
+                done: 0,
+                total: documents.len(),
+                file_name: None,
+            }
+        });
         let mut result = RevalidationResult {
             total: documents.len(),
             ..RevalidationResult::default()
@@ -3126,12 +3163,14 @@ impl StatementServiceTrait for StatementService {
         let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
         for document in documents.iter() {
             let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
+                run.set(|p| p.done += 1);
                 continue;
             };
             match self.check_readable(&doc, content.clone()).await {
                 Ok(()) => readable.push((doc, content)),
                 Err(e) => {
                     outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
+                    run.set(|p| p.done += 1);
                 }
             }
         }
@@ -3146,7 +3185,10 @@ impl StatementServiceTrait for StatementService {
         // 3. oldest first
         for (document, content) in &readable {
             let carry = carries.remove(&document.id).unwrap_or_default();
-            match self.reimport(document, content, carry).await {
+            run.set(|p| p.file_name = Some(document.file_name.clone()));
+            let read = self.reimport(document, content, carry).await;
+            run.set(|p| p.done += 1);
+            match read {
                 Ok(updated) => {
                     outcomes.insert(updated.id.clone(), outcome_of(&updated, None));
                 }
@@ -3941,6 +3983,8 @@ mod tests {
             ["feb"]
         );
         // consecutive statements do not overlap
-        assert!(overlapping(docs, "a", "2026-03-01", "2026-03-31", "me").is_empty());
+        assert!(overlapping(docs.clone(), "a", "2026-03-01", "2026-03-31", "me").is_empty());
+        // nor do statements that share the day one ends and the next starts (from the 28th to the 28th)
+        assert!(overlapping(docs, "a", "2026-02-28", "2026-03-28", "me").is_empty());
     }
 }

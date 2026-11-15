@@ -466,6 +466,7 @@ pub fn run() {
             commands::statements::validate_statement_document,
             commands::statements::revalidate_statement_document,
             commands::statements::revalidate_all_statement_documents,
+            commands::statements::get_statement_revalidation_progress,
             commands::statements::invalidate_all_statement_documents,
             commands::statements::invalidate_statement_documents,
             commands::statements::get_statement_document_sources,
