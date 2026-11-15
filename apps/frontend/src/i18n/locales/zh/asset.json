@@ -790,7 +790,12 @@
     "error_decode_failed": "无法将该文件读取为图片。",
     "error_encode_failed": "无法将图片转换为 PNG。",
     "error_too_large_output": "图片过于复杂，无法压缩到 150 KB 以内。请尝试更简单或更小的图片。",
-    "error_save_failed": "无法保存 Logo。"
+    "error_save_failed": "无法保存 Logo。",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "导出还款计划",

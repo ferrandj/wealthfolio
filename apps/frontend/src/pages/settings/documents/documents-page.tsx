@@ -1,3 +1,4 @@
+import { findMissingAssetLogos } from "@/hooks/use-asset-logos";
 import { analyzeStatement, importStatement, logger, purgeStatementDocuments } from "@/adapters";
 import { LoanAccountDialog } from "../loans/loan-account-dialog";
 import { DescribeNewSourcesDialog, DocumentSourcesPanel } from "./sources/document-sources-dialogs";
@@ -121,6 +122,8 @@ export default function DocumentsPage() {
         );
         if (created.length > 0) setNewAccounts((list) => [...new Set([...list, ...created])]);
         void queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENT_SOURCES] });
+        // the funds a document brought get their picture
+        void findMissingAssetLogos(queryClient);
         setDescribe(true);
         const imported = result.document;
         if (

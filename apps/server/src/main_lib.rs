@@ -125,6 +125,7 @@ pub struct AppState {
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
     pub asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync>,
+    pub asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>,
     pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
@@ -1023,6 +1024,17 @@ async fn initialize_profile_state(
             Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone())),
             asset_repository.clone(),
         ));
+    // The pictures of the funds: found once on the web, then read from the database
+    let asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait> =
+        Arc::new(wealthfolio_core::assets::AssetLogoFinder::new(
+            asset_service.clone(),
+            asset_logo_service.clone(),
+            account_service.clone(),
+            activity_service.clone(),
+            snapshot_service.clone(),
+            settings_service.clone(),
+            Arc::new(wealthfolio_core::assets::WebLogoSource::new()),
+        ));
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
@@ -1109,6 +1121,7 @@ async fn initialize_profile_state(
         contacts_service.clone(),
         rates_service.clone(),
     ));
+    ai_environment.attach_asset_logo_finder(asset_logo_finder.clone());
     let agent_environment: Arc<dyn wealthfolio_agent_tools::AgentEnvironment> =
         ai_environment.clone();
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
@@ -1270,6 +1283,7 @@ async fn initialize_profile_state(
         net_worth_service,
         alternative_asset_service,
         asset_logo_service,
+        asset_logo_finder,
         addon_service,
         connect_sync_service,
         ai_provider_service,

@@ -531,6 +531,7 @@ pub fn run() {
             // Asset logo commands
             commands::asset_logo::get_asset_logo,
             commands::asset_logo::list_asset_logos,
+            commands::asset_logo::find_asset_logos,
             commands::asset_logo::upsert_asset_logo,
             commands::asset_logo::delete_asset_logo,
             // Alternative asset commands

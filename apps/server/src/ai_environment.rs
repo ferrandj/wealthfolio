@@ -84,6 +84,8 @@ pub struct ServerAiEnvironment {
     statement_service: Arc<dyn wealthfolio_core::statements::StatementServiceTrait>,
     contacts_service: Arc<dyn wealthfolio_core::contacts::ContactsServiceTrait>,
     rates_service: Arc<dyn wealthfolio_core::rates::RatesServiceTrait>,
+    /// Finds the pictures of the assets; attached once the environment is built.
+    asset_logo_finder: std::sync::OnceLock<Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>>,
 }
 
 impl ServerAiEnvironment {
@@ -166,7 +168,15 @@ impl ServerAiEnvironment {
             statement_service,
             contacts_service,
             rates_service,
+            asset_logo_finder: std::sync::OnceLock::new(),
         }
+    }
+
+    pub fn attach_asset_logo_finder(
+        &self,
+        finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>,
+    ) {
+        let _ = self.asset_logo_finder.set(finder);
     }
 }
 
@@ -314,6 +324,10 @@ impl AgentEnvironment for ServerAiEnvironment {
 
     fn rates_service(&self) -> Option<Arc<dyn wealthfolio_core::rates::RatesServiceTrait>> {
         Some(self.rates_service.clone())
+    }
+
+    fn asset_logo_finder(&self) -> Option<Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>> {
+        self.asset_logo_finder.get().cloned()
     }
 
     async fn run_health_checks(&self) -> wealthfolio_core::Result<HealthStatus> {

@@ -69,7 +69,13 @@ export const TickerAvatar = ({
   if (cashAvatarLabel) {
     return (
       <Avatar key="cash" className={cn("font-semibold", className)}>
-        <AvatarFallback className="bg-primary/80 dark:bg-primary/20 text-xs font-semibold text-white">
+        <AvatarFallback
+          className={cn(
+            "bg-primary/80 dark:bg-primary/20 font-semibold text-white",
+            // a lone sign (€, $, £) is drawn larger than a code
+            cashAvatarLabel.length === 1 ? "text-base" : "text-xs",
+          )}
+        >
           <span className="p-1" title={fullSymbol}>
             {cashAvatarLabel}
           </span>

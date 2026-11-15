@@ -790,7 +790,12 @@
     "error_decode_failed": "파일을 이미지로 읽을 수 없습니다.",
     "error_encode_failed": "이미지를 PNG로 변환할 수 없습니다.",
     "error_too_large_output": "이미지가 너무 복잡하여 150 KB에 맞출 수 없습니다. 더 단순하거나 작은 이미지를 사용해 보세요.",
-    "error_save_failed": "로고를 저장할 수 없습니다."
+    "error_save_failed": "로고를 저장할 수 없습니다.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "상환 일정 내보내기",

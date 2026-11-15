@@ -1,7 +1,23 @@
 // Asset Logo Commands
-import type { AssetLogo, AssetLogoSummary, UpsertAssetLogoInput } from "@/lib/types";
+import type {
+  AssetLogo,
+  AssetLogoSummary,
+  FindAssetLogosReport,
+  FindAssetLogosRequest,
+  UpsertAssetLogoInput,
+} from "@/lib/types";
 
 import { invoke } from "./platform";
+
+/**
+ * Find a picture for the assets that have none (the fund's house, else the bank that holds it). The backend
+ * fetches each picture once, shrinks it and stores it as the asset's logo.
+ */
+export const findAssetLogos = async (
+  request: FindAssetLogosRequest = {},
+): Promise<FindAssetLogosReport> => {
+  return invoke<FindAssetLogosReport>("find_asset_logos", { request });
+};
 
 /**
  * List every asset with a custom logo override (metadata only, no image bytes).

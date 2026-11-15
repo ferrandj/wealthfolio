@@ -737,7 +737,22 @@
     "save": "حفظ الشعار",
     "saved": "تم حفظ الشعار.",
     "title": "شعار الأصل",
-    "updated_at": "تم التحديث في {{date}}"
+    "updated_at": "تم التحديث في {{date}}",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_zero": "{{count}} pictures found",
+    "find_done_one": "{{count}} picture found",
+    "find_done_two": "{{count}} pictures found",
+    "find_done_few": "{{count}} pictures found",
+    "find_done_many": "{{count}} pictures found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_zero": "{{count}} securities are left without a picture",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_two": "{{count}} securities are left without a picture",
+    "find_missing_few": "{{count}} securities are left without a picture",
+    "find_missing_many": "{{count}} securities are left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "lots": {
     "account_few": "{{count}} حسابات",

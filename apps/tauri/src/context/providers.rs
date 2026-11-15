@@ -704,6 +704,17 @@ async fn build_context(
         asset_logo_repository,
         asset_repository.clone(),
     ));
+    // The pictures of the funds: found once on the web, then read from the database
+    let asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait> =
+        Arc::new(wealthfolio_core::assets::AssetLogoFinder::new(
+            asset_service.clone(),
+            asset_logo_service.clone(),
+            account_service.clone(),
+            activity_service.clone(),
+            snapshot_service.clone(),
+            settings_service.clone(),
+            Arc::new(wealthfolio_core::assets::WebLogoSource::new()),
+        ));
 
     let sync_service = Arc::new(
         BrokerSyncService::new(
@@ -787,6 +798,7 @@ async fn build_context(
         contacts_service.clone(),
         rates_service.clone(),
     ));
+    ai_environment.attach_asset_logo_finder(asset_logo_finder.clone());
     let agent_environment: Arc<dyn wealthfolio_agent_tools::AgentEnvironment> =
         ai_environment.clone();
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
@@ -908,6 +920,7 @@ async fn build_context(
             sync_service,
             alternative_asset_service,
             asset_logo_service,
+            asset_logo_finder,
             taxonomy_service,
             connect_service,
             ai_provider_service,

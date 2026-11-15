@@ -797,7 +797,16 @@
     "error_decode_failed": "Não foi possível ler o arquivo como imagem.",
     "error_encode_failed": "Não foi possível converter a imagem para PNG.",
     "error_too_large_output": "A imagem é detalhada demais para caber em 150 KB. Tente uma imagem mais simples ou menor.",
-    "error_save_failed": "Não foi possível salvar o logotipo."
+    "error_save_failed": "Não foi possível salvar o logotipo.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_many": "{{count}} pictures found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_many": "{{count}} securities are left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "Exportar cronograma",

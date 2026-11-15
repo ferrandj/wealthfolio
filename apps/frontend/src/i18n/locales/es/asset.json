@@ -797,7 +797,16 @@
     "error_decode_failed": "No se pudo leer el archivo como imagen.",
     "error_encode_failed": "No se pudo convertir la imagen a PNG.",
     "error_too_large_output": "La imagen tiene demasiado detalle para caber en 150 KB. Prueba con una imagen más simple o más pequeña.",
-    "error_save_failed": "No se pudo guardar el logo."
+    "error_save_failed": "No se pudo guardar el logo.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_many": "{{count}} pictures found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_many": "{{count}} securities are left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "Exportar calendario de pagos",

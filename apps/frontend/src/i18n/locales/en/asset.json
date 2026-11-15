@@ -894,7 +894,14 @@
     "error_decode_failed": "The file could not be read as an image.",
     "error_encode_failed": "The image could not be converted to PNG.",
     "error_too_large_output": "The image is too detailed to fit in 150 KB. Try a simpler or smaller image.",
-    "error_save_failed": "The logo could not be saved."
+    "error_save_failed": "The logo could not be saved.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanOverview": {
     "regular_payment": "Regular payment",

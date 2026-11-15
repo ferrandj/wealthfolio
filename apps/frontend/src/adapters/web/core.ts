@@ -224,6 +224,7 @@ export const COMMANDS: CommandMap = {
   update_quote_mode: { method: "PUT", path: "/assets/pricing-mode" },
   // Asset logos
   list_asset_logos: { method: "GET", path: "/assets/logos" },
+  find_asset_logos: { method: "POST", path: "/assets/logos/find" },
   get_asset_logo: { method: "GET", path: "/assets/logo" },
   upsert_asset_logo: { method: "PUT", path: "/assets/logo" },
   delete_asset_logo: { method: "DELETE", path: "/assets/logo" },
@@ -1356,6 +1357,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "delete_asset_logo": {
       const { assetId } = payload as { assetId: string };
       url += `/${encodeURIComponent(assetId)}`;
+      break;
+    }
+    case "find_asset_logos": {
+      const { request } = payload as { request?: Record<string, unknown> };
+      body = JSON.stringify(request ?? {});
       break;
     }
     case "upsert_asset_logo": {

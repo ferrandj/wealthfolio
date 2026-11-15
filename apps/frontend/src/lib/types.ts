@@ -995,6 +995,29 @@ export interface Asset {
   updatedAt: string; // ISO date string
 }
 
+/** Which assets to find a picture for. */
+export interface FindAssetLogosRequest {
+  /** Only these assets; every fund or hand-priced asset without a picture when absent. */
+  assetIds?: string[];
+  /** Also look again for the pictures found this way before (never for one chosen by hand). */
+  again?: boolean;
+}
+
+export interface FoundAssetLogo {
+  assetId: string;
+  symbol: string | null;
+  name: string | null;
+  /** issuer: the house that manages the fund; bank: the bank that holds it. */
+  source: "issuer" | "bank";
+  site: string;
+}
+
+export interface FindAssetLogosReport {
+  found: FoundAssetLogo[];
+  /** The assets left without a picture. */
+  missing: string[];
+}
+
 /** One row of the custom-logo index (no image bytes). */
 export interface AssetLogoSummary {
   assetId: string;

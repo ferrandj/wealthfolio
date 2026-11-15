@@ -387,6 +387,7 @@ pub fn domain_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(RevalidateStatementDocument),
         Arc::new(RevalidateAllStatementDocuments),
         Arc::new(GetStatementRevalidationProgress),
+        Arc::new(FindAssetLogos),
         Arc::new(InvalidateAllStatementDocuments),
         Arc::new(DeleteStatementDocument),
         Arc::new(LinkStatementDocument),
@@ -534,6 +535,7 @@ mod tests {
                         | RatesWrite
                         | FinancialPlanningWrite
                         | AccountsWrite
+                        | HoldingsWrite
                 )
             });
             assert_eq!(writes, has_write_scope, "{}", tool.name());

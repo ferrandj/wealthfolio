@@ -797,7 +797,16 @@
     "error_decode_failed": "Impossibile leggere il file come immagine.",
     "error_encode_failed": "Impossibile convertire l'immagine in PNG.",
     "error_too_large_output": "L'immagine è troppo dettagliata per rientrare in 150 KB. Prova con un'immagine più semplice o più piccola.",
-    "error_save_failed": "Impossibile salvare il logo."
+    "error_save_failed": "Impossibile salvare il logo.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_many": "{{count}} pictures found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_many": "{{count}} securities are left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "Esporta piano di ammortamento",

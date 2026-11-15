@@ -66,6 +66,7 @@ device-sync = []
 
 [dev-dependencies]
 reqwest = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [lints]
 workspace = true

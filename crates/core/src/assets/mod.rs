@@ -4,6 +4,7 @@ mod alternative_assets_model;
 mod alternative_assets_service;
 mod alternative_assets_traits;
 mod asset_id;
+mod asset_logo_finder;
 mod asset_logo_model;
 mod asset_logo_service;
 mod asset_logo_traits;
@@ -33,6 +34,10 @@ pub use alternative_assets_traits::{
 pub use asset_id::{
     parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, parse_symbol_with_known_exchange,
     symbol_resolution_candidates,
+};
+pub use asset_logo_finder::{
+    bank_site, issuer_site, small_png, AssetLogoFinder, AssetLogoFinderTrait, FindLogosReport,
+    FindLogosRequest, FoundLogo, LogoSourceTrait, WebLogoSource, FOUND_LOGOS_KEY, FOUND_LOGO_SIDE,
 };
 pub use asset_logo_model::{
     decode_and_validate as decode_and_validate_asset_logo, AssetLogo, AssetLogoSummary,

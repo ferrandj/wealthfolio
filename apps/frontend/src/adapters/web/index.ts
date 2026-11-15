@@ -366,6 +366,7 @@ export {
   deleteAssetLogo,
   getAssetLogo,
   listAssetLogos,
+  findAssetLogos,
   upsertAssetLogo,
 } from "../shared/asset-logos";
 

@@ -1,8 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useTranslation } from "react-i18next";
 
-import { deleteAssetLogo, listAssetLogos, logger, upsertAssetLogo } from "@/adapters";
+import {
+  deleteAssetLogo,
+  findAssetLogos,
+  listAssetLogos,
+  logger,
+  upsertAssetLogo,
+} from "@/adapters";
 import { assetLogoRegistry } from "@/lib/asset-logo-registry";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AssetLogo, AssetLogoSummary } from "@/lib/types";
@@ -18,6 +24,47 @@ export function useAssetLogoIndex() {
     refetchOnWindowFocus: false,
     // A fresh array on every fetch so `AssetLogoRegistrySync` re-applies the index after a reset.
     structuralSharing: false,
+  });
+}
+
+/**
+ * Looks for a picture for the assets that have none and shows what was found. Quiet: it runs on its own when
+ * the app opens and after an import, and a failure (no network) only means the initials stay.
+ */
+export async function findMissingAssetLogos(queryClient: QueryClient): Promise<void> {
+  try {
+    const report = await findAssetLogos();
+    if (report.found.length > 0) await queryClient.invalidateQueries({ queryKey: INDEX_KEY });
+  } catch {
+    // no network, or not signed in yet: the initials stay, and the next opening tries again
+  }
+}
+
+/** The "find the pictures" button: looks again for those found before too, and says what came of it. */
+export function useFindAssetLogos() {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation("asset");
+  return useMutation({
+    mutationFn: () => findAssetLogos({ again: true }),
+    onSuccess: async (report) => {
+      await queryClient.invalidateQueries({ queryKey: INDEX_KEY });
+      toast({
+        title: t("logo.find_done", { count: report.found.length }),
+        description:
+          report.missing.length > 0
+            ? t("logo.find_missing", { count: report.missing.length })
+            : undefined,
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      logger.error(`Error finding asset logos: ${describeError(error)}`);
+      toast({
+        title: t("logo.find_failed"),
+        description: describeError(error),
+        variant: "destructive",
+      });
+    },
   });
 }
 

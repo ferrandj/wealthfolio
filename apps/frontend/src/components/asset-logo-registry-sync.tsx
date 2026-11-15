@@ -1,6 +1,7 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { useAssetLogoIndex } from "@/hooks/use-asset-logos";
+import { findMissingAssetLogos, useAssetLogoIndex } from "@/hooks/use-asset-logos";
 import { assetLogoRegistry } from "@/lib/asset-logo-registry";
 
 /**
@@ -10,6 +11,13 @@ import { assetLogoRegistry } from "@/lib/asset-logo-registry";
  */
 export function AssetLogoRegistrySync() {
   const { data } = useAssetLogoIndex();
+  const queryClient = useQueryClient();
+
+  // Once per session: the assets still without a picture get one (their house's, else their bank's). Nothing
+  // is fetched when none is missing.
+  useEffect(() => {
+    void findMissingAssetLogos(queryClient);
+  }, [queryClient]);
 
   useEffect(() => {
     if (data) assetLogoRegistry.setIndex(data);

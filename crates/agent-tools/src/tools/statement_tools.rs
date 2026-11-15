@@ -881,3 +881,17 @@ service_tool!(
         reply(&need(env.statement_service(), "Statements")?.set_document_source(&args.key, args.settings).await.map_err(fail)?)
     }
 );
+
+service_tool!(
+    FindAssetLogos, "find_asset_logos", Write, additive = true,
+    scopes = [HoldingsWrite],
+    description = "Find a picture for the assets that have none (the app's 'Trouver les images'): a fund gets the mark of the house that manages it, told by its name, else the mark of the bank that holds it. Each picture is fetched once from the web, shrunk and stored; a picture chosen by hand is never replaced. Returns the pictures found (asset, source issuer|bank, site) and the assets left without one.",
+    schema = object(json!({
+        "assetIds": {"type": "array", "items": {"type": "string"}, "description": "Only these assets (default: every fund or hand-priced asset without a picture)."},
+        "again": {"type": "boolean", "description": "Also look again for the assets whose picture was found this way before (default false)."}
+    }), &[]),
+    |env, args| {
+        let request: wealthfolio_core::assets::FindLogosRequest = serde_json::from_value(args)?;
+        reply(&need(env.asset_logo_finder(), "Asset pictures")?.find_logos(request).await.map_err(fail)?)
+    }
+);

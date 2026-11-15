@@ -790,7 +790,12 @@
     "error_decode_failed": "ファイルを画像として読み込めませんでした。",
     "error_encode_failed": "画像を PNG に変換できませんでした。",
     "error_too_large_output": "画像が複雑すぎて 150 KB に収まりません。よりシンプルな画像か小さい画像をお試しください。",
-    "error_save_failed": "ロゴを保存できませんでした。"
+    "error_save_failed": "ロゴを保存できませんでした。",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "返済予定表をエクスポート",

@@ -1,8 +1,32 @@
+// The sign a currency is written with, where it has one; the dollars other than the US one say whose they are.
 const CASH_AVATAR_LABELS: Record<string, string> = {
   USD: "$",
   CAD: "C$",
   AUD: "A$",
   NZD: "NZ$",
+  HKD: "HK$",
+  SGD: "S$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+  CNY: "¥",
+  CHF: "Fr",
+  INR: "₹",
+  KRW: "₩",
+  ILS: "₪",
+  PLN: "zł",
+  SEK: "kr",
+  NOK: "kr",
+  DKK: "kr",
+  CZK: "Kč",
+  TRY: "₺",
+  BRL: "R$",
+  ZAR: "R",
+  THB: "฿",
+  VND: "₫",
+  PHP: "₱",
+  UAH: "₴",
+  NGN: "₦",
 };
 
 const CASH_SYMBOL_PATTERN = /^\$?CASH[-_:]([A-Z]{3})$/;

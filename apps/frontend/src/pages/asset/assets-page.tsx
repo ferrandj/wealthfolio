@@ -17,6 +17,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
 import { BulkQuoteModeDialog } from "./bulk-quote-mode-dialog";
 
+import { useFindAssetLogos } from "@/hooks/use-asset-logos";
 import { useHoldings } from "@/hooks/use-holdings";
 import { HoldingsScopeNotice } from "@/components/holdings-scope-notice";
 import { useIsCompactTableViewport } from "@/hooks/use-platform";
@@ -71,6 +72,7 @@ export default function AssetsPage() {
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
   const [assetPendingRefetch, setAssetPendingRefetch] = useState<ParsedAsset | null>(null);
   const [bulkQuotesOpen, setBulkQuotesOpen] = useState(false);
+  const findLogos = useFindAssetLogos();
 
   // The tables build their columns from these. New functions on each render (every
   // holdings refetch) would remount the rows and close an open row menu.
@@ -101,6 +103,16 @@ export default function AssetsPage() {
             aria-label={t("asset:securities.add_security")}
           >
             <Icons.Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={findLogos.isPending}
+            onClick={() => findLogos.mutate()}
+            data-testid="find-logos-button"
+          >
+            <Icons.ImageUp className="me-2 h-4 w-4" />
+            {findLogos.isPending ? t("asset:logo.find_running") : t("asset:logo.find_button")}
           </Button>
           <Button
             size="sm"

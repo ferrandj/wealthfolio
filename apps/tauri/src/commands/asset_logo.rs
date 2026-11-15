@@ -14,6 +14,19 @@ pub async fn get_asset_logo(
 }
 
 #[tauri::command]
+pub async fn find_asset_logos(
+    request: wealthfolio_core::assets::FindLogosRequest,
+    state: ProfileAccess,
+) -> Result<wealthfolio_core::assets::FindLogosReport, String> {
+    let context = state.context()?;
+    context
+        .asset_logo_finder()
+        .find_logos(request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_asset_logos(state: ProfileAccess) -> Result<Vec<AssetLogoSummary>, String> {
     let context = state.context()?;
     context

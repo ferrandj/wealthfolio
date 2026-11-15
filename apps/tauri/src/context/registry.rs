@@ -78,6 +78,7 @@ pub struct ServiceContext {
     pub sync_service: Arc<dyn BrokerSyncServiceTrait>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait>,
     pub asset_logo_service: Arc<dyn AssetLogoServiceTrait>,
+    pub asset_logo_finder: Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>,
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
     pub connect_service: Arc<ConnectService>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
@@ -274,6 +275,10 @@ impl ServiceContext {
 
     pub fn asset_logo_service(&self) -> Arc<dyn AssetLogoServiceTrait> {
         Arc::clone(&self.asset_logo_service)
+    }
+
+    pub fn asset_logo_finder(&self) -> Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait> {
+        Arc::clone(&self.asset_logo_finder)
     }
 
     pub fn taxonomy_service(&self) -> Arc<dyn taxonomies::TaxonomyServiceTrait> {

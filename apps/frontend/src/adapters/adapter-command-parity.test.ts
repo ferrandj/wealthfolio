@@ -954,6 +954,13 @@ describe("bank statements and account documents", () => {
     });
   });
 
+  it("asks for the pictures of the assets, with what to look for as the body", async () => {
+    const mock = stubFetch({ found: [], missing: [] });
+    await invoke("find_asset_logos", { request: { again: true } });
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/assets/logos/find", method: "POST" });
+    expect(JSON.parse(lastCall(mock).body as string)).toEqual({ again: true });
+  });
+
   it("asks how far the re-reading is", async () => {
     const mock = stubFetch({});
     await invoke("get_statement_revalidation_progress");

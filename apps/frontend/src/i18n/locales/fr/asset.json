@@ -797,7 +797,16 @@
     "error_decode_failed": "Le fichier n'a pas pu être lu comme une image.",
     "error_encode_failed": "L'image n'a pas pu être convertie en PNG.",
     "error_too_large_output": "L'image est trop détaillée pour tenir dans 150 Ko. Essayez une image plus simple ou plus petite.",
-    "error_save_failed": "Le logo n'a pas pu être enregistré."
+    "error_save_failed": "Le logo n'a pas pu être enregistré.",
+    "find_button": "Trouver les images",
+    "find_running": "Recherche des images…",
+    "find_done_one": "{{count}} image trouvée",
+    "find_done_many": "{{count}} images trouvées",
+    "find_done_other": "{{count}} images trouvées",
+    "find_missing_one": "{{count}} titre reste sans image (ni sa société de gestion ni sa banque n'en ont donné)",
+    "find_missing_many": "{{count}} titres restent sans image (ni leur société de gestion ni leur banque n'en ont donné)",
+    "find_missing_other": "{{count}} titres restent sans image (ni leur société de gestion ni leur banque n'en ont donné)",
+    "find_failed": "Recherche des images impossible"
   },
   "loanExport": {
     "action": "Exporter l’échéancier",

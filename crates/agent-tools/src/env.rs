@@ -165,6 +165,12 @@ pub trait AgentEnvironment: Send + Sync {
         None
     }
 
+    /// Finds a picture for the assets that have none (the fund's house, else
+    /// the bank that holds it). The default has none.
+    fn asset_logo_finder(&self) -> Option<Arc<dyn wealthfolio_core::assets::AssetLogoFinderTrait>> {
+        None
+    }
+
     /// Run the Health Center's full checks, as its "run checks" does, and
     /// cache the result. Hosts implement it with the services the checks
     /// read; the default reports that this environment cannot run them.

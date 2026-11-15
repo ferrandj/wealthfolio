@@ -255,7 +255,10 @@ describe.each([
   it.each([
     ["$CASH", "$"],
     ["CASH:CAD", "C$"],
-    ["$cash-eur", "EUR"],
+    ["$cash-eur", "€"],
+    ["CASH:GBP", "£"],
+    // a currency written with no sign of its own keeps its code
+    ["CASH:XAF", "XAF"],
   ])("renders %s without probing an image", (symbol, label) => {
     const image = vi.fn();
     vi.stubGlobal("Image", image);

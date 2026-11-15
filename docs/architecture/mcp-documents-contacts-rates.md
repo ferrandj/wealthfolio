@@ -37,7 +37,7 @@ tokens keep the scopes they were created with).
   `list_supported_statement_institutions`, `analyze_statement_document` (upload
   as base64, nothing stored), `import_statement_document` (upload, `overrides`,
   `replaceDocumentIds`), `validate_statement_document`,
-  `revalidate_statement_document`, `revalidate_all_statement_documents`, `get_statement_revalidation_progress`,
+  `revalidate_statement_document`, `revalidate_all_statement_documents`, `get_statement_revalidation_progress`, `find_asset_logos`,
   `invalidate_all_statement_documents`, `delete_statement_document`,
   `link_statement_document`, `list_account_identities`, `get_account_identity`,
   `save_account_identity`, `get_statement_coverage`,

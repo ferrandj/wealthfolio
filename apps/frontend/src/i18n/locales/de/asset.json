@@ -790,7 +790,14 @@
     "error_decode_failed": "Die Datei konnte nicht als Bild gelesen werden.",
     "error_encode_failed": "Das Bild konnte nicht in PNG konvertiert werden.",
     "error_too_large_output": "Das Bild ist zu detailliert für 150 KB. Versuchen Sie ein einfacheres oder kleineres Bild.",
-    "error_save_failed": "Das Logo konnte nicht gespeichert werden."
+    "error_save_failed": "Das Logo konnte nicht gespeichert werden.",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "Tilgungsplan exportieren",

@@ -790,7 +790,14 @@
     "error_decode_failed": "無法讀取這個圖片檔。",
     "error_encode_failed": "無法將圖片轉換為 PNG。",
     "error_too_large_output": "圖片內容太複雜，無法縮小到 150 KB。請改用較簡單或尺寸較小的圖片。",
-    "error_save_failed": "無法儲存 Logo。"
+    "error_save_failed": "無法儲存 Logo。",
+    "find_button": "Find the pictures",
+    "find_running": "Looking for pictures…",
+    "find_done_one": "{{count}} picture found",
+    "find_done_other": "{{count}} pictures found",
+    "find_missing_one": "{{count}} security is left without a picture",
+    "find_missing_other": "{{count}} securities are left without a picture",
+    "find_failed": "Could not look for pictures"
   },
   "loanExport": {
     "action": "匯出還款排程",

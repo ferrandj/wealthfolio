@@ -4,7 +4,7 @@ use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Path, Query},
     http::StatusCode,
-    routing::{delete, get, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use wealthfolio_core::assets::{
@@ -85,6 +85,13 @@ async fn list_asset_logos(
     Ok(Json(state.asset_logo_service.list_asset_logos()?))
 }
 
+async fn find_asset_logos(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(request): Json<wealthfolio_core::assets::FindLogosRequest>,
+) -> ApiResult<Json<wealthfolio_core::assets::FindLogosReport>> {
+    Ok(Json(state.asset_logo_finder.find_logos(request).await?))
+}
+
 async fn get_asset_logo(
     Path(id): Path<String>,
     axum::Extension(state): axum::Extension<Arc<AppState>>,
@@ -120,6 +127,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/assets/profile/{id}", put(update_asset_profile))
         .route("/assets/pricing-mode/{id}", put(update_quote_mode))
         .route("/assets/logos", get(list_asset_logos))
+        .route("/assets/logos/find", post(find_asset_logos))
         .route(
             "/assets/logo/{id}",
             get(get_asset_logo)
