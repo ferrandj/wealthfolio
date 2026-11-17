@@ -4,7 +4,8 @@ use super::base::{cp1252_char, W};
 use super::re::{fullmatch, py_match, re};
 
 /// Some banks embed their font without a proper Unicode map: pdfminer then returns the glyph codes of the font.
-/// Seen on real statements: é comes out as Ø, è as Ł, and à, ô, °, € as (cid:224), (cid:244), (cid:176), (cid:128).
+/// Seen on real statements: é comes out as Ø, è as Ł, ê as Œ, and à, ô, °, € as (cid:224), (cid:244), (cid:176),
+/// (cid:128).
 pub fn fix_text(text: &str) -> String {
     let replaced = re(r"\(cid:(\d+)\)").replace_all(text, |c: &regex::Captures| {
         let n: i64 = c[1].parse().unwrap_or(-1);
@@ -21,6 +22,7 @@ pub fn fix_text(text: &str) -> String {
         .map(|c| match c {
             'Ø' => 'é',
             'Ł' => 'è',
+            'Œ' => 'ê',
             other => other,
         })
         .collect()

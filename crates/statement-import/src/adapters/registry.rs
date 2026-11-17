@@ -8,6 +8,7 @@
 use serde_json::{Map, Value};
 
 use super::base::{Adapter, ParsedStatement, SourceDocument};
+use super::boursobank::fees_pdf::BoursoBankFeesPdf;
 use super::boursobank::savings_pdf::BoursoBankSavingsPdf;
 use super::boursobank::statement_pdf::BoursoBankStatementPdf;
 use super::common::{find_iban, find_institution};
@@ -42,6 +43,7 @@ pub fn reader_version() -> &'static str {
 pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoBankStatementPdf,
     &BoursoBankSavingsPdf,
+    &BoursoBankFeesPdf,
     &FortuneoStatementPdf,
     &FortuneoFeesPdf,
     &FortuneoDepositGuaranteePdf,

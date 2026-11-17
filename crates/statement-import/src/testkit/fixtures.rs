@@ -596,3 +596,153 @@ pub fn boursobank_savings_pdf(spec: &SavingsSpec) -> Vec<u8> {
     );
     pdf.bytes()
 }
+
+/// One service of a yearly fee statement: its name as printed (cut in narrow lines), how many times it was used,
+/// its unit price, how many times it was billed, its total.
+#[derive(Clone)]
+pub struct FeeLine {
+    pub name: Vec<String>,
+    pub used: u32,
+    pub unit: Decimal,
+    pub billed: u32,
+    pub total: Decimal,
+}
+
+#[derive(Clone)]
+pub struct BoursoFeesSpec {
+    pub year: i32,
+    pub issued: NaiveDate,
+    pub category: String,
+    pub services: Vec<FeeLine>,
+    /// The total printed; the sum of the services when `None`.
+    pub total: Option<Decimal>,
+}
+
+impl BoursoFeesSpec {
+    pub fn new() -> BoursoFeesSpec {
+        BoursoFeesSpec {
+            year: 2025,
+            issued: ymd(2026, 1, 23),
+            category: "Autres services".into(),
+            services: vec![],
+            total: None,
+        }
+    }
+
+    pub fn printed_total(&self) -> Decimal {
+        self.total
+            .unwrap_or_else(|| self.services.iter().map(|s| s.total).sum())
+    }
+}
+
+/// BoursoBank's "Relevé de frais": the yearly recap of the fees and interest of the account, in its own layout
+/// (the account box on the right, the service names cut in narrow lines under their figures, the accents of
+/// "intérêts" printed through a font with no map for them).
+pub fn boursobank_fees_pdf(spec: &BoursoFeesSpec) -> Vec<u8> {
+    let mut pdf = Pdf::new("");
+    let footer = |pdf: &mut Pdf| {
+        pdf.text(
+            85.0,
+            773.0,
+            "Boursorama - SA au capital de 1 000 000,00 € - RCS Nanterre 000 000 000",
+        );
+        pdf.text(
+            137.0,
+            783.0,
+            "44 rue Traversière - 92772 Boulogne Billancourt Cedex - www.boursobank.com",
+        );
+    };
+    pdf.text(241.0, 59.0, "Relevé de frais");
+    pdf.text(56.0, 112.0, "BOURSOBANK");
+    pdf.text(56.0, 125.0, "44 RUE TRAVERSIERE");
+    pdf.text(56.0, 137.0, "92772 BOULOGNE-BILLANCOURT");
+    pdf.text(56.0, 149.0, "01 46 09 49 49");
+    pdf.text(56.0, 177.0, &holder()[0]);
+    for (i, line) in address().iter().enumerate() {
+        pdf.text(56.0, 190.0 + 12.6 * i as f64, line);
+    }
+    pdf.text(61.0, 257.0, "Compte");
+    pdf.text(301.0, 257.0, "Compte de dØpôt");
+    pdf.text(61.0, 270.0, "Identification du compte");
+    pdf.text(301.0, 270.0, "BOUSFRPPXXX");
+    pdf.text(301.0, 282.0, &format!("IBAN {}", spaced(&iban())));
+    pdf.text(301.0, 294.0, ACCOUNT);
+    pdf.text(301.0, 307.0, BRANCH);
+    pdf.text(61.0, 320.0, "Période");
+    pdf.text(
+        301.0,
+        320.0,
+        &format!("du 01/01/{} au 31/12/{}", spec.year, spec.year),
+    );
+    pdf.text(61.0, 332.0, "Date");
+    pdf.text(301.0, 332.0, &format!("Le {}", fdate(spec.issued)));
+    pdf.text(60.0, 480.0, "Récapitulatif des frais et intérŒts");
+    pdf.text(61.0, 500.0, "Total des frais payés");
+    pdf.right(525.0, 500.0, &fr(spec.printed_total()));
+    pdf.text(
+        61.0,
+        517.0,
+        "(frais afférents aux offres groupées de services et tous",
+    );
+    pdf.text(61.0, 534.0, "autres frais)");
+    pdf.text(61.0, 565.0, "Total des intérŒts payés");
+    pdf.right(525.0, 565.0, "0,00");
+    pdf.text(61.0, 596.0, "Total des intérŒts acquis");
+    pdf.right(525.0, 596.0, "0,00");
+    footer(&mut pdf);
+
+    pdf.add_page();
+    pdf.text(61.0, 126.0, "Décompte des frais prélevés sur le compte");
+    pdf.text(128.0, 146.0, "Service");
+    pdf.text(357.0, 146.0, "Frais (en €)");
+    for (x, t) in [
+        (80.0, "Service"),
+        (165.0, "Nombre de"),
+        (257.0, "Prix unitaire"),
+        (358.0, "Nombre de"),
+        (474.0, "Total"),
+    ] {
+        pdf.text(x, 170.0, t);
+    }
+    pdf.text(167.0, 186.0, "fois que le");
+    pdf.text(356.0, 186.0, "fois que les");
+    pdf.text(159.0, 202.0, "service a été");
+    pdf.text(355.0, 202.0, "frais ont été");
+    pdf.text(181.0, 218.0, "utilisé");
+    pdf.text(367.0, 218.0, "facturés");
+    let mut y = 241.0;
+    if !spec.services.is_empty() {
+        pdf.text(61.0, y, &spec.category);
+        y += 21.0;
+    }
+    for s in &spec.services {
+        pdf.text(61.0, y, &s.name[0]);
+        pdf.text(239.0, y, &s.used.to_string());
+        pdf.right(340.0, y, &fr(s.unit));
+        pdf.text(433.0, y, &s.billed.to_string());
+        pdf.right(530.0, y, &fr(s.total));
+        for part in &s.name[1..] {
+            y += 12.6;
+            pdf.text(61.0, y, part);
+        }
+        y += 20.0;
+    }
+    pdf.text(61.0, y, "Total des");
+    pdf.right(525.0, y, &fr(spec.printed_total()));
+    pdf.text(61.0, y + 17.0, "frais payés");
+    pdf.text(
+        60.0,
+        y + 86.0,
+        "Décompte des frais inclus dans l'offre groupée de services",
+    );
+    pdf.text(
+        60.0,
+        y + 169.0,
+        "Décompte des intérŒts prélevés sur le compte",
+    );
+    pdf.text(61.0, y + 213.0, "Total des intérŒts");
+    pdf.right(525.0, y + 213.0, "0,00");
+    pdf.text(61.0, y + 230.0, "payés");
+    footer(&mut pdf);
+    pdf.bytes()
+}

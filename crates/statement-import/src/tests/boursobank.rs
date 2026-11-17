@@ -240,6 +240,10 @@ fn test_fix_text() {
         fix_text("LibellØ DØbit RŁf (cid:224) 20h 5(cid:176) 10(cid:128)"),
         "Libellé Débit Rèf à 20h 5° 10€"
     );
+    assert_eq!(
+        fix_text("Total des intØrŒts acquis"),
+        "Total des intérêts acquis"
+    );
 }
 
 #[test]
@@ -522,4 +526,143 @@ fn test_a_word_cut_by_the_bank_at_the_end_of_a_line_is_glued_back() {
     };
     assert_eq!(t.counterparty, s("DUPONT JEAN"));
     assert_eq!(t.memo, s("Virement depuis BOURSORAMA Mathieu"));
+}
+
+// ------------------------------------------------------------------------------------- yearly fee statement
+
+const FEES: &str = "boursobank.fees_pdf";
+
+fn insurance_fee() -> FeeLine {
+    FeeLine {
+        name: [
+            "Cotisation à une",
+            "offre d’assurance",
+            "perte ou vol de",
+            "moyens de",
+            "paiement -",
+            "[Exemple",
+            "Protection]",
+        ]
+        .map(String::from)
+        .to_vec(),
+        used: 2,
+        unit: dec("4.99"),
+        billed: 2,
+        total: dec("9.98"),
+    }
+}
+
+#[test]
+fn test_the_yearly_fee_statement_is_read_with_its_services_and_filed_with_the_account() {
+    let spec = BoursoFeesSpec {
+        year: 2023,
+        issued: ymd(2024, 1, 25),
+        services: vec![insurance_fee()],
+        ..BoursoFeesSpec::new()
+    };
+    let data = boursobank_fees_pdf(&spec);
+    let found = identify(&SourceDocument::new("COM-25-01-2024.pdf", data.clone()));
+    assert_eq!(found.decision, "auto");
+    assert_eq!(found.chosen.as_ref().unwrap().adapter.id(), FEES);
+    // neither the statement readers nor Fortuneo's fee reader take it
+    assert!(found
+        .candidates
+        .iter()
+        .filter(|c| c.adapter.id() != FEES)
+        .all(|c| c.score <= 0.4));
+
+    let st = parse_one(FEES, "COM.pdf", data);
+    assert_eq!(
+        (st.document_kind.clone(), st.institution.clone()),
+        (s("fees_summary"), s("BoursoBank"))
+    );
+    assert_eq!(
+        (st.period_start, st.period_end),
+        (Some(ymd(2023, 1, 1)), Some(ymd(2023, 12, 31)))
+    );
+    assert_eq!(st.extra_str("issued_on"), s("2024-01-25"));
+    assert_eq!(st.extra_str("title"), s("Relevé de frais 2023"));
+    assert_eq!(st.extra_str("product"), s("Compte de dépôt"));
+    assert_eq!(st.account_type, s("checking"));
+    // the account is the one its IBAN names
+    assert_eq!(st.iban, Some(iban()));
+    assert_eq!(st.bic, s("BOUSFRPPXXX"));
+    assert_eq!(st.account_number, s(ACCOUNT));
+    assert_eq!(st.account_label, s("Compte de dépôt BoursoBank …5678"));
+    assert_eq!(st.holder_name, s("M DUPONT JEAN"));
+    assert_eq!(st.holder_address, Some(address().join("\n")));
+    assert_eq!(st.extra_str("fees_total"), s("9.98"));
+    assert_eq!(st.extra_str("interest_paid"), s("0.00"));
+    assert_eq!(st.extra_str("interest_earned"), s("0.00"));
+    // the service's name is whole, though printed in narrow lines under its figures
+    assert_eq!(
+        st.extra["services"],
+        json!([{
+            "category": "Autres services",
+            "name": "Cotisation à une offre d’assurance perte ou vol de moyens de paiement - [Exemple Protection]",
+            "used": 2,
+            "unit_price": "4.99",
+            "billed": 2,
+            "total": "9.98"
+        }])
+    );
+    assert!(st.transactions.is_empty());
+    assert_eq!(st.confidence, "high");
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+}
+
+#[test]
+fn test_a_year_without_fees_is_read_and_one_that_does_not_add_up_is_flagged() {
+    let free = parse_one(FEES, "COM.pdf", boursobank_fees_pdf(&BoursoFeesSpec::new()));
+    assert_eq!(free.extra_str("fees_total"), s("0.00"));
+    assert_eq!(free.extra["services"], json!([]));
+    assert_eq!(free.extra_str("title"), s("Relevé de frais 2025"));
+    assert_eq!(free.confidence, "high");
+
+    // two services, one name on a single line
+    let card = FeeLine {
+        name: vec!["Carte de débit".into()],
+        used: 1,
+        unit: dec("2.00"),
+        billed: 1,
+        total: dec("2.00"),
+    };
+    let two = parse_one(
+        FEES,
+        "COM.pdf",
+        boursobank_fees_pdf(&BoursoFeesSpec {
+            services: vec![insurance_fee(), card.clone()],
+            ..BoursoFeesSpec::new()
+        }),
+    );
+    let names: Vec<&str> = two.extra["services"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "Cotisation à une offre d’assurance perte ou vol de moyens de paiement - [Exemple Protection]",
+            "Carte de débit"
+        ]
+    );
+    assert_eq!(two.extra_str("fees_total"), s("11.98"));
+    assert_eq!(two.confidence, "high");
+
+    let wrong = parse_one(
+        FEES,
+        "COM.pdf",
+        boursobank_fees_pdf(&BoursoFeesSpec {
+            services: vec![card],
+            total: Some(dec("5.00")),
+            ..BoursoFeesSpec::new()
+        }),
+    );
+    assert_eq!(wrong.confidence, "low");
+    assert!(wrong
+        .warnings
+        .iter()
+        .any(|w| w.contains("somme des services")));
 }

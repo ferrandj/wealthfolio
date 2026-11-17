@@ -159,7 +159,7 @@ impl Adapter for FortuneoFeesPdf {
         }
 
         read_totals(&mut st, &texts);
-        read_services(&mut st, &rows, &texts)?;
+        read_services(&mut st, &rows, &texts, FORTUNEO_SERVICES)?;
         if let Some(n) = &st.account_number {
             let product = st.extra_str("product").unwrap_or_else(|| "Compte".into());
             st.account_label = Some(format!("{product} Fortuneo …{}", last4(n)));
@@ -169,7 +169,7 @@ impl Adapter for FortuneoFeesPdf {
     }
 }
 
-fn read_totals(st: &mut ParsedStatement, texts: &[String]) {
+pub(crate) fn read_totals(st: &mut ParsedStatement, texts: &[String]) {
     for text in texts {
         let n = norm(text);
         let amounts = findall(r"\d{1,3}(?:[ .]\d{3})*,\d{2}", text);
@@ -195,23 +195,42 @@ fn read_totals(st: &mut ParsedStatement, texts: &[String]) {
     }
 }
 
+/// How a bank lays out its list of services.
+#[derive(Clone, Copy)]
+pub(crate) struct ServiceLayout {
+    /// The name of a service is printed on the row of its figures and goes on, narrow, on the rows below
+    /// (BoursoBank); the total under the list may be cut ("Total des" / "frais payés").
+    pub name_wraps_below: bool,
+    /// A category line starts left of this.
+    pub category_x: f64,
+}
+
+pub(crate) const FORTUNEO_SERVICES: ServiceLayout = ServiceLayout {
+    name_wraps_below: false,
+    category_x: 60.0,
+};
+
 /// Rows of "Décompte des frais prélevés sur le compte": a category line, then one line per service with how many
 /// times it was used, its unit price, how many times it was billed and the total.
-fn read_services(
+pub(crate) fn read_services(
     st: &mut ParsedStatement,
     rows: &[Vec<W>],
     texts: &[String],
+    layout: ServiceLayout,
 ) -> Result<(), String> {
     let start = texts
         .iter()
         .position(|t| norm(t).starts_with("decompte des frais"));
     let from = start.unwrap_or(0);
-    let end = texts
-        .iter()
-        .enumerate()
-        .position(|(i, t)| i > from && norm(t).starts_with("total des frais payes"));
+    let end = texts.iter().enumerate().position(|(i, t)| {
+        i > from
+            && (norm(t).starts_with("total des frais payes")
+                || (layout.name_wraps_below && norm(t).starts_with("total des")))
+    });
     let mut services: Vec<Value> = vec![];
     let mut category: Option<String> = None;
+    // the row the last service's name was read on, to take the rest of a wrapped name
+    let mut last_service_top: Option<f64> = None;
     let (Some(start), Some(end)) = (start, end) else {
         st.set_extra("services", Value::Array(services));
         return Ok(());
@@ -292,22 +311,38 @@ fn read_services(
             m.insert("billed".into(), Value::from(py::py_int(t[2])?));
             m.insert("total".into(), Value::String(amount_str(t[3])));
             services.push(Value::Object(m));
+            last_service_top = Some(p.top);
+        } else if layout.name_wraps_below
+            && p.numbers.is_empty()
+            && !name.is_empty()
+            && last_service_top.is_some_and(|top| p.top - top < 15.0)
+        {
+            // the name goes on under its figures
+            if let Some(Value::Object(m)) = services.last_mut() {
+                let whole = format!(
+                    "{} {name}",
+                    m.get("name").and_then(Value::as_str).unwrap_or_default()
+                );
+                m.insert("name".into(), Value::String(whole));
+            }
+            last_service_top = Some(p.top);
         } else if beside(i) {
             continue;
         } else if !name.is_empty()
             && p.numbers.is_empty()
             && !["service", "frais"].contains(&norm(&name).as_str())
             && row.len() <= 6
-            && row[0].x0 < 60.0
+            && row[0].x0 < layout.category_x
         {
             category = Some(name);
+            last_service_top = None;
         }
     }
     st.set_extra("services", Value::Array(services));
     Ok(())
 }
 
-fn check(st: &mut ParsedStatement) {
+pub(crate) fn check(st: &mut ParsedStatement) {
     let total = st
         .extra
         .get("fees_total")
