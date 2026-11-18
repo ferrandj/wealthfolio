@@ -296,7 +296,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("./account-identity-card", () => ({ AccountIdentityCard: () => null }));
+vi.mock("./account-identity-card", () => ({ AccountIdentityButton: () => null }));
 vi.mock("./account-documents-card", () => ({ AccountDocumentsCard: () => null }));
 
 vi.mock("./account-contribution-limit", () => ({

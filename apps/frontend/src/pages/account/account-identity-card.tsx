@@ -4,7 +4,26 @@ import { maskAddress, maskIban, maskText } from "@/lib/privacy-mask";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AccountIdentity, AccountIdentityInput } from "@/lib/types/statements";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, CardContent, CardHeader, CardTitle, Icons, Input } from "@wealthfolio/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Icons,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@wealthfolio/ui";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@wealthfolio/ui/components/ui/sheet";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { copyText } from "@wealthfolio/ui/lib/clipboard";
 import { useState } from "react";
@@ -30,7 +49,78 @@ export function displayValue(field: IdentityField, value: string): string {
   return field === "iban" ? value.replace(/(.{4})(?=.)/g, "$1 ") : value;
 }
 
-export function AccountIdentityCard({ accountId }: { accountId: string }) {
+/** An "i" in a speech bubble: the account's details. */
+function DetailsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
+  );
+}
+
+/**
+ * The account's details (holder, address, IBAN, bank codes) behind a button of the page header, in a side panel:
+ * they are looked up now and then, and take no room beside the chart.
+ */
+export function AccountIdentityButton({ accountId }: { accountId: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                aria-label={t("settings:identity.open")}
+                data-testid="account-identity-button"
+                onClick={() => setOpen(true)}
+              />
+            }
+          >
+            <DetailsIcon className="size-5" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{t("settings:identity.open")}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{t("settings:identity.title")}</SheetTitle>
+            <SheetDescription className="sr-only">{t("settings:identity.open")}</SheetDescription>
+          </SheetHeader>
+          {open && <AccountIdentityCard accountId={accountId} inPanel />}
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+export function AccountIdentityCard({
+  accountId,
+  inPanel = false,
+}: {
+  accountId: string;
+  /** Shown in the side panel, which already carries the title. */
+  inPanel?: boolean;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -96,9 +186,13 @@ export function AccountIdentityCard({ accountId }: { accountId: string }) {
   };
 
   return (
-    <Card>
+    <Card className={inPanel ? "border-0 bg-transparent shadow-none" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base">{t("settings:identity.title")}</CardTitle>
+        {inPanel ? (
+          <span />
+        ) : (
+          <CardTitle className="text-base">{t("settings:identity.title")}</CardTitle>
+        )}
         <div className="flex gap-1">
           {!editing && filled.length > 0 && (
             <Button

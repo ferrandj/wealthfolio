@@ -2207,6 +2207,7 @@
   },
   "identity": {
     "title": "Account details",
+    "open": "Account details (holder, IBAN…)",
     "empty": "Nothing yet — import a statement and the holder, IBAN and bank details are filled in.",
     "edit": "Edit",
     "save": "Save",

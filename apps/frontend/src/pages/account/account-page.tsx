@@ -106,7 +106,7 @@ import { useBackNavigation } from "@/pages/layouts/mobile-stack/use-mobile-stack
 import { isContributionLimitCurrent } from "@/pages/settings/contribution-limits/contribution-limit-dates";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import { AccountDocumentsCard } from "./account-documents-card";
-import { AccountIdentityCard } from "./account-identity-card";
+import { AccountIdentityButton } from "./account-identity-card";
 import { AccountHeaderDetails } from "./account-header-details";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
@@ -826,85 +826,88 @@ const AccountPage = () => {
       <PageHeader
         onBack={goBack}
         actions={
-          <ActionPalette
-            open={actionPaletteOpen}
-            onOpenChange={setActionPaletteOpen}
-            groups={
-              canEditHoldingsDirectly
-                ? ([
-                    {
-                      title: t("account:action_group_holdings"),
-                      items: [
-                        {
-                          icon: Icons.Pencil,
-                          label: t("account:update_holdings_title"),
-                          onClick: () => {
-                            setEditingSnapshotDate(null);
-                            setIsEditingHoldings(true);
+          <div className="flex items-center gap-1">
+            <AccountIdentityButton accountId={id} />
+            <ActionPalette
+              open={actionPaletteOpen}
+              onOpenChange={setActionPaletteOpen}
+              groups={
+                canEditHoldingsDirectly
+                  ? ([
+                      {
+                        title: t("account:action_group_holdings"),
+                        items: [
+                          {
+                            icon: Icons.Pencil,
+                            label: t("account:update_holdings_title"),
+                            onClick: () => {
+                              setEditingSnapshotDate(null);
+                              setIsEditingHoldings(true);
+                            },
                           },
-                        },
-                        {
-                          icon: Icons.Import,
-                          label: t("account:action_import_csv"),
-                          onClick: () => navigate(`/import?account=${id}`),
-                        },
-                      ],
-                    },
-                    {
-                      title: t("account:action_group_manage"),
-                      items: [
-                        {
-                          icon: Icons.Clock,
-                          label: t("account:action_recalculate_history"),
-                          onClick: () => recalculatePortfolioMutation.mutate(),
-                        },
-                      ],
-                    },
-                  ] satisfies ActionPaletteGroup[])
-                : ([
-                    {
-                      title: isLiabilityAccount
-                        ? t("account:action_group_activity")
-                        : t("account:action_group_transactions"),
-                      items: [
-                        ...(!isLiabilityAccount
-                          ? [
-                              {
-                                icon: Icons.Plus,
-                                label: t("account:action_record_transaction"),
-                                onClick: () => navigate(`/activities/manage?account=${id}`),
-                              },
-                            ]
-                          : []),
-                        ...(isHoldingsMode || isLiabilityAccount
-                          ? []
-                          : [
-                              {
-                                icon: Icons.Holdings,
-                                label: t("account:action_transfer_holdings"),
-                                onClick: () => setShowBulkHoldingsForm(true),
-                              },
-                            ]),
-                        {
-                          icon: Icons.Import,
-                          label: t("account:action_import_csv"),
-                          onClick: () => navigate(`/import?account=${id}`),
-                        },
-                      ],
-                    },
-                    {
-                      title: t("account:action_group_manage"),
-                      items: [
-                        {
-                          icon: Icons.Clock,
-                          label: t("account:action_recalculate_history"),
-                          onClick: () => recalculatePortfolioMutation.mutate(),
-                        },
-                      ],
-                    },
-                  ] satisfies ActionPaletteGroup[])
-            }
-          />
+                          {
+                            icon: Icons.Import,
+                            label: t("account:action_import_csv"),
+                            onClick: () => navigate(`/import?account=${id}`),
+                          },
+                        ],
+                      },
+                      {
+                        title: t("account:action_group_manage"),
+                        items: [
+                          {
+                            icon: Icons.Clock,
+                            label: t("account:action_recalculate_history"),
+                            onClick: () => recalculatePortfolioMutation.mutate(),
+                          },
+                        ],
+                      },
+                    ] satisfies ActionPaletteGroup[])
+                  : ([
+                      {
+                        title: isLiabilityAccount
+                          ? t("account:action_group_activity")
+                          : t("account:action_group_transactions"),
+                        items: [
+                          ...(!isLiabilityAccount
+                            ? [
+                                {
+                                  icon: Icons.Plus,
+                                  label: t("account:action_record_transaction"),
+                                  onClick: () => navigate(`/activities/manage?account=${id}`),
+                                },
+                              ]
+                            : []),
+                          ...(isHoldingsMode || isLiabilityAccount
+                            ? []
+                            : [
+                                {
+                                  icon: Icons.Holdings,
+                                  label: t("account:action_transfer_holdings"),
+                                  onClick: () => setShowBulkHoldingsForm(true),
+                                },
+                              ]),
+                          {
+                            icon: Icons.Import,
+                            label: t("account:action_import_csv"),
+                            onClick: () => navigate(`/import?account=${id}`),
+                          },
+                        ],
+                      },
+                      {
+                        title: t("account:action_group_manage"),
+                        items: [
+                          {
+                            icon: Icons.Clock,
+                            label: t("account:action_recalculate_history"),
+                            onClick: () => recalculatePortfolioMutation.mutate(),
+                          },
+                        ],
+                      },
+                    ] satisfies ActionPaletteGroup[])
+              }
+            />
+          </div>
         }
       >
         <div className="flex items-center gap-2" data-tauri-drag-region="true">
@@ -1067,7 +1070,8 @@ const AccountPage = () => {
         {hasHoldings && !isHoldingsLoading ? (
           <>
             <div className="grid grid-cols-1 gap-4 pt-0 lg:grid-cols-3">
-              <Card className="col-span-1 overflow-hidden lg:col-span-2">
+              {/* as tall as its chart: the cards beside it do not stretch it */}
+              <Card className="col-span-1 self-start overflow-hidden lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-md">
                     <PortfolioUpdateTrigger
@@ -1230,7 +1234,6 @@ const AccountPage = () => {
                   }
                 />
                 {showContributionLimitCard && <AccountContributionLimit accountId={id} />}
-                <AccountIdentityCard accountId={id} />
                 <AccountDocumentsCard accountId={id} />
               </div>
             </div>

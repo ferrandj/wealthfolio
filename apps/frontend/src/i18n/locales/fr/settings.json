@@ -2305,6 +2305,7 @@
   },
   "identity": {
     "title": "Coordonnées du compte",
+    "open": "Coordonnées du compte (titulaire, IBAN…)",
     "empty": "Rien pour l’instant — importez un relevé et le titulaire, l’IBAN et les coordonnées bancaires seront remplis.",
     "edit": "Modifier",
     "save": "Enregistrer",
