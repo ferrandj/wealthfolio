@@ -157,7 +157,9 @@ async fn a_document_reviewed_again_says_the_same() {
     // reading everything again counts the documents as it goes, and says when it is over
     let before = state.statement_service.revalidation_progress();
     assert!(!before.running);
+    let started = Instant::now();
     let result = state.statement_service.revalidate_all().await.unwrap();
+    println!("every document read again: {:?}", started.elapsed());
     let after = state.statement_service.revalidation_progress();
     assert!(!after.running);
     assert_eq!((after.done, after.total), (36, 36));

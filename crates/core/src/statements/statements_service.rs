@@ -312,7 +312,6 @@ fn activity_key(a: &crate::activities::Activity) -> Option<OperationKey> {
 }
 
 /// How an import is run: a first import of a dropped file, or a document read again from its stored original.
-#[derive(Default)]
 struct ImportRun {
     /// The stored document being read again (it is updated instead of a new one being stored).
     reimport_of: Option<StatementDocument>,
@@ -322,6 +321,21 @@ struct ImportRun {
     carry: HashMap<OperationKey, (String, String)>,
     /// The account of the document being read again, for a lone statement that no IBAN or number matches.
     fallback_account: Option<String>,
+    /// Look for transfers between own accounts once the document is in. Off while every document is read again:
+    /// they are looked for once, at the end.
+    link_transfers: bool,
+}
+
+impl Default for ImportRun {
+    fn default() -> Self {
+        Self {
+            reimport_of: None,
+            create_accounts: false,
+            carry: HashMap::new(),
+            fallback_account: None,
+            link_transfers: true,
+        }
+    }
 }
 
 /// The stored statements of an account (other files than `sha256`) whose period intersects `start..=end`.
@@ -982,16 +996,20 @@ impl StatementService {
             }
         }
 
-        // reading a PDF is CPU work: keep it off the async workers
-        let reading = {
-            let (name, bytes, adapter) = (
-                request.file_name.clone(),
-                content.clone(),
-                request.adapter_id.clone(),
-            );
-            tokio::task::spawn_blocking(move || analyze(&name, &bytes, adapter.as_deref()))
-                .await
-                .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?
+        // reading a PDF is CPU work: keep it off the async workers. A stored document read again is read under its
+        // own name and reader, as when it is reviewed: its reading is taken from there when it was just made.
+        let reading = match &run.reimport_of {
+            Some(previous) => (*self.reading_of(previous, Some(content.clone())).await?).clone(),
+            None => {
+                let (name, bytes, adapter) = (
+                    request.file_name.clone(),
+                    content.clone(),
+                    request.adapter_id.clone(),
+                );
+                tokio::task::spawn_blocking(move || analyze(&name, &bytes, adapter.as_deref()))
+                    .await
+                    .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?
+            }
         };
         let analyzed = self.enrich(reading)?;
         if let Some(error) = &analyzed.analysis.error {
@@ -1380,7 +1398,7 @@ impl StatementService {
             }
             apply_reason(&mut document, &reason);
         }
-        if tracked_any {
+        if tracked_any && run.link_transfers {
             if let Err(e) = self.link_own_transfers().await {
                 warn!("could not look for transfers between own accounts: {e}");
             }
@@ -2284,9 +2302,8 @@ impl StatementService {
         &self,
         document: &StatementDocument,
     ) -> Result<HashMap<OperationKey, (String, String)>> {
-        let mut carry = HashMap::new();
         let Some(run) = &document.import_run_id else {
-            return Ok(carry);
+            return Ok(HashMap::new());
         };
         let activities: Vec<_> = self
             .activity_service
@@ -2294,6 +2311,16 @@ impl StatementService {
             .into_iter()
             .filter(|a| a.import_run_id.as_deref() == Some(run.as_str()))
             .collect();
+        self.undo_operations(activities).await
+    }
+
+    /// Take a document's operations away (`activities`, those of its import run), keeping the categories chosen by
+    /// hand to put back.
+    async fn undo_operations(
+        &self,
+        activities: Vec<crate::activities::Activity>,
+    ) -> Result<HashMap<OperationKey, (String, String)>> {
+        let mut carry = HashMap::new();
         if activities.is_empty() {
             return Ok(carry);
         }
@@ -2357,6 +2384,7 @@ impl StatementService {
         document: &StatementDocument,
         content: &[u8],
         carry: HashMap<OperationKey, (String, String)>,
+        link_transfers: bool,
     ) -> Result<StatementDocument> {
         let result = self
             .run_import(
@@ -2373,6 +2401,7 @@ impl StatementService {
                     create_accounts: false,
                     carry,
                     fallback_account: document.account_id.clone(),
+                    link_transfers,
                 },
             )
             .await?;
@@ -2917,7 +2946,7 @@ impl StatementServiceTrait for StatementService {
         // nothing is undone unless the file can still be read
         self.check_readable(&document, content.clone()).await?;
         let carry = self.undo_document(&document).await?;
-        self.reimport(&document, &content, carry).await
+        self.reimport(&document, &content, carry, true).await
     }
 
     async fn invalidate_all(&self) -> Result<u32> {
@@ -3188,7 +3217,10 @@ impl StatementServiceTrait for StatementService {
                 error,
             };
 
-        // 1. only documents that can still be read are touched
+        // 1. only documents that can still be read are touched. They are read a few at once first; what is read is
+        //    kept for the import that follows, so no file is read twice.
+        run.set(|p| p.file_name = None);
+        self.read_ahead(&documents).await;
         let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
         let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
         for document in documents.iter() {
@@ -3207,16 +3239,28 @@ impl StatementServiceTrait for StatementService {
 
         // 2. every document's operations go first, so that the oldest statement of an account carries its
         //    opening balance again when they are read back
+        //    The operations are loaded once for all the documents.
+        let mut by_run: HashMap<String, Vec<crate::activities::Activity>> = HashMap::new();
+        for activity in self.activity_service.get_activities()? {
+            if let Some(run) = activity.import_run_id.clone() {
+                by_run.entry(run).or_default().push(activity);
+            }
+        }
         let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
         for (document, _) in &readable {
-            carries.insert(document.id.clone(), self.undo_document(document).await?);
+            let activities = document
+                .import_run_id
+                .as_ref()
+                .and_then(|run| by_run.remove(run))
+                .unwrap_or_default();
+            carries.insert(document.id.clone(), self.undo_operations(activities).await?);
         }
 
         // 3. oldest first
         for (document, content) in &readable {
             let carry = carries.remove(&document.id).unwrap_or_default();
             run.set(|p| p.file_name = Some(document.file_name.clone()));
-            let read = self.reimport(document, content, carry).await;
+            let read = self.reimport(document, content, carry, false).await;
             run.set(|p| p.done += 1);
             match read {
                 Ok(updated) => {
@@ -3245,6 +3289,11 @@ impl StatementServiceTrait for StatementService {
                     outcomes.insert(saved.id.clone(), outcome_of(&saved, Some(e.to_string())));
                 }
             }
+        }
+
+        // the transfers between own accounts, once every document is in
+        if let Err(e) = self.link_own_transfers().await {
+            warn!("could not look for transfers between own accounts: {e}");
         }
 
         for document in &documents {
