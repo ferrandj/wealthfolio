@@ -5,10 +5,10 @@ use async_trait::async_trait;
 use super::loans::LoanDocumentData;
 use super::statements_coverage::AccountCoverage;
 use super::statements_model::{
-    AccountIdentity, AccountIdentityInput, CategoryAssignment, DocumentReview, DocumentStorage,
-    NewStatementDocument, OutdatedDocuments, RevalidationProgress, RevalidationResult,
-    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
-    StatementImportResult,
+    AccountIdentity, AccountIdentityInput, AutoReviewResult, CategoryAssignment, DocumentReview,
+    DocumentStorage, NewStatementDocument, OutdatedDocuments, RevalidationProgress,
+    RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
+    StatementImportRequest, StatementImportResult,
 };
 use crate::errors::Result;
 
@@ -109,6 +109,11 @@ pub trait StatementServiceTrait: Send + Sync {
         id: &str,
         decisions: Vec<ReviewDecision>,
     ) -> Result<StatementDocument>;
+    /// Validate, in the review order, every waiting document that raises no alert: no account missing, no
+    /// earlier statement of its account left waiting, its days and balance following the previous statement, no
+    /// reader warning, no balance gap and no operation in doubt (a guessed category, no category, an unknown own
+    /// account, a loan instalment to confirm). The others stay waiting, listed with what stopped them.
+    async fn auto_review(&self) -> Result<AutoReviewResult>;
     /// Undo what one document brought in and read its stored original again.
     async fn revalidate_document(&self, id: &str) -> Result<StatementDocument>;
     /// Every validated statement goes back to waiting for review. Nothing is changed in the operations: each one

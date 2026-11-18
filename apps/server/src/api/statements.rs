@@ -11,8 +11,8 @@ use axum::{
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use wealthfolio_core::statements::{
-    supported_documents, AccountCoverage, AccountIdentity, AccountIdentityInput, DocumentReview,
-    RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
+    supported_documents, AccountCoverage, AccountIdentity, AccountIdentityInput, AutoReviewResult,
+    DocumentReview, RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
     StatementImportRequest, StatementImportResult, SupportedInstitution, MAX_DOCUMENT_BYTES,
 };
 
@@ -182,6 +182,14 @@ async fn revalidate_all(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<RevalidationResult>> {
     let result = state.statement_service.revalidate_all().await?;
+    state.health_service.clear_cache().await;
+    Ok(Json(result))
+}
+
+async fn auto_review(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<AutoReviewResult>> {
+    let result = state.statement_service.auto_review().await?;
     state.health_service.clear_cache().await;
     Ok(Json(result))
 }
@@ -497,6 +505,7 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
             get(get_document_content),
         )
         .route("/statements/review-queue", get(review_queue))
+        .route("/statements/auto-review", post(auto_review))
         .route("/statements/revalidate", post(revalidate_all))
         .route(
             "/statements/revalidate/progress",

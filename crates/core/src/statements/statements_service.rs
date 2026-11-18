@@ -19,12 +19,12 @@ use wealthfolio_statement_import::{
 };
 
 use super::statements_model::{
-    AccountIdentity, AccountIdentityInput, AnalyzedStatement, CategoryAssignment, DocumentReview,
-    DocumentStorage, ImportMode, MatchedAccount, NewStatementDocument, RevalidationOutcome,
-    RevalidationProgress, RevalidationResult, ReviewDecision, ReviewedOperation, StatementAnalysis,
-    StatementDocument, StatementImportOutcome, StatementImportRequest, StatementImportResult,
-    StatementOverride, StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED,
-    DOCUMENT_STATUS_VALIDATED,
+    AccountIdentity, AccountIdentityInput, AnalyzedStatement, AutoReviewResult, AutoReviewSkip,
+    CategoryAssignment, DocumentReview, DocumentStorage, ImportMode, MatchedAccount,
+    NewStatementDocument, RevalidationOutcome, RevalidationProgress, RevalidationResult,
+    ReviewDecision, ReviewedOperation, StatementAnalysis, StatementDocument,
+    StatementImportOutcome, StatementImportRequest, StatementImportResult, StatementOverride,
+    StatementReview, DOCUMENT_STATUS_PENDING, DOCUMENT_STATUS_STORED, DOCUMENT_STATUS_VALIDATED,
 };
 use super::statements_review::{
     apply_reason, assess, balance_gap, is_own_transfer_category, logical_order, operations_sum,
@@ -591,6 +591,95 @@ pub struct StatementService {
 }
 
 impl StatementService {
+    /// Apply a review the person (or the automatic review) confirmed: the decisions, then every other category
+    /// as shown; the document becomes validated.
+    async fn apply_review(
+        &self,
+        review: DocumentReview,
+        decisions: Vec<ReviewDecision>,
+    ) -> Result<StatementDocument> {
+        let chosen: HashMap<&str, &ReviewDecision> = decisions
+            .iter()
+            .map(|d| (d.activity_id.as_str(), d))
+            .collect();
+        let mut items = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        // what was chosen for a payee in this document applies to its other operations without a new choice
+        let note_of: HashMap<String, Option<String>> = if decisions.iter().any(|d| d.remember) {
+            self.activity_service
+                .get_activities()?
+                .into_iter()
+                .map(|a| (a.id, a.notes))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+        let mut same_payee: HashMap<String, &ReviewDecision> = HashMap::new();
+        for d in decisions.iter().filter(|d| d.remember) {
+            if let Some(key) = note_of
+                .get(&d.activity_id)
+                .and_then(|n| n.as_deref())
+                .and_then(equivalence_key)
+            {
+                same_payee.insert(key, d);
+            }
+        }
+        for statement in &review.statements {
+            for op in &statement.operations {
+                let Some(activity_id) = &op.activity_id else {
+                    continue;
+                };
+                if !seen.insert(activity_id.clone()) {
+                    continue;
+                }
+                let equivalent = note_of
+                    .get(activity_id)
+                    .and_then(|n| n.as_deref())
+                    .and_then(equivalence_key)
+                    .and_then(|key| same_payee.get(&key).copied());
+                let (taxonomy, category) =
+                    match chosen.get(activity_id.as_str()).copied().or(equivalent) {
+                        Some(d) => (d.taxonomy_id.clone(), d.category_id.clone()),
+                        None => match (
+                            op.taxonomy_id.clone().or(op.suggested_taxonomy_id.clone()),
+                            op.category_id.clone().or(op.suggested_category_id.clone()),
+                        ) {
+                            (Some(t), Some(c)) => (t, c),
+                            _ => continue,
+                        },
+                    };
+                items.push(CategoryAssignment {
+                    activity_id: activity_id.clone(),
+                    taxonomy_id: taxonomy,
+                    category_id: category,
+                    source: "manual".to_string(),
+                });
+            }
+        }
+        // a decision on an activity that is not in the document is refused rather than silently applied
+        for d in &decisions {
+            if !seen.contains(&d.activity_id) {
+                return Err(invalid(
+                    "A decision refers to an operation that is not in this document",
+                ));
+            }
+        }
+        let remembered = self.equivalent_assignments(&decisions, &seen).await?;
+        if !items.is_empty() {
+            let assigned = items.clone();
+            self.category_assigner.assign(items).await?;
+            self.mark_own_transfers(&assigned).await?;
+        }
+        if !remembered.is_empty() {
+            let assigned = remembered.clone();
+            self.category_assigner.assign(remembered).await?;
+            self.mark_own_transfers(&assigned).await?;
+        }
+        let mut document = review.document;
+        apply_reason(&mut document, &ReviewReason::default());
+        self.repository.update_document(document).await
+    }
+
     pub fn new(
         repository: Arc<dyn StatementRepositoryTrait>,
         account_service: Arc<dyn AccountServiceTrait>,
@@ -2856,86 +2945,99 @@ impl StatementServiceTrait for StatementService {
                 .ok_or_else(|| invalid("Document not found"));
         }
         let review = self.review_document(id).await?;
-        let chosen: HashMap<&str, &ReviewDecision> = decisions
-            .iter()
-            .map(|d| (d.activity_id.as_str(), d))
-            .collect();
-        let mut items = Vec::new();
-        let mut seen: HashSet<String> = HashSet::new();
-        // what was chosen for a payee in this document applies to its other operations without a new choice
-        let note_of: HashMap<String, Option<String>> = if decisions.iter().any(|d| d.remember) {
-            self.activity_service
-                .get_activities()?
-                .into_iter()
-                .map(|a| (a.id, a.notes))
-                .collect()
-        } else {
-            HashMap::new()
-        };
-        let mut same_payee: HashMap<String, &ReviewDecision> = HashMap::new();
-        for d in decisions.iter().filter(|d| d.remember) {
-            if let Some(key) = note_of
-                .get(&d.activity_id)
-                .and_then(|n| n.as_deref())
-                .and_then(equivalence_key)
-            {
-                same_payee.insert(key, d);
+        self.apply_review(review, decisions).await
+    }
+
+    async fn auto_review(&self) -> Result<AutoReviewResult> {
+        let queue = self.review_queue()?;
+        let mut all = self.repository.list_documents()?;
+        let mut context = ReviewContext::default();
+        let payments = self.loan_payments_by_activity()?;
+        // an account whose earlier statement stays waiting: its later ones wait too, the chain is not checked
+        let mut stopped: HashSet<String> = HashSet::new();
+        let mut result = AutoReviewResult::default();
+        for document in queue {
+            let mut reasons: Vec<&str> = Vec::new();
+            let loan = document
+                .document_kind
+                .as_deref()
+                .is_some_and(super::is_loan_kind);
+            if loan {
+                reasons.push("loan");
             }
-        }
-        for statement in &review.statements {
-            for op in &statement.operations {
-                let Some(activity_id) = &op.activity_id else {
-                    continue;
-                };
-                if !seen.insert(activity_id.clone()) {
-                    continue;
+            if document.account_id.is_none() {
+                reasons.push("no_account");
+            }
+            let mut statements = Vec::new();
+            let mut warnings = Vec::new();
+            if reasons.is_empty() {
+                match self.review_statements(&document, &mut context).await {
+                    Ok((s, w)) => (statements, warnings) = (s, w),
+                    Err(_) => reasons.push("unreadable"),
                 }
-                let equivalent = note_of
-                    .get(activity_id)
-                    .and_then(|n| n.as_deref())
-                    .and_then(equivalence_key)
-                    .and_then(|key| same_payee.get(&key).copied());
-                let (taxonomy, category) =
-                    match chosen.get(activity_id.as_str()).copied().or(equivalent) {
-                        Some(d) => (d.taxonomy_id.clone(), d.category_id.clone()),
-                        None => match (
-                            op.taxonomy_id.clone().or(op.suggested_taxonomy_id.clone()),
-                            op.category_id.clone().or(op.suggested_category_id.clone()),
-                        ) {
-                            (Some(t), Some(c)) => (t, c),
-                            _ => continue,
-                        },
-                    };
-                items.push(CategoryAssignment {
-                    activity_id: activity_id.clone(),
-                    taxonomy_id: taxonomy,
-                    category_id: category,
-                    source: "manual".to_string(),
+            }
+            // a document with operations (a statement, whatever its reader) follows the earlier ones of its account
+            let statement = !statements.is_empty()
+                || matches!(document.document_kind.as_deref(), None | Some("statement"));
+            if let Some(account) = &document.account_id {
+                if statement && stopped.contains(account) {
+                    reasons.push("previous_pending");
+                }
+            }
+            if reasons.is_empty() {
+                Self::annotate_loan_payments(&mut statements, &payments);
+                if !warnings.is_empty() || !document.warnings.is_empty() {
+                    reasons.push("warnings");
+                }
+                if statements.iter().any(|s| s.balance_gap.is_some()) {
+                    reasons.push("balance_gap");
+                }
+                let doubtful = statements.iter().flat_map(|s| &s.operations).any(|op| {
+                    let categorized = op.taxonomy_id.is_some() && op.category_id.is_some()
+                        || op.suggested_taxonomy_id.is_some() && op.suggested_category_id.is_some();
+                    op.activity_id.is_some()
+                        && (op.needs_review
+                            || op.other_account_unknown
+                            || !categorized
+                            || matches!(op.loan_state.as_deref(), Some("proposed" | "to_attach")))
                 });
+                if doubtful {
+                    reasons.push("doubts");
+                }
+                if let Some(c) = super::statements_review::continuity(&document, &all) {
+                    if matches!(c.state.as_str(), "gap" | "overlap")
+                        || c.balance_follows == Some(false)
+                    {
+                        reasons.push("chain");
+                    }
+                }
             }
-        }
-        // a decision on an activity that is not in the document is refused rather than silently applied
-        for d in &decisions {
-            if !seen.contains(&d.activity_id) {
-                return Err(invalid(
-                    "A decision refers to an operation that is not in this document",
-                ));
+            if !reasons.is_empty() {
+                if let (true, Some(account)) = (statement, &document.account_id) {
+                    stopped.insert(account.clone());
+                }
+                result.skipped.push(AutoReviewSkip {
+                    document_id: document.id.clone(),
+                    file_name: document.file_name.clone(),
+                    reasons: reasons.into_iter().map(String::from).collect(),
+                });
+                continue;
             }
+            let review = DocumentReview {
+                continuity: None,
+                document,
+                statements,
+                earlier_pending: Vec::new(),
+                warnings,
+                loan: None,
+            };
+            let validated = self.apply_review(review, Vec::new()).await?;
+            if let Some(slot) = all.iter_mut().find(|d| d.id == validated.id) {
+                *slot = validated;
+            }
+            result.validated += 1;
         }
-        let remembered = self.equivalent_assignments(&decisions, &seen).await?;
-        if !items.is_empty() {
-            let assigned = items.clone();
-            self.category_assigner.assign(items).await?;
-            self.mark_own_transfers(&assigned).await?;
-        }
-        if !remembered.is_empty() {
-            let assigned = remembered.clone();
-            self.category_assigner.assign(remembered).await?;
-            self.mark_own_transfers(&assigned).await?;
-        }
-        let mut document = review.document;
-        apply_reason(&mut document, &ReviewReason::default());
-        self.repository.update_document(document).await
+        Ok(result)
     }
 
     async fn revalidate_document(&self, id: &str) -> Result<StatementDocument> {
@@ -3153,8 +3255,11 @@ impl StatementServiceTrait for StatementService {
                 .as_deref()
                 .map(super::is_loan_kind)
                 .unwrap_or(false);
-            let statement = matches!(document.document_kind.as_deref(), None | Some("statement"))
-                && document.import_run_id.is_some();
+            // a generic export (OFX, QIF, CSV) is a statement too: its operations were validated the same way
+            let statement = matches!(
+                document.document_kind.as_deref(),
+                None | Some("statement" | "ofx" | "qif" | "csv")
+            ) && document.import_run_id.is_some();
             if document.status != DOCUMENT_STATUS_VALIDATED || !(statement || loan_paper) {
                 continue;
             }

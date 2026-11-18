@@ -17,6 +17,7 @@ import type {
   DocumentStorage,
   RevalidationProgress,
   RevalidationResult,
+  AutoReviewResult,
   ReviewDecision,
   StatementAnalysis,
   StatementDocument,
@@ -152,6 +153,11 @@ export const purgeStatementDocuments = async (
   dryRun: boolean,
 ): Promise<PurgeReport> => {
   return invoke<PurgeReport>("purge_statement_documents", { ids, dryRun });
+};
+
+/** Validate every waiting document that raises no alert; the others stay waiting with their reasons. */
+export const autoReviewStatementDocuments = async (): Promise<AutoReviewResult> => {
+  return invoke<AutoReviewResult>("auto_review_statement_documents");
 };
 
 export const invalidateAllStatementDocuments = async (): Promise<number> => {

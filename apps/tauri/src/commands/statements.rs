@@ -4,9 +4,9 @@ use base64::Engine;
 use serde::Serialize;
 use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::statements::{
-    supported_documents, AccountIdentity, AccountIdentityInput, DocumentReview, RevalidationResult,
-    ReviewDecision, StatementAnalysis, StatementDocument, StatementImportRequest,
-    StatementImportResult, SupportedInstitution,
+    supported_documents, AccountIdentity, AccountIdentityInput, AutoReviewResult, DocumentReview,
+    RevalidationResult, ReviewDecision, StatementAnalysis, StatementDocument,
+    StatementImportRequest, StatementImportResult, SupportedInstitution,
 };
 
 use crate::profiles::ProfileAccess;
@@ -193,6 +193,20 @@ pub async fn revalidate_all_statement_documents(
     let result = context
         .statement_service()
         .revalidate_all()
+        .await
+        .map_err(|e| e.to_string())?;
+    context.health_service().clear_cache().await;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn auto_review_statement_documents(
+    state: ProfileAccess,
+) -> Result<AutoReviewResult, String> {
+    let context = state.context()?;
+    let result = context
+        .statement_service()
+        .auto_review()
         .await
         .map_err(|e| e.to_string())?;
     context.health_service().clear_cache().await;

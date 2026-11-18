@@ -238,6 +238,18 @@ service_tool!(
 );
 
 service_tool!(
+    AutoReviewStatementDocuments, "auto_review_statement_documents", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Validate every waiting document that raises no alert (the app's 'Revue automatique'): an account is known, the earlier statements of the account are validated, days and balance follow the previous statement, no reader warning, no balance gap, every operation has a confirmed category. Returns how many were validated and, for each document left waiting, why (no_account, loan, unreadable, warnings, doubts, balance_gap, chain, previous_pending).",
+    schema = no_args(),
+    |env, _args| {
+        let result = need(env.statement_service(), "Statements")?.auto_review().await.map_err(fail)?;
+        env.health_service().clear_cache().await;
+        reply(&result)
+    }
+);
+
+service_tool!(
     InvalidateAllStatementDocuments, "invalidate_all_statement_documents", Write, additive = false,
     scopes = [DocumentsWrite],
     description = "Put every validated document back in the review queue (the app's 'Tout invalider'). Returns how many were reset. Nothing is deleted.",

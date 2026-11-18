@@ -470,6 +470,7 @@ pub fn run() {
             commands::statements::get_statement_revalidation_progress,
             commands::statements::get_statement_document_storage,
             commands::statements::invalidate_all_statement_documents,
+            commands::statements::auto_review_statement_documents,
             commands::statements::invalidate_statement_documents,
             commands::statements::get_statement_document_sources,
             commands::statements::set_statement_document_source,

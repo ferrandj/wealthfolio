@@ -408,6 +408,24 @@ pub struct RevalidationOutcome {
     pub error: Option<String>,
 }
 
+/// A document the automatic review left for the person, with what stopped it.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoReviewSkip {
+    pub document_id: String,
+    pub file_name: String,
+    /// no_account | loan | unreadable | warnings | doubts | balance_gap | chain | previous_pending
+    pub reasons: Vec<String>,
+}
+
+/// What the automatic review did: the documents it validated, and those it left with their alerts.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoReviewResult {
+    pub validated: u32,
+    pub skipped: Vec<AutoReviewSkip>,
+}
+
 /// What removing a set of documents takes away (or would take away, for a dry run).
 #[derive(Debug, Clone, Serialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]

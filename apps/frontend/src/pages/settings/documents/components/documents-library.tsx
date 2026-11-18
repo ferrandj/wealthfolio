@@ -1,6 +1,7 @@
 import {
   deleteStatementDocument,
   getStatementOutdated,
+  autoReviewStatementDocuments,
   invalidateAllStatementDocuments,
   getStatementLoans,
   linkStatementDocument,
@@ -173,6 +174,38 @@ export function DocumentsLibrary() {
           total: progress.total,
         })
       : t("settings:documents.revalidate_all_running");
+
+  // validates every waiting document that raises no alert; what stopped the others is summed up
+  const autoReview = useMutation({
+    mutationFn: autoReviewStatementDocuments,
+    onSuccess: async (result) => {
+      await Promise.all([
+        refreshOperations(),
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_REVIEW_QUEUE] }),
+      ]);
+      const counts = new Map<string, number>();
+      for (const skip of result.skipped) {
+        for (const reason of skip.reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+      }
+      const why = [...counts.entries()]
+        .map(([reason, n]) => `${t(`settings:documents.auto_review_reason_${reason}`)} (${n})`)
+        .join(", ");
+      const summary = t("settings:documents.auto_review_summary", {
+        validated: result.validated,
+        skipped: result.skipped.length,
+      });
+      toast({
+        title: t("settings:documents.auto_review_done"),
+        description: why ? `${summary} — ${why}` : summary,
+      });
+    },
+    onError: (e) =>
+      toast({
+        title: t("settings:documents.error"),
+        description: String(e),
+        variant: "destructive",
+      }),
+  });
 
   const invalidateAll = useMutation({
     mutationFn: invalidateAllStatementDocuments,
@@ -550,6 +583,19 @@ export function DocumentsLibrary() {
           {pending.length === 0
             ? t("settings:documents.review_none")
             : t("settings:documents.review_start", { count: pending.length })}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title={t("settings:documents.auto_review_hint")}
+          disabled={pending.length === 0 || autoReview.isPending || rereading}
+          onClick={() => autoReview.mutate()}
+        >
+          <Icons.Wand2 className={`me-1 size-4 ${autoReview.isPending ? "animate-pulse" : ""}`} />
+          {autoReview.isPending
+            ? t("settings:documents.auto_review_running")
+            : t("settings:documents.auto_review")}
         </Button>
         <Button
           type="button"

@@ -303,6 +303,7 @@ export {
   getStatementRevalidationProgress,
   getStatementDocumentStorage,
   invalidateAllStatementDocuments,
+  autoReviewStatementDocuments,
   invalidateStatementDocuments,
   purgeStatementDocuments,
   getStatementDocumentSources,

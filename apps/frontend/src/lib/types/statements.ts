@@ -378,6 +378,19 @@ export interface RevalidationResult {
   outcomes: RevalidationOutcome[];
 }
 
+/** A document the automatic review left waiting, with what stopped it. */
+export interface AutoReviewSkip {
+  documentId: string;
+  fileName: string;
+  /** no_account | loan | unreadable | warnings | doubts | balance_gap | chain | previous_pending */
+  reasons: string[];
+}
+
+export interface AutoReviewResult {
+  validated: number;
+  skipped: AutoReviewSkip[];
+}
+
 export interface MissingMonth {
   month: string;
   normal: boolean;

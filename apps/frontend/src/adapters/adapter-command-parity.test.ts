@@ -995,6 +995,12 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
   });
 
+  it("validates every waiting document without alert", async () => {
+    const mock = stubFetch({ validated: 0, skipped: [] });
+    await invoke("auto_review_statement_documents");
+    expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/auto-review", method: "POST" });
+  });
+
   it("sends every validated statement back to review", async () => {
     const mock = stubFetch(3);
     await invoke("invalidate_all_statement_documents");
