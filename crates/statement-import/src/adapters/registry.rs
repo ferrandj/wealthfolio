@@ -9,6 +9,11 @@ use serde_json::{Map, Value};
 
 use super::base::{Adapter, ParsedStatement, SourceDocument};
 use super::boursobank::fees_pdf::BoursoBankFeesPdf;
+use super::boursobank::papers_pdf::{
+    BoursoBankAccountCertificatePdf, BoursoBankCardRequestPdf, BoursoBankHomeSavingsSituationPdf,
+    BoursoBankLoanInformationPdf, BoursoBankMobilityMandatePdf, BoursoBankResourcesCertificatePdf,
+    BoursoBankRibPdf, BoursoBankTaxFormPdf,
+};
 use super::boursobank::savings_pdf::BoursoBankSavingsPdf;
 use super::boursobank::statement_pdf::BoursoBankStatementPdf;
 use super::common::{find_iban, find_institution};
@@ -44,6 +49,14 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoBankStatementPdf,
     &BoursoBankSavingsPdf,
     &BoursoBankFeesPdf,
+    &BoursoBankRibPdf,
+    &BoursoBankAccountCertificatePdf,
+    &BoursoBankResourcesCertificatePdf,
+    &BoursoBankHomeSavingsSituationPdf,
+    &BoursoBankMobilityMandatePdf,
+    &BoursoBankLoanInformationPdf,
+    &BoursoBankCardRequestPdf,
+    &BoursoBankTaxFormPdf,
     &FortuneoStatementPdf,
     &FortuneoFeesPdf,
     &FortuneoDepositGuaranteePdf,

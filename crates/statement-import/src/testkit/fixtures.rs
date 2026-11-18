@@ -155,7 +155,7 @@ pub fn fdate(value: NaiveDate) -> String {
     value.format("%d/%m/%Y").to_string()
 }
 
-fn spaced(iban: &str) -> String {
+pub fn spaced(iban: &str) -> String {
     iban.as_bytes()
         .chunks(4)
         .map(|c| std::str::from_utf8(c).unwrap())
