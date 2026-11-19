@@ -72,7 +72,7 @@ fn date_after(text: &str, before: &str) -> Option<chrono::NaiveDate> {
     search(&format!(r"(?i){before}\s*{DOTTED_DATE}"), text).and_then(|m| dotted(&m, 1))
 }
 
-/// "M JEREMIE FERRAND" printed alone on a line above an address: the holder, last name first.
+/// "M HELENE DUPONT" printed alone on a line above an address: the holder, last name first.
 fn printed_holder(text: &str) -> Option<String> {
     text.lines()
         .map(py::strip)
@@ -202,7 +202,7 @@ impl Adapter for HelloBankAccountAgreementPdf {
                 st.rib_key = Some(part(25, 27));
             }
         }
-        // "Nom : FERRAND" / "Prénom : JEREMIE", else the name printed above the address
+        // "Nom : DUPONT" / "Prénom : HELENE", else the name printed above the address
         let field = |name: &str| {
             search(&format!(r"(?m)^\s*{name}\s*:\s+(\S[^\n]*?)\s*$"), &text)
                 .map(|m| py::strip(&m[1]).to_string())

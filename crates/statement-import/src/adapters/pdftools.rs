@@ -23,9 +23,20 @@ pub fn fix_text(text: &str) -> String {
             'Ø' => 'é',
             'Ł' => 'è',
             'Œ' => 'ê',
+            '\u{e041}'..='\u{e100}' => compart_char(c).unwrap_or(c),
             other => other,
         })
         .collect()
+}
+
+/// EBCDIC (code page 1140) from 0x40 to 0xFF.
+const EBCDIC_1140: &str = " \u{a0}\u{e2}\u{e4}\u{e0}\u{e1}\u{e3}\u{e5}\u{e7}\u{f1}\u{a2}.<(+|&\u{e9}\u{ea}\u{eb}\u{e8}\u{ed}\u{ee}\u{ef}\u{ec}\u{df}!$*);\u{ac}-/\u{c2}\u{c4}\u{c0}\u{c1}\u{c3}\u{c5}\u{c7}\u{d1}\u{a6},%_>?\u{f8}\u{c9}\u{ca}\u{cb}\u{c8}\u{cd}\u{ce}\u{cf}\u{cc}`:#@'=\u{22}\u{d8}abcdefghi\u{ab}\u{bb}\u{f0}\u{fd}\u{fe}\u{b1}\u{b0}jklmnopqr\u{aa}\u{ba}\u{e6}\u{b8}\u{c6}\u{20ac}\u{b5}~stuvwxyz\u{a1}\u{bf}\u{d0}\u{dd}\u{de}\u{ae}^\u{a3}\u{a5}\u{b7}\u{a9}\u{a7}\u{b6}\u{bc}\u{bd}\u{be}[]\u{af}\u{a8}\u{b4}\u{d7}{ABCDEFGHI\u{ad}\u{f4}\u{f6}\u{f2}\u{f3}\u{f5}}JKLMNOPQR\u{b9}\u{fb}\u{fc}\u{f9}\u{fa}\u{ff}\u{5c}\u{f7}STUVWXYZ\u{b2}\u{d4}\u{d6}\u{d2}\u{d3}\u{d5}0123456789\u{b3}\u{db}\u{dc}\u{d9}\u{da}\u{9f}";
+
+/// The papers printed by Compart (Oradéa Vie, Sogecap) draw their text with bitmap fonts whose characters are mapped
+/// to the private use area: U+E000 plus one more than the character's EBCDIC code.
+fn compart_char(c: char) -> Option<char> {
+    let code = (c as u32).checked_sub(0xE001)?;
+    EBCDIC_1140.chars().nth(code.checked_sub(0x40)? as usize)
 }
 
 fn pdf_error(e: crate::pdf::Error) -> String {

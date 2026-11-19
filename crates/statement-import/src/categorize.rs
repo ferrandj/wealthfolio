@@ -623,7 +623,7 @@ pub fn suggest(input: &CategoryInput) -> CategorySuggestion {
         );
     }
 
-    // an explicit label wins over the "it is a transfer to myself" reading ("1FERRAN — Remboursement one plus")
+    // an explicit label wins over the "it is a transfer to myself" reading ("1DUPON — Remboursement one plus")
     let rules: &[Rule] = if outgoing {
         &EXPENSE_RULES
     } else {
@@ -770,7 +770,7 @@ mod tests {
             memo: None,
             kind: Some(kind),
             amount,
-            holder_name: Some("M FERRAND JEREMIE"),
+            holder_name: Some("M DUPONT HELENE"),
             account_type: None,
         }
     }
@@ -870,8 +870,8 @@ mod tests {
     #[test]
     fn a_transfer_to_oneself_is_not_called_an_expense_with_confidence() {
         let s = cat(
-            "FERRAND JEREMIE — Virement de Monsieur",
-            Some("FERRAND JEREMIE"),
+            "DUPONT HELENE — Virement de Monsieur",
+            Some("DUPONT HELENE"),
             "instant_transfer",
             -800.0,
         );
@@ -882,8 +882,8 @@ mod tests {
         );
         assert!(s.reason.unwrap().contains("vous-même"));
         let incoming = cat(
-            "MR FERRAND JEREMIE",
-            Some("MR FERRAND JEREMIE"),
+            "MR DUPONT HELENE",
+            Some("MR DUPONT HELENE"),
             "transfer",
             3000.0,
         );
@@ -895,7 +895,7 @@ mod tests {
 
     #[test]
     fn a_name_that_only_looks_like_the_holders_is_still_looked_at() {
-        let s = cat("1FERRAN", Some("1FERRAN"), "transfer", 120.0);
+        let s = cat("1DUPON", Some("1DUPON"), "transfer", 120.0);
         assert_eq!(s.category_id, "cat_income_transfers_own");
         assert_eq!(s.confidence, LOW);
         assert!(s.needs_review());
@@ -904,8 +904,8 @@ mod tests {
     #[test]
     fn a_relative_with_the_same_surname_is_not_taken_for_oneself() {
         let s = cat(
-            "MLE FERRAND AMANDINE — CADEAU NOA L",
-            Some("MLE FERRAND AMANDINE"),
+            "MLE DUPONT MARIE — CADEAU NOA L",
+            Some("MLE DUPONT MARIE"),
             "transfer",
             63.2,
         );
@@ -922,8 +922,8 @@ mod tests {
     #[test]
     fn a_reimbursement_label_wins_over_a_truncated_own_name() {
         let s = cat(
-            "1FERRAN — Remboursement one plus",
-            Some("1FERRAN"),
+            "1DUPON — Remboursement one plus",
+            Some("1DUPON"),
             "transfer",
             380.53,
         );
@@ -988,8 +988,8 @@ mod tests {
         assert_eq!(funding.category_id, "cat_income_transfers_own");
         assert!(!funding.needs_review());
         let check = cat(
-            "VIREMENT CREATION COMPTE — M FERRAND J",
-            Some("M FERRAND J"),
+            "VIREMENT CREATION COMPTE — M DUPONT J",
+            Some("M DUPONT J"),
             "transfer",
             -10.0,
         );

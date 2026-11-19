@@ -62,7 +62,7 @@ const op = (patch: Partial<ReviewedOperation>): ReviewedOperation => ({
   row: 0,
   activityId: "a1",
   date: "2020-11-10",
-  label: "MR FERRAND JEREMIE",
+  label: "MR DUPONT HELENE",
   amount: "3000.00",
   currency: "EUR",
   confidence: "low",

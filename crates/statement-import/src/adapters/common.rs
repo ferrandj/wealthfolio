@@ -541,10 +541,7 @@ mod holders_tests {
 
     #[test]
     fn a_lone_holder_stays_one() {
-        assert_eq!(
-            split_holders("M FERRAND JEREMIE"),
-            vec!["M FERRAND JEREMIE"]
-        );
+        assert_eq!(split_holders("M DUPONT HELENE"), vec!["M DUPONT HELENE"]);
         assert!(split_holders("  ").is_empty());
     }
 

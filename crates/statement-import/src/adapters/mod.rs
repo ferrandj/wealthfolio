@@ -8,6 +8,7 @@ pub mod fortuneo;
 pub mod generic;
 pub mod hellobank;
 pub mod lines;
+pub mod oradea;
 pub mod pdftools;
 pub mod re;
 pub mod registry;

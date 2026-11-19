@@ -68,6 +68,6 @@ describe("printedNameOwner", () => {
       id: "i1",
       contactId: "me",
     });
-    expect(printedNameOwner(contacts, "M FERRAND JEREMIE")).toBeNull();
+    expect(printedNameOwner(contacts, "M DUPONT HELENE")).toBeNull();
   });
 });

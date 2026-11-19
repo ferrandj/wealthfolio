@@ -77,7 +77,7 @@ export function holderRows(names: string[], contacts: ContactSummary[]): HolderR
   return rows;
 }
 
-/** "M FERRAND JEREMIE et MME CHACON KARLA": the name of a joint account is the names of its holders. */
+/** "M DUPONT HELENE et MME MARTIN CLAIRE": the name of a joint account is the names of its holders. */
 export function jointName(names: string[]): string {
   const kept = names.map((n) => n.trim()).filter(Boolean);
   if (kept.length <= 1) return kept[0] ?? "";

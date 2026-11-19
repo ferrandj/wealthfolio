@@ -196,7 +196,7 @@ export interface PrintedName {
 }
 
 /**
- * What a bank prints for a person ("M FERRAND JEREMIE", "MLE FERRAND AMANDINE"): civility, then the family name,
+ * What a bank prints for a person ("M DUPONT HELENE", "MLE DUPONT MARIE"): civility, then the family name,
  * then the given names. A guess to prefill a card, the person corrects it.
  */
 export function parsePrintedName(text: string): PrintedName {

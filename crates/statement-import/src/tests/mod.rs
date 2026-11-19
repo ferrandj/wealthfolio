@@ -3,3 +3,4 @@ mod boursobank;
 mod boursobank_papers;
 mod fortuneo;
 mod hellobank;
+mod oradea;

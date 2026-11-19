@@ -28,17 +28,17 @@ use rust_decimal::Decimal;
 use serde_json::{json, Value};
 
 const INSTITUTION: &str = "BoursoBank";
-const DATE: &str = r"(\d{2}/\d{2}/\d{4})";
+pub(crate) const DATE: &str = r"(\d{2}/\d{2}/\d{4})";
 /// An amount as these papers print it: "2 838,61", "-3", "14".
-const AMOUNT: &str = r"(-?\d{1,3}(?: \d{3})*(?:,\d{1,2})?)";
+pub(crate) const AMOUNT: &str = r"(-?\d{1,3}(?: \d{3})*(?:,\d{1,2})?)";
 
 /// The document's text without accents, case or spaces, its apostrophes straightened.
-fn squeezed(doc: &SourceDocument) -> Result<String, String> {
+pub(crate) fn squeezed(doc: &SourceDocument) -> Result<String, String> {
     Ok(doc.compact()?.replace('’', "'"))
 }
 
 /// The rows of each page, rebuilt from the words' positions.
-fn page_rows(doc: &SourceDocument) -> Result<Vec<Vec<String>>, String> {
+pub(crate) fn page_rows(doc: &SourceDocument) -> Result<Vec<Vec<String>>, String> {
     let pages = doc.words(1.0)?;
     Ok(pages
         .iter()
@@ -57,7 +57,7 @@ fn page_rows(doc: &SourceDocument) -> Result<Vec<Vec<String>>, String> {
         .collect())
 }
 
-fn rows_text(doc: &SourceDocument) -> Result<String, String> {
+pub(crate) fn rows_text(doc: &SourceDocument) -> Result<String, String> {
     Ok(page_rows(doc)?
         .into_iter()
         .flatten()
@@ -65,13 +65,15 @@ fn rows_text(doc: &SourceDocument) -> Result<String, String> {
         .join("\n"))
 }
 
-fn is_bourso(c: &str) -> bool {
+pub(crate) fn is_bourso(c: &str) -> bool {
     c.contains("boursobank") || c.contains("boursorama") || c.contains("bousfrpp")
 }
 
-fn detection(parts: &[(bool, f64, &str)], bourso: bool) -> Detection {
+/// The score of the clues, the first being the issuer and the second the paper's own title: without both, the paper is
+/// only a guess.
+pub(crate) fn detection(parts: &[(bool, f64, &str)], bourso: bool) -> Detection {
     let (mut s, reasons) = score(parts);
-    if !bourso {
+    if !bourso || !parts.get(1).is_some_and(|p| p.0) {
         s = s.min(0.3);
     }
     Detection {
@@ -80,20 +82,20 @@ fn detection(parts: &[(bool, f64, &str)], bourso: bool) -> Detection {
     }
 }
 
-fn paper(adapter: &dyn Adapter) -> ParsedStatement {
+pub(crate) fn paper(adapter: &dyn Adapter) -> ParsedStatement {
     let mut st = ParsedStatement::new("pdf");
-    st.institution = Some(INSTITUTION.into());
+    st.institution = adapter.institution().map(String::from);
     st.adapter_id = Some(adapter.id().into());
     st.document_kind = Some(adapter.kind().into());
     st.confidence = "high".into();
     st
 }
 
-fn iso(d: chrono::NaiveDate) -> String {
+pub(crate) fn iso(d: chrono::NaiveDate) -> String {
     d.format("%Y-%m-%d").to_string()
 }
 
-fn issued(st: &mut ParsedStatement, date: Option<chrono::NaiveDate>) {
+pub(crate) fn issued(st: &mut ParsedStatement, date: Option<chrono::NaiveDate>) {
     if let Some(d) = date {
         st.balance_date = Some(d);
         st.set_extra("issued_on", iso(d));
@@ -115,7 +117,7 @@ fn set_iban(st: &mut ParsedStatement, iban: Option<String>) {
 }
 
 /// The first date after `before` (a regular expression).
-fn date_after(text: &str, before: &str) -> Option<chrono::NaiveDate> {
+pub(crate) fn date_after(text: &str, before: &str) -> Option<chrono::NaiveDate> {
     search(&format!(r"(?i){before}\s*{DATE}"), text).and_then(|m| parse_date_s(&m[1]))
 }
 
@@ -125,7 +127,7 @@ fn dated(text: &str) -> Option<chrono::NaiveDate> {
 }
 
 /// The amount ending the row that starts with `label` (a regular expression).
-fn amount_of(text: &str, label: &str) -> Option<Decimal> {
+pub(crate) fn amount_of(text: &str, label: &str) -> Option<Decimal> {
     let m = search(
         &format!(r"(?im)^\s*{label}[^\n]*?[\s:]{AMOUNT}\s*(?:€|¤|euros?)?\s*$"),
         text,
@@ -133,7 +135,7 @@ fn amount_of(text: &str, label: &str) -> Option<Decimal> {
     parse_amount(Some(&m[1]))
 }
 
-fn put_amount(st: &mut ParsedStatement, key: &str, value: Option<Decimal>) {
+pub(crate) fn put_amount(st: &mut ParsedStatement, key: &str, value: Option<Decimal>) {
     if let Some(v) = value {
         st.set_extra(key, py::dec_str(&v));
     }
@@ -147,7 +149,7 @@ fn label_of(st: &mut ParsedStatement, product: &str) {
 }
 
 /// "LIVRET DEVELOPPEMENT DURABLE SOLIDAIRE" → "Livret developpement durable solidaire".
-fn sentence_case(line: &str) -> String {
+pub(crate) fn sentence_case(line: &str) -> String {
     let line = py::strip(line);
     let text = if line.chars().any(char::is_lowercase) {
         line.to_string()
@@ -162,12 +164,15 @@ fn sentence_case(line: &str) -> String {
 
 macro_rules! paper_adapter {
     ($name:ident, $id:literal, $label:literal, $description:literal) => {
+        paper_adapter!($name, $id, $label, $description, INSTITUTION);
+    };
+    ($name:ident, $id:literal, $label:literal, $description:literal, $institution:expr) => {
         impl Adapter for $name {
             fn id(&self) -> &'static str {
                 $id
             }
             fn institution(&self) -> Option<&'static str> {
-                Some(INSTITUTION)
+                Some($institution)
             }
             fn kind(&self) -> &'static str {
                 "info"
@@ -194,6 +199,7 @@ macro_rules! paper_adapter {
         }
     };
 }
+pub(crate) use paper_adapter;
 
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -451,7 +457,7 @@ impl BoursoBankResourcesCertificatePdf {
         }
         st.set_extra("accounts", Value::Array(accounts));
         st.set_extra("total", py::dec_str(&total));
-        // "Monsieur Jérémie DUPONT" printed above the address
+        // "Monsieur Hélène DUPONT" printed above the address
         st.holder_name = rows
             .iter()
             .find(|r| search(r"^(?:Monsieur|Madame|M\.|Mme)\s+\S", r).is_some())
@@ -507,7 +513,7 @@ impl BoursoBankHomeSavingsSituationPdf {
             ("Compte Epargne Logement", "cel")
         };
         st.account_type = Some(kind.into());
-        // "02/01/2026 00030363644 EUR du 01/01/2025 au 31/12/2025 1"
+        // "02/01/2026 00098765432 EUR du 01/01/2025 au 31/12/2025 1"
         for row in text.lines() {
             let head = search(
                 &format!(r"^{DATE}\s+([0-9A-Z]{{11}})\s+([A-Z]{{3}})\b"),
@@ -971,4 +977,157 @@ impl BoursoBankTaxFormPdf {
         st.set_extra("category", "Fiscalité");
         Ok(vec![st])
     }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+
+/// The insurance papers of BoursoBank: the certificate of membership of an insurance (Bourso Prévoyance), the advice
+/// given before it ("Vos besoins - nos conseils"), its information notice and product sheet (IPID), and the notice of
+/// the insurance and assistance that come with a card (Carte Ultim). They name no account: they are kept as papers.
+pub struct BoursoBankInsurancePaperPdf;
+
+paper_adapter!(
+    BoursoBankInsurancePaperPdf,
+    "boursobank.insurance_paper_pdf",
+    "BoursoBank · papiers d'assurance (PDF)",
+    "Les papiers d'une assurance distribuée par BoursoBank : certificat d'adhésion (Bourso Prévoyance), devoir de conseil, notice d'information, fiche produit (IPID), notice des assurances de la carte."
+);
+
+/// Which insurance paper it is, from its title.
+fn insurance_paper(c: &str) -> Option<&'static str> {
+    if c.starts_with("bulletind'adhesionvalantcertificat") {
+        Some("certificate")
+    } else if c.contains("vosbesoins-nosconseils") {
+        Some("advice")
+    } else if c.contains("documentd'informationsurleproduitd'assurancecompagnie") {
+        Some("ipid")
+    } else if c.contains("noticed'informationassurancesetassistancevoyage") {
+        Some("card_notice")
+    } else if c.contains("noticed'informationrelativeaucontratd'assurance") {
+        Some("notice")
+    } else {
+        None
+    }
+}
+
+impl BoursoBankInsurancePaperPdf {
+    fn score(&self, c: &str) -> Detection {
+        detection(
+            &[
+                (is_bourso(c), 0.3, "mentionne BoursoBank"),
+                (
+                    insurance_paper(c).is_some(),
+                    0.45,
+                    "un papier d'assurance (certificat, conseil, notice, IPID)",
+                ),
+                (
+                    c.contains("codedesassurances"),
+                    0.15,
+                    "« Code des assurances »",
+                ),
+            ],
+            is_bourso(c),
+        )
+    }
+
+    fn read(&self, doc: &SourceDocument) -> ParseResult {
+        let mut st = paper(self);
+        let c = squeezed(doc)?;
+        let text = rows_text(doc)?;
+        let which = insurance_paper(&c).unwrap_or("notice");
+        let insurer = if c.contains("chubb") {
+            "Chubb"
+        } else if c.contains("sogecap") {
+            "SOGECAP"
+        } else {
+            ""
+        };
+        if !insurer.is_empty() {
+            st.set_extra("insurer", insurer);
+        }
+        let product = if c.contains("carteultim") {
+            "Carte Ultim".to_string()
+        } else if which == "advice" {
+            search(r"(?i)adh[ée]rer au contrat\s+(.+?)\.", &text)
+                .map(|m| py::strip(&m[1]).to_string())
+                .unwrap_or_else(|| "Assurance".to_string())
+        } else if c.contains("boursoprevoyance") {
+            "Bourso Prévoyance".to_string()
+        } else {
+            "Assurance".to_string()
+        };
+        st.set_extra("product", product.clone());
+        if let Some(m) = search(r"n°\s*(\d{2}\.\d{3})", &text) {
+            st.set_extra("contract_number", m[1].to_string());
+        }
+        if let Some(m) = search(r"(?i)\bpolice\b[^\n]*?\b([A-Z]{4,}\d{4,})\b", &text) {
+            st.set_extra("policy_number", m[1].to_string());
+        }
+        // "un minimum de 3 000¤ et un maximum de 50 000¤", "dans la limite de 30 000 ¤"
+        if let Some(m) = search(
+            &format!(
+                r"(?i)minimum de\s+{AMOUNT}\s*[¤€]\s*et (?:un maximum de|dans la limite de)\s+{AMOUNT}\s*[¤€]"
+            ),
+            &text,
+        ) {
+            put_amount(&mut st, "capital_min", parse_amount(Some(&m[1])));
+            put_amount(&mut st, "capital_max", parse_amount(Some(&m[2])));
+        }
+        if let Some(m) = search(
+            r"(?i)cotisation est de\s+(\d+(?:,\d{1,2})?)\s*[¤€]\s*TTC par\s+(mois|an)",
+            &text,
+        ) {
+            put_amount(&mut st, "premium", parse_amount(Some(&m[1])));
+            st.set_extra(
+                "premium_every",
+                if &m[2] == "mois" { "month" } else { "year" },
+            );
+        }
+        if let Some(d) = date_after(
+            &text,
+            r"adh[ée]sion [ée]lectronique effectu[ée]e en date du",
+        ) {
+            issued(&mut st, Some(d));
+            st.set_extra("joined_on", iso(d));
+        }
+        // "Applicable au 1er janvier 2026"
+        if let Some(m) = search(
+            r"(?i)applicable au\s+(\d{1,2})(?:er)?\s+([a-zéû]+)\s+(\d{4})",
+            &text,
+        ) {
+            if let Some(d) = french_day(&m[1], &m[2], &m[3]) {
+                st.set_extra("effective_on", iso(d));
+            }
+        }
+        let (title, category) = match which {
+            "certificate" => (format!("Certificat d'adhésion · {product}"), "Assurance"),
+            "advice" => (format!("Devoir de conseil · {product}"), "Assurance"),
+            "ipid" => (format!("Fiche produit (IPID) · {product}"), "Assurance"),
+            _ => (format!("Notice d'information · {product}"), "Assurance"),
+        };
+        st.set_extra("paper", which);
+        st.set_extra("title", title);
+        st.set_extra("category", category);
+        Ok(vec![st])
+    }
+}
+
+/// "1", "janvier", "2026" → the day.
+pub(crate) fn french_day(day: &str, month: &str, year: &str) -> Option<chrono::NaiveDate> {
+    let months = [
+        "janvier",
+        "fevrier",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "aout",
+        "septembre",
+        "octobre",
+        "novembre",
+        "decembre",
+    ];
+    let m = months.iter().position(|n| *n == norm(month))? as u32 + 1;
+    chrono::NaiveDate::from_ymd_opt(year.parse().ok()?, m, day.parse().ok()?)
 }

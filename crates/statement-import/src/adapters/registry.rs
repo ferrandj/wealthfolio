@@ -11,8 +11,8 @@ use super::base::{Adapter, ParsedStatement, SourceDocument};
 use super::boursobank::fees_pdf::BoursoBankFeesPdf;
 use super::boursobank::papers_pdf::{
     BoursoBankAccountCertificatePdf, BoursoBankCardRequestPdf, BoursoBankHomeSavingsSituationPdf,
-    BoursoBankLoanInformationPdf, BoursoBankMobilityMandatePdf, BoursoBankResourcesCertificatePdf,
-    BoursoBankRibPdf, BoursoBankTaxFormPdf,
+    BoursoBankInsurancePaperPdf, BoursoBankLoanInformationPdf, BoursoBankMobilityMandatePdf,
+    BoursoBankResourcesCertificatePdf, BoursoBankRibPdf, BoursoBankTaxFormPdf,
 };
 use super::boursobank::savings_pdf::BoursoBankSavingsPdf;
 use super::boursobank::statement_pdf::BoursoBankStatementPdf;
@@ -36,6 +36,7 @@ use super::hellobank::papers_pdf::{
     HelloBankSavingsContractPdf,
 };
 use super::hellobank::statement_pdf::HelloBankStatementPdf;
+use super::oradea::papers_pdf::{OradeaPerContributionsPdf, OradeaTaxFormPdf};
 use super::revolut::statement_csv::RevolutStatementCsv;
 
 /// A short fingerprint of the reading code (every adapter and the PDF reader). A document remembers the one that read
@@ -57,6 +58,9 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoBankLoanInformationPdf,
     &BoursoBankCardRequestPdf,
     &BoursoBankTaxFormPdf,
+    &BoursoBankInsurancePaperPdf,
+    &OradeaTaxFormPdf,
+    &OradeaPerContributionsPdf,
     &FortuneoStatementPdf,
     &FortuneoFeesPdf,
     &FortuneoDepositGuaranteePdf,

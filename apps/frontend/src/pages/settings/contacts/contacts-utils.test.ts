@@ -148,15 +148,15 @@ describe("filterContacts", () => {
 
 describe("names printed by a bank", () => {
   it("reads civility, family name and given names", () => {
-    expect(parsePrintedName("M FERRAND JEREMIE")).toEqual({
+    expect(parsePrintedName("M DUPONT HELENE")).toEqual({
       civility: "M.",
-      lastName: "Ferrand",
-      firstName: "Jeremie",
+      lastName: "Dupont",
+      firstName: "Helene",
     });
-    expect(parsePrintedName("MLE FERRAND AMANDINE")).toEqual({
+    expect(parsePrintedName("MLE DUPONT MARIE")).toEqual({
       civility: "Mlle",
-      lastName: "Ferrand",
-      firstName: "Amandine",
+      lastName: "Dupont",
+      firstName: "Marie",
     });
     expect(parsePrintedName("MME DUPONT-MARTIN ANNE SOPHIE").firstName).toBe("Anne Sophie");
     expect(parsePrintedName("Kraken")).toEqual({ civility: "", lastName: "Kraken", firstName: "" });
@@ -176,18 +176,18 @@ describe("proposing the owner of an account", () => {
       identifiers: [],
     }) as unknown as ContactSummary;
   const list = [
-    summary("jeremie", "Jérémie Ferrand", "Jérémie", "Ferrand"),
-    summary("amandine", "Amandine Ferrand", "Amandine", "Ferrand"),
+    summary("helene", "Hélène Dupont", "Hélène", "Dupont"),
+    summary("marie", "Marie Dupont", "Marie", "Dupont"),
   ];
 
   it("finds the same words in any order, accents and civility aside", () => {
-    expect(suggestContact(list, "M FERRAND JEREMIE")).toBe("jeremie");
-    expect(suggestContact(list, "MR Jérémie Ferrand")).toBe("jeremie");
-    expect(suggestContact(list, "MLE FERRAND AMANDINE")).toBe("amandine");
+    expect(suggestContact(list, "M DUPONT HELENE")).toBe("helene");
+    expect(suggestContact(list, "MR Hélène Dupont")).toBe("helene");
+    expect(suggestContact(list, "MLE DUPONT MARIE")).toBe("marie");
   });
 
   it("does not guess from the family name alone", () => {
-    expect(suggestContact(list, "FERRAND")).toBeNull();
+    expect(suggestContact(list, "DUPONT")).toBeNull();
     expect(suggestContact(list, "KRAKEN KRAKEN")).toBeNull();
   });
 });
