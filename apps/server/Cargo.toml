@@ -68,6 +68,7 @@ device-sync = []
 [dev-dependencies]
 reqwest = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

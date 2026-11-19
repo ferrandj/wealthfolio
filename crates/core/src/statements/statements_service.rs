@@ -224,6 +224,8 @@ fn base_row(
         is_external: None,
         source_group_id: None,
         charges: None,
+        metadata: None,
+        source_record_id: None,
     }
 }
 

@@ -189,7 +189,10 @@ async fn a_partial_update_sends_back_every_field_storage_would_clear() {
     assert_eq!(profile.quote_mode, Some(QuoteMode::Market));
     assert_eq!(profile.kind, Some(AssetKind::Investment));
     assert_eq!(profile.instrument_symbol.as_deref(), Some("AMZN"));
-    assert_eq!(profile.instrument_exchange_mic.as_deref(), Some("XNAS"));
+    assert_eq!(
+        profile.instrument_exchange_mic,
+        Some(Some("XNAS".to_string()))
+    );
     assert_eq!(
         profile.provider_config,
         amazon(QuoteMode::Market).provider_config
@@ -391,7 +394,23 @@ async fn switching_to_market_asks_the_provider_and_refuses_another_currency() {
         preview["errors"][0]
             .as_str()
             .unwrap()
-            .contains("returned no quote"),
+            .starts_with("YAHOO returned no quote for AMZN on XNAS;"),
+        "{preview}"
+    );
+
+    // Without a preferred provider, the message must not read as a double negative.
+    let unrouted = Asset {
+        provider_config: None,
+        ..amazon(QuoteMode::Manual)
+    };
+    let preview = prepare(
+        &fixture(unrouted, None, None),
+        json!({ "assetId": "amzn", "quoteMode": "MARKET" }),
+    )
+    .await;
+    assert_eq!(
+        preview["errors"][0],
+        "No enabled provider returned a quote for AMZN on XNAS; check the symbol, exchange and provider",
         "{preview}"
     );
 }

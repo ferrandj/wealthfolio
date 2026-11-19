@@ -260,7 +260,9 @@ fn requested_profile(asset: &Asset, args: &AssetUpdateArgs) -> UpdateAssetProfil
         instrument_symbol: trimmed(args.symbol.as_deref())
             .map(str::to_string)
             .or_else(|| asset.instrument_symbol.clone()),
-        instrument_exchange_mic: exchange_mic.or_else(|| asset.instrument_exchange_mic.clone()),
+        instrument_exchange_mic: exchange_mic
+            .or_else(|| asset.instrument_exchange_mic.clone())
+            .map(Some),
         provider_config: updated_provider_config(asset, args),
         metadata: None,
     }
@@ -276,7 +278,10 @@ fn asset_after(asset: &Asset, profile: &UpdateAssetProfile) -> Asset {
             .clone()
             .unwrap_or_else(|| asset.quote_ccy.clone()),
         instrument_symbol: profile.instrument_symbol.clone(),
-        instrument_exchange_mic: profile.instrument_exchange_mic.clone(),
+        instrument_exchange_mic: profile
+            .instrument_exchange_mic
+            .clone()
+            .unwrap_or_else(|| asset.instrument_exchange_mic.clone()),
         provider_config: profile.provider_config.clone(),
         ..asset.clone()
     }
@@ -485,17 +490,21 @@ async fn build_plan(
             .await
             .map_err(|e| exec_err(redact_urls(&e.to_string())))?;
         match resolved.currency.as_deref() {
-            None => errors.push(format!(
-                "{} returned no quote for {symbol}{}; check the symbol, exchange and provider",
-                requested_provider
-                    .as_deref()
-                    .unwrap_or("No enabled provider"),
-                after
+            None => {
+                let listing = after
                     .instrument_exchange_mic
                     .as_deref()
                     .map(|mic| format!(" on {mic}"))
-                    .unwrap_or_default(),
-            )),
+                    .unwrap_or_default();
+                errors.push(match requested_provider.as_deref() {
+                    Some(provider) => format!(
+                        "{provider} returned no quote for {symbol}{listing}; check the symbol, exchange and provider"
+                    ),
+                    None => format!(
+                        "No enabled provider returned a quote for {symbol}{listing}; check the symbol, exchange and provider"
+                    ),
+                });
+            }
             Some(currency) if !same_quote_currency(currency, &after.quote_ccy) => {
                 errors.push(format!(
                     "The provider quotes this listing in {currency}, not {}; set quoteCurrency to \

@@ -5,6 +5,7 @@
 //! snapshots in `crates/ai/tests/`).
 
 pub mod account_changes;
+pub(crate) mod account_scope;
 pub mod accounts;
 pub mod activities;
 pub mod activity_deletions;
@@ -27,6 +28,7 @@ pub mod commit_transaction_categories;
 pub mod contact_tools;
 pub mod contribution_limits;
 pub mod create_categorization_rule;
+pub(crate) mod date_bounds;
 pub mod exchange_rates;
 pub mod goals;
 pub mod health;
@@ -297,9 +299,8 @@ pub fn activity_update_tools() -> Vec<Arc<dyn AgentTool>> {
     ]
 }
 
-/// Spending reads and reviewed workflows remain MCP-only until assistant review
-/// renderers support them. Every tool declares its own read/write scopes.
-pub fn spending_access_tools() -> Vec<Arc<dyn AgentTool>> {
+/// The read-only Spending tools, shared by the in-app assistant and MCP.
+pub fn spending_read_tools() -> Vec<Arc<dyn AgentTool>> {
     vec![
         Arc::new(spending_reads::GetSpendingContext),
         Arc::new(spending_reads::SearchSpendingTransactions),
@@ -308,6 +309,15 @@ pub fn spending_access_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(spending_reads::GetSpendingReport),
         Arc::new(spending_reads::GetSpendingInsight),
         Arc::new(spending_reads::GetEventSpendingSummaries),
+    ]
+}
+
+/// Spending reads plus the reviewed Spending workflows. The workflows remain
+/// MCP-only until assistant review renderers support them. Every tool
+/// declares its own read/write scopes.
+pub fn spending_access_tools() -> Vec<Arc<dyn AgentTool>> {
+    let mut tools = spending_read_tools();
+    tools.extend::<[Arc<dyn AgentTool>; 11]>([
         Arc::new(spending_splits::PrepareSpendingSplits),
         Arc::new(spending_splits::CommitSpendingSplits),
         Arc::new(spending_splits::PrepareSpendingAllocationClear),
@@ -319,7 +329,8 @@ pub fn spending_access_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(spending_events::PrepareSpendingEventTag),
         Arc::new(spending_events::CommitSpendingEventTag),
         Arc::new(spending_import_metadata::PrepareSpendingImportMetadata),
-    ]
+    ]);
+    tools
 }
 
 /// MCP-only category discovery and creation; the assistant has no category

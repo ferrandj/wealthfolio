@@ -239,7 +239,9 @@ impl AssetServiceTrait for MockAssetService {
             quote_mode: payload.quote_mode.unwrap_or(asset.quote_mode),
             quote_ccy: payload.quote_ccy.unwrap_or(asset.quote_ccy.clone()),
             instrument_symbol: payload.instrument_symbol,
-            instrument_exchange_mic: payload.instrument_exchange_mic,
+            instrument_exchange_mic: payload
+                .instrument_exchange_mic
+                .unwrap_or_else(|| asset.instrument_exchange_mic.clone()),
             provider_config: payload.provider_config,
             ..asset
         })
@@ -1932,20 +1934,20 @@ impl MockEnvironment {
 #[async_trait::async_trait]
 impl AgentEnvironment for MockEnvironment {
     fn budget_service(&self) -> Arc<dyn wealthfolio_spending::budget::BudgetServiceTrait> {
-        unimplemented!("MCP-only service")
+        unimplemented!("Spending service not mocked for assistant tests and evals")
     }
     fn spending_events_service(&self) -> Arc<dyn wealthfolio_spending::events::EventsServiceTrait> {
-        unimplemented!("MCP-only service")
+        unimplemented!("Spending service not mocked for assistant tests and evals")
     }
     fn spending_analytics_service(
         &self,
     ) -> Arc<dyn wealthfolio_spending::analytics::AnalyticsServiceTrait> {
-        unimplemented!("MCP-only service")
+        unimplemented!("Spending service not mocked for assistant tests and evals")
     }
     fn spending_insight_service(
         &self,
     ) -> Arc<dyn wealthfolio_spending::insight::InsightServiceTrait> {
-        unimplemented!("MCP-only service")
+        unimplemented!("Spending service not mocked for assistant tests and evals")
     }
     fn base_currency(&self) -> String {
         self.base_currency.clone()

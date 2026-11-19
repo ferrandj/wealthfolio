@@ -1,4 +1,6 @@
+import { isValuationComplete } from "@/lib/valuation";
 import { TopMoversCard, ConcentrationCard } from "./holdings-highlight-cards";
+import { HoldingsDonutCard } from "./holdings-donut-card";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCurrentValuation } from "@/hooks/use-current-account-valuations";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -439,6 +441,7 @@ export function OverviewPage({
             <ValueWidget
               metric="value"
               data={valueStrip}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               currency={baseCurrency}
               isLoading={isLoading}
             />
@@ -447,6 +450,7 @@ export function OverviewPage({
             <ValueWidget
               metric="cash"
               data={valueStrip}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               currency={baseCurrency}
               isLoading={isLoading}
             />
@@ -455,6 +459,7 @@ export function OverviewPage({
             <ValueWidget
               metric="invested"
               data={valueStrip}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               currency={baseCurrency}
               isLoading={isLoading}
             />
@@ -463,6 +468,7 @@ export function OverviewPage({
             <ValueWidget
               metric="bookCost"
               data={valueStrip}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               currency={baseCurrency}
               isLoading={isLoading}
             />
@@ -471,6 +477,7 @@ export function OverviewPage({
             <ValueWidget
               metric="pnl"
               data={valueStrip}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               currency={baseCurrency}
               isLoading={isLoading}
             />
@@ -478,6 +485,7 @@ export function OverviewPage({
           accounts: (
             <DrillableAccountChart
               isLoading={isLoading}
+              isUnavailable={!isValuationComplete(currentValuation?.summary.valueStatus)}
               accountIds={filteredAccountIds}
               accountValuations={currentValuation?.accounts}
             />
@@ -550,6 +558,16 @@ export function OverviewPage({
               <HoldingsScopeNotice {...holdingsQuery} />
             ) : (
               <ConcentrationCard
+                holdings={portfolioHoldings}
+                currency={baseCurrency}
+                isLoading={isLoading}
+              />
+            ),
+          holdings:
+            !holdingsQuery.isComplete && !holdingsLoading ? (
+              <HoldingsScopeNotice {...holdingsQuery} />
+            ) : (
+              <HoldingsDonutCard
                 holdings={portfolioHoldings}
                 currency={baseCurrency}
                 isLoading={isLoading}

@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import {
   deleteSnapshot,
   getAssetHoldingsScope,
@@ -42,6 +43,7 @@ import {
 import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { isHoldingsScopeReady } from "@/lib/holdings-scope";
 
 interface AssetAccountHoldingsProps {
   assetId: string;
@@ -102,7 +104,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
 
   const notice = (
     <HoldingsScopeNotice
-      isComplete={!!scope && scope.incompleteAccounts.length === 0 && !isError}
+      isComplete={!!scope && isHoldingsScopeReady(scope.incompleteAccounts) && !isError}
       isLoading={isLoading}
       isError={isError}
       incompleteAccounts={scope?.incompleteAccounts}
@@ -577,7 +579,13 @@ export function AssetSnapshotHistory({
 
       {editingSnapshot && (
         <Sheet open={!!editingSnapshot} onOpenChange={() => handleEditClose()}>
-          <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+          <SheetContent
+            side={isMobile ? "bottom" : "inline-end"}
+            className={cn(
+              "flex h-full flex-col p-0",
+              isMobile ? "mx-1 rounded-t-4xl [--overlay-max-height:90dvh]" : "w-full sm:max-w-2xl",
+            )}
+          >
             <SheetHeader className="border-b px-6 py-4">
               <SheetTitle>{t("asset:accountHoldings.update_holdings")}</SheetTitle>
             </SheetHeader>
