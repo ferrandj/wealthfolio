@@ -200,6 +200,35 @@ pub async fn revalidate_all_statement_documents(
 }
 
 #[tauri::command]
+pub async fn revalidate_outdated_statement_documents(
+    state: ProfileAccess,
+) -> Result<RevalidationResult, String> {
+    let context = state.context()?;
+    let result = context
+        .statement_service()
+        .revalidate_outdated()
+        .await
+        .map_err(|e| e.to_string())?;
+    context.health_service().clear_cache().await;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn revalidate_statement_documents(
+    ids: Vec<String>,
+    state: ProfileAccess,
+) -> Result<RevalidationResult, String> {
+    let context = state.context()?;
+    let result = context
+        .statement_service()
+        .revalidate_documents(&ids)
+        .await
+        .map_err(|e| e.to_string())?;
+    context.health_service().clear_cache().await;
+    Ok(result)
+}
+
+#[tauri::command]
 pub async fn auto_review_statement_documents(
     state: ProfileAccess,
 ) -> Result<AutoReviewResult, String> {

@@ -228,6 +228,31 @@ service_tool!(
 );
 
 service_tool!(
+    RevalidateOutdatedStatementDocuments, "revalidate_outdated_statement_documents", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Read again, with today's readers, only the documents read by an older version of them (the app's 'Actualiser à la dernière version'). Returns how many were validated, are pending or failed.",
+    schema = no_args(),
+    |env, _args| {
+        let result = need(env.statement_service(), "Statements")?.revalidate_outdated().await.map_err(fail)?;
+        env.health_service().clear_cache().await;
+        reply(&result)
+    }
+);
+
+service_tool!(
+    RevalidateStatementDocuments, "revalidate_statement_documents", Write, additive = false,
+    scopes = [DocumentsWrite],
+    description = "Read again, with today's readers, the given documents, oldest first. To update many documents, call it with a few ids at a time (about ten), in the order get_outdated_statement_documents gives.",
+    schema = object(json!({"documentIds": {"type": "array", "items": {"type": "string"}}}), &["documentIds"]),
+    |env, args| {
+        let args: DocumentIdsArgs = serde_json::from_value(args)?;
+        let result = need(env.statement_service(), "Statements")?.revalidate_documents(&args.document_ids).await.map_err(fail)?;
+        env.health_service().clear_cache().await;
+        reply(&result)
+    }
+);
+
+service_tool!(
     GetStatementRevalidationProgress, "get_statement_revalidation_progress", Read, additive = false,
     scopes = [DocumentsRead],
     description = "How far a running revalidation of every document is: whether it runs, how many documents are done out of how many, and the file being read.",

@@ -2171,6 +2171,8 @@
     "coverage_break": "The opening balance ({{found}}) does not pick up the previous statement's closing balance ({{expected}}).",
     "reader_outdated": "Outdated reader",
     "update_reader": "Update to the latest version ({{count}})",
+    "update_reader_title": "Read again the {{count}} documents of an older version?",
+    "update_reader_description": "Only the documents read by an older version of the readers are read again, oldest first: their operations are taken back, then brought back from what the current reader finds. Categories you chose by hand are kept; the other documents are not touched.",
     "review_remember": "Remember these choices for all equivalent operations (same payee)",
     "review_help": "For each line marked \"To check\": press Confirm if the proposed category is right, Account to account if it is a transfer between your own accounts, or pick another category. You can also confirm everything at once.",
     "review_confirm_all": "Confirm all ({{count}})",

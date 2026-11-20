@@ -143,4 +143,31 @@ async fn the_automatic_review_validates_what_raises_no_alert_and_says_why_for_th
     let again = state.statement_service.auto_review().await.unwrap();
     assert_eq!(again.validated, 0);
     assert_eq!(again.skipped.len(), 2);
+
+    // every document was read by today's readers: updating to the last version reads none of them again
+    let update = state.statement_service.revalidate_outdated().await.unwrap();
+    assert_eq!(update.total, 0);
+    assert!(update.outcomes.is_empty());
+    // read again in parts: only the documents named are read
+    let first = after
+        .iter()
+        .find(|d| d.file_name.starts_with("11111111111-1"))
+        .unwrap();
+    let part = state
+        .statement_service
+        .revalidate_documents(std::slice::from_ref(&first.id))
+        .await
+        .unwrap();
+    assert_eq!(part.total, 1);
+    assert_eq!(part.outcomes.len(), 1);
+    assert_eq!(part.outcomes[0].document_id, first.id);
+    assert_eq!(part.validated, 1, "{part:?}");
+    let unchanged = state.statement_service.list_documents().unwrap();
+    assert_eq!(
+        unchanged
+            .iter()
+            .map(|d| (&d.id, &d.status))
+            .collect::<Vec<_>>(),
+        after.iter().map(|d| (&d.id, &d.status)).collect::<Vec<_>>()
+    );
 }

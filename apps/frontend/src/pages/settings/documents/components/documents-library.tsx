@@ -8,12 +8,13 @@ import {
   listStatementDocuments,
   getStatementRevalidationProgress,
   revalidateAllStatementDocuments,
+  revalidateStatementDocuments,
   revalidateStatementDocument,
 } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { invalidateLoanCaches } from "../../loans/loan-caches";
 import { QueryKeys } from "@/lib/query-keys";
-import type { StatementDocument } from "@/lib/types/statements";
+import type { RevalidationResult, StatementDocument } from "@/lib/types/statements";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
 import { LoanAccountDialog } from "../../loans/loan-account-dialog";
@@ -52,6 +53,9 @@ import { DocumentGroupActions } from "./document-group-actions";
 import { matchesHolderFilter, type HolderFilter } from "../holders";
 
 const NO_ACCOUNT = "none";
+
+/** Documents read again per request when the readers are updated. */
+const REVALIDATION_BATCH = 10;
 
 export function DocumentsLibrary() {
   const { t } = useTranslation();
@@ -134,11 +138,44 @@ export function DocumentsLibrary() {
       }),
   });
 
+  // documents already read again in an update done in parts, and how many it reads in all
+  const [batch, setBatch] = useState<{ done: number; total: number } | null>(null);
+
   const revalidateAll = useMutation({
-    mutationFn: revalidateAllStatementDocuments,
+    // with documents read by an older reader, only those are read again, a few per request (oldest first) so that no
+    // request lasts long enough to time out
+    mutationFn: async (onlyOutdated: boolean): Promise<RevalidationResult> => {
+      if (!onlyOutdated) return revalidateAllStatementDocuments();
+      const ids = (await getStatementOutdated()).documentIds;
+      const total: RevalidationResult = {
+        total: 0,
+        validated: 0,
+        pending: 0,
+        failed: 0,
+        outcomes: [],
+      };
+      setBatch({ done: 0, total: ids.length });
+      try {
+        for (let start = 0; start < ids.length; start += REVALIDATION_BATCH) {
+          const part = await revalidateStatementDocuments(
+            ids.slice(start, start + REVALIDATION_BATCH),
+          );
+          total.total += part.total;
+          total.validated += part.validated;
+          total.pending += part.pending;
+          total.failed += part.failed;
+          total.outcomes.push(...part.outcomes);
+          setBatch({ done: Math.min(start + REVALIDATION_BATCH, ids.length), total: ids.length });
+        }
+      } finally {
+        setBatch(null);
+      }
+      return total;
+    },
     onSuccess: async (result) => {
       setConfirmAll(false);
       await refreshOperations();
+      await queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_OUTDATED] });
       toast({
         title: t("settings:documents.revalidate_all_done"),
         description: t("settings:documents.revalidate_all_summary", {
@@ -167,8 +204,12 @@ export function DocumentsLibrary() {
       revalidateAll.isPending || query.state.data?.running ? 800 : false,
   });
   const rereading = revalidateAll.isPending || !!progress?.running;
-  const progressLabel =
-    progress?.running && progress.total > 0
+  const progressLabel = batch
+    ? t("settings:documents.revalidate_all_progress", {
+        done: Math.min(batch.done + (progress?.running ? progress.done : 0), batch.total),
+        total: batch.total,
+      })
+    : progress?.running && progress.total > 0
       ? t("settings:documents.revalidate_all_progress", {
           done: progress.done,
           total: progress.total,
@@ -646,9 +687,15 @@ export function DocumentsLibrary() {
       <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings:documents.revalidate_all_title")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {outdatedIds.size > 0
+                ? t("settings:documents.update_reader_title", { count: outdatedIds.size })
+                : t("settings:documents.revalidate_all_title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("settings:documents.revalidate_all_description")}
+              {outdatedIds.size > 0
+                ? t("settings:documents.update_reader_description")
+                : t("settings:documents.revalidate_all_description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {rereading && (
@@ -669,7 +716,7 @@ export function DocumentsLibrary() {
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>{t("settings:documents.cancel")}</AlertDialogCancel>
-            <Button disabled={rereading} onClick={() => revalidateAll.mutate()}>
+            <Button disabled={rereading} onClick={() => revalidateAll.mutate(outdatedIds.size > 0)}>
               {rereading ? progressLabel : t("settings:documents.revalidate_all_confirm")}
             </Button>
           </AlertDialogFooter>

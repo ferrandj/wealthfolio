@@ -593,6 +593,130 @@ pub struct StatementService {
 }
 
 impl StatementService {
+    /// Read the given documents again with the current readers, oldest first: their operations are undone, then
+    /// brought back from what is read now; the transfers between own accounts are looked for once at the end.
+    async fn revalidate(
+        &self,
+        mut documents: Vec<StatementDocument>,
+    ) -> Result<RevalidationResult> {
+        documents.sort_by(logical_order);
+        let run = RevalidationRun(&self.revalidation);
+        run.set(|p| {
+            *p = RevalidationProgress {
+                running: true,
+                done: 0,
+                total: documents.len(),
+                file_name: None,
+            }
+        });
+        let mut result = RevalidationResult {
+            total: documents.len(),
+            ..RevalidationResult::default()
+        };
+        let outcome_of =
+            |document: &StatementDocument, error: Option<String>| RevalidationOutcome {
+                document_id: document.id.clone(),
+                file_name: document.file_name.clone(),
+                status: document.status.clone(),
+                to_review_count: document.to_review_count,
+                review_reason: document.review_reason.clone(),
+                error,
+            };
+
+        // 1. only documents that can still be read are touched. They are read a few at once first; what is read is
+        //    kept for the import that follows, so no file is read twice.
+        run.set(|p| p.file_name = None);
+        self.read_ahead(&documents).await;
+        let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
+        let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
+        for document in documents.iter() {
+            let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
+                run.set(|p| p.done += 1);
+                continue;
+            };
+            match self.check_readable(&doc, content.clone()).await {
+                Ok(()) => readable.push((doc, content)),
+                Err(e) => {
+                    outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
+                    run.set(|p| p.done += 1);
+                }
+            }
+        }
+
+        // 2. every document's operations go first, so that the oldest statement of an account carries its
+        //    opening balance again when they are read back
+        //    The operations are loaded once for all the documents.
+        let mut by_run: HashMap<String, Vec<crate::activities::Activity>> = HashMap::new();
+        for activity in self.activity_service.get_activities()? {
+            if let Some(run) = activity.import_run_id.clone() {
+                by_run.entry(run).or_default().push(activity);
+            }
+        }
+        let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
+        for (document, _) in &readable {
+            let activities = document
+                .import_run_id
+                .as_ref()
+                .and_then(|run| by_run.remove(run))
+                .unwrap_or_default();
+            carries.insert(document.id.clone(), self.undo_operations(activities).await?);
+        }
+
+        // 3. oldest first
+        for (document, content) in &readable {
+            let carry = carries.remove(&document.id).unwrap_or_default();
+            run.set(|p| p.file_name = Some(document.file_name.clone()));
+            let read = self.reimport(document, content, carry, false).await;
+            run.set(|p| p.done += 1);
+            match read {
+                Ok(updated) => {
+                    outcomes.insert(updated.id.clone(), outcome_of(&updated, None));
+                }
+                Err(e) => {
+                    // its operations are gone: say so instead of leaving it looking validated
+                    let mut broken = document.clone();
+                    broken.import_run_id = None;
+                    broken.imported_count = 0;
+                    broken.duplicate_count = 0;
+                    apply_reason(
+                        &mut broken,
+                        &ReviewReason {
+                            doubts: 0,
+                            balance_gap: None,
+                            warnings: 1,
+                            ..ReviewReason::default()
+                        },
+                    );
+                    let saved = self
+                        .repository
+                        .update_document(broken)
+                        .await
+                        .unwrap_or(document.clone());
+                    outcomes.insert(saved.id.clone(), outcome_of(&saved, Some(e.to_string())));
+                }
+            }
+        }
+
+        // the transfers between own accounts, once every document is in
+        if let Err(e) = self.link_own_transfers().await {
+            warn!("could not look for transfers between own accounts: {e}");
+        }
+
+        for document in &documents {
+            if let Some(outcome) = outcomes.remove(&document.id) {
+                if outcome.error.is_some() {
+                    result.failed += 1;
+                } else if outcome.status == DOCUMENT_STATUS_PENDING {
+                    result.pending += 1;
+                } else if outcome.status == super::statements_model::DOCUMENT_STATUS_VALIDATED {
+                    result.validated += 1;
+                }
+                result.outcomes.push(outcome);
+            }
+        }
+        Ok(result)
+    }
+
     /// Apply a review the person (or the automatic review) confirmed: the decisions, then every other category
     /// as shown; the document becomes validated.
     async fn apply_review(
@@ -3299,134 +3423,43 @@ impl StatementServiceTrait for StatementService {
     }
 
     async fn revalidate_all(&self) -> Result<RevalidationResult> {
-        let mut documents = self.repository.list_documents()?;
-        documents.sort_by(logical_order);
-        let run = RevalidationRun(&self.revalidation);
-        run.set(|p| {
-            *p = RevalidationProgress {
-                running: true,
-                done: 0,
-                total: documents.len(),
-                file_name: None,
-            }
-        });
-        let mut result = RevalidationResult {
-            total: documents.len(),
-            ..RevalidationResult::default()
-        };
-        let outcome_of =
-            |document: &StatementDocument, error: Option<String>| RevalidationOutcome {
-                document_id: document.id.clone(),
-                file_name: document.file_name.clone(),
-                status: document.status.clone(),
-                to_review_count: document.to_review_count,
-                review_reason: document.review_reason.clone(),
-                error,
-            };
-
-        // 1. only documents that can still be read are touched. They are read a few at once first; what is read is
-        //    kept for the import that follows, so no file is read twice.
-        run.set(|p| p.file_name = None);
-        self.read_ahead(&documents).await;
-        let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
-        let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
-        for document in documents.iter() {
-            let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
-                run.set(|p| p.done += 1);
-                continue;
-            };
-            match self.check_readable(&doc, content.clone()).await {
-                Ok(()) => readable.push((doc, content)),
-                Err(e) => {
-                    outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
-                    run.set(|p| p.done += 1);
-                }
-            }
-        }
-
-        // 2. every document's operations go first, so that the oldest statement of an account carries its
-        //    opening balance again when they are read back
-        //    The operations are loaded once for all the documents.
-        let mut by_run: HashMap<String, Vec<crate::activities::Activity>> = HashMap::new();
-        for activity in self.activity_service.get_activities()? {
-            if let Some(run) = activity.import_run_id.clone() {
-                by_run.entry(run).or_default().push(activity);
-            }
-        }
-        let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
-        for (document, _) in &readable {
-            let activities = document
-                .import_run_id
-                .as_ref()
-                .and_then(|run| by_run.remove(run))
-                .unwrap_or_default();
-            carries.insert(document.id.clone(), self.undo_operations(activities).await?);
-        }
-
-        // 3. oldest first
-        for (document, content) in &readable {
-            let carry = carries.remove(&document.id).unwrap_or_default();
-            run.set(|p| p.file_name = Some(document.file_name.clone()));
-            let read = self.reimport(document, content, carry, false).await;
-            run.set(|p| p.done += 1);
-            match read {
-                Ok(updated) => {
-                    outcomes.insert(updated.id.clone(), outcome_of(&updated, None));
-                }
-                Err(e) => {
-                    // its operations are gone: say so instead of leaving it looking validated
-                    let mut broken = document.clone();
-                    broken.import_run_id = None;
-                    broken.imported_count = 0;
-                    broken.duplicate_count = 0;
-                    apply_reason(
-                        &mut broken,
-                        &ReviewReason {
-                            doubts: 0,
-                            balance_gap: None,
-                            warnings: 1,
-                            ..ReviewReason::default()
-                        },
-                    );
-                    let saved = self
-                        .repository
-                        .update_document(broken)
-                        .await
-                        .unwrap_or(document.clone());
-                    outcomes.insert(saved.id.clone(), outcome_of(&saved, Some(e.to_string())));
-                }
-            }
-        }
-
-        // the transfers between own accounts, once every document is in
-        if let Err(e) = self.link_own_transfers().await {
-            warn!("could not look for transfers between own accounts: {e}");
-        }
-
-        for document in &documents {
-            if let Some(outcome) = outcomes.remove(&document.id) {
-                if outcome.error.is_some() {
-                    result.failed += 1;
-                } else if outcome.status == DOCUMENT_STATUS_PENDING {
-                    result.pending += 1;
-                } else if outcome.status == super::statements_model::DOCUMENT_STATUS_VALIDATED {
-                    result.validated += 1;
-                }
-                result.outcomes.push(outcome);
-            }
-        }
-        Ok(result)
+        let documents = self.repository.list_documents()?;
+        self.revalidate(documents).await
     }
 
-    fn outdated_documents(&self) -> Result<super::OutdatedDocuments> {
+    async fn revalidate_outdated(&self) -> Result<RevalidationResult> {
         let current = wealthfolio_statement_import::reader_version().to_string();
-        let document_ids = self
+        let documents = self
             .repository
             .list_documents()?
             .into_iter()
             .filter(|d| d.reader_version.as_deref() != Some(current.as_str()))
-            .map(|d| d.id)
             .collect();
+        self.revalidate(documents).await
+    }
+
+    async fn revalidate_documents(&self, ids: &[String]) -> Result<RevalidationResult> {
+        let wanted: HashSet<&str> = ids.iter().map(String::as_str).collect();
+        let documents = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| wanted.contains(d.id.as_str()))
+            .collect();
+        self.revalidate(documents).await
+    }
+
+    fn outdated_documents(&self) -> Result<super::OutdatedDocuments> {
+        let current = wealthfolio_statement_import::reader_version().to_string();
+        // oldest first: read again in parts, in this order, each account's statements still follow each other
+        let mut documents: Vec<StatementDocument> = self
+            .repository
+            .list_documents()?
+            .into_iter()
+            .filter(|d| d.reader_version.as_deref() != Some(current.as_str()))
+            .collect();
+        documents.sort_by(logical_order);
+        let document_ids = documents.into_iter().map(|d| d.id).collect();
         Ok(super::OutdatedDocuments {
             current_version: current,
             document_ids,

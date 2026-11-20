@@ -304,6 +304,8 @@ export {
   getStatementDocumentStorage,
   invalidateAllStatementDocuments,
   autoReviewStatementDocuments,
+  revalidateOutdatedStatementDocuments,
+  revalidateStatementDocuments,
   invalidateStatementDocuments,
   purgeStatementDocuments,
   getStatementDocumentSources,

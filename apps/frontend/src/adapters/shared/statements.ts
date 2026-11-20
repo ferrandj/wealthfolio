@@ -121,6 +121,16 @@ export const revalidateAllStatementDocuments = async (): Promise<RevalidationRes
   return invoke<RevalidationResult>("revalidate_all_statement_documents");
 };
 
+/** Read again only the documents read by an older version of the readers. */
+export const revalidateOutdatedStatementDocuments = async (): Promise<RevalidationResult> => {
+  return invoke<RevalidationResult>("revalidate_outdated_statement_documents");
+};
+
+/** Read again the given documents, oldest first: a long update goes a few documents per call. */
+export const revalidateStatementDocuments = async (ids: string[]): Promise<RevalidationResult> => {
+  return invoke<RevalidationResult>("revalidate_statement_documents", { ids });
+};
+
 /** Every validated statement goes back to waiting for review; returns how many. */
 /** The documents brought back regularly: how each is obtained, how often, which are due. */
 export const getStatementDocumentSources = async (): Promise<DocumentSource[]> => {

@@ -41,11 +41,31 @@
     },
     {
       "profile": "validation",
-      "commands": ["preview_import_assets", "check_activities_import", "check_holdings_import"],
+      "commands": [
+        "preview_import_assets",
+        "check_activities_import",
+        "check_holdings_import",
+        "import_statement",
+        "revalidate_all_statement_documents",
+        "revalidate_outdated_statement_documents",
+        "auto_review_statement_documents",
+        "invalidate_all_statement_documents",
+        "invalidate_statement_documents",
+        "purge_statement_documents",
+        "revalidate_statement_documents"
+      ],
       "paths": [
         "/activities/import/assets/preview",
         "/activities/import/check",
-        "/snapshots/import/check"
+        "/snapshots/import/check",
+        "/statements/import",
+        "/statements/revalidate",
+        "/statements/revalidate-outdated",
+        "/statements/auto-review",
+        "/statements/invalidate",
+        "/statements/documents/invalidate",
+        "/statements/documents/purge",
+        "/statements/revalidate-documents"
       ]
     },
     {

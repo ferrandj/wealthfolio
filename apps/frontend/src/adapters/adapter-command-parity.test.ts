@@ -1020,6 +1020,25 @@ describe("bank statements and account documents", () => {
     expect(lastCall(mock)).toMatchObject({ url: "/api/v1/statements/revalidate", method: "POST" });
   });
 
+  it("reads again only the documents of an older reader", async () => {
+    const mock = stubFetch({});
+    await invoke("revalidate_outdated_statement_documents");
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/revalidate-outdated",
+      method: "POST",
+    });
+  });
+
+  it("reads again a part of the documents", async () => {
+    const mock = stubFetch({});
+    await invoke("revalidate_statement_documents", { ids: ["a", "b"] });
+    expect(lastCall(mock)).toMatchObject({
+      url: "/api/v1/statements/revalidate-documents",
+      method: "POST",
+      body: JSON.stringify({ ids: ["a", "b"] }),
+    });
+  });
+
   it("validates every waiting document without alert", async () => {
     const mock = stubFetch({ validated: 0, skipped: [] });
     await invoke("auto_review_statement_documents");

@@ -195,6 +195,11 @@ export const COMMANDS: CommandMap = {
   get_statement_document_storage: { method: "GET", path: "/statements/storage" },
   invalidate_all_statement_documents: { method: "POST", path: "/statements/invalidate" },
   auto_review_statement_documents: { method: "POST", path: "/statements/auto-review" },
+  revalidate_statement_documents: { method: "POST", path: "/statements/revalidate-documents" },
+  revalidate_outdated_statement_documents: {
+    method: "POST",
+    path: "/statements/revalidate-outdated",
+  },
   invalidate_statement_documents: { method: "POST", path: "/statements/documents/invalidate" },
   purge_statement_documents: { method: "POST", path: "/statements/documents/purge" },
   get_statement_document_sources: { method: "GET", path: "/statements/sources" },
@@ -1258,6 +1263,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify({ keys, until });
       break;
     }
+    case "revalidate_statement_documents":
     case "invalidate_statement_documents": {
       const { ids } = payload as { ids: string[] };
       body = JSON.stringify({ ids });

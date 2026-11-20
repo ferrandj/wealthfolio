@@ -178,26 +178,73 @@ async fn revalidation_progress(
     Json(state.statement_service.revalidation_progress())
 }
 
+/// Run a job over many documents to its end even when the request is given up (a timeout, a closed tab): stopped
+/// halfway, documents would be left without their operations. Its progress stays readable meanwhile.
+async fn to_the_end<T, F>(state: &Arc<AppState>, job: F) -> ApiResult<T>
+where
+    T: Send + 'static,
+    F: std::future::Future<Output = wealthfolio_core::Result<T>> + Send + 'static,
+{
+    let health = state.health_service.clone();
+    tokio::spawn(async move {
+        let result = job.await;
+        health.clear_cache().await;
+        result
+    })
+    .await
+    .map_err(|e| ApiError::Internal(e.to_string()))?
+    .map_err(ApiError::from)
+}
+
 async fn revalidate_all(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<RevalidationResult>> {
-    let result = state.statement_service.revalidate_all().await?;
-    state.health_service.clear_cache().await;
-    Ok(Json(result))
+    let service = state.statement_service.clone();
+    Ok(Json(
+        to_the_end(&state, async move { service.revalidate_all().await }).await?,
+    ))
+}
+
+async fn revalidate_outdated(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<RevalidationResult>> {
+    let service = state.statement_service.clone();
+    Ok(Json(
+        to_the_end(&state, async move { service.revalidate_outdated().await }).await?,
+    ))
+}
+
+async fn revalidate_documents(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(body): Json<DocumentIdsBody>,
+) -> ApiResult<Json<RevalidationResult>> {
+    let service = state.statement_service.clone();
+    let ids = body.ids;
+    Ok(Json(
+        to_the_end(
+            &state,
+            async move { service.revalidate_documents(&ids).await },
+        )
+        .await?,
+    ))
 }
 
 async fn auto_review(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<AutoReviewResult>> {
-    let result = state.statement_service.auto_review().await?;
-    state.health_service.clear_cache().await;
-    Ok(Json(result))
+    let service = state.statement_service.clone();
+    Ok(Json(
+        to_the_end(&state, async move { service.auto_review().await }).await?,
+    ))
 }
 
 async fn invalidate_all(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<u32>> {
-    Ok(Json(state.statement_service.invalidate_all().await?))
+    let service = state.statement_service.clone();
+    Ok(Json(
+        to_the_end(&state, async move { service.invalidate_all().await }).await?,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -507,6 +554,11 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .route("/statements/review-queue", get(review_queue))
         .route("/statements/auto-review", post(auto_review))
         .route("/statements/revalidate", post(revalidate_all))
+        .route("/statements/revalidate-outdated", post(revalidate_outdated))
+        .route(
+            "/statements/revalidate-documents",
+            post(revalidate_documents),
+        )
         .route(
             "/statements/revalidate/progress",
             get(revalidation_progress),
