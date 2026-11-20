@@ -170,7 +170,7 @@ fn test_the_yearly_situation_of_a_pel_and_of_a_cel_is_read_and_filed_by_account_
             (110.0, "du 01/01/2025 au 31/12/2025"),
             (190.0, "1"),
         ],
-        vec![(12.0, "Date d'ouverture fiscale"), (120.0, "28/02/2023")],
+        vec![(12.0, "Date d'ouverture fiscale"), (120.0, "15/03/2021")],
         vec![(12.0, "Intérêts au 31/12/2025"), (120.0, "186,64")],
         vec![(12.0, "Solde au 31/12/2025"), (120.0, "770,62")],
         vec![(
@@ -185,7 +185,7 @@ fn test_the_yearly_situation_of_a_pel_and_of_a_cel_is_read_and_filed_by_account_
     assert_eq!(cel.account_type.as_deref(), Some("cel"));
     assert_eq!(extra(&cel, "balance"), &json!("770.62"));
     assert_eq!(extra(&cel, "interest"), &json!("186.64"));
-    assert_eq!(extra(&cel, "opened_on"), &json!("2023-02-28"));
+    assert_eq!(extra(&cel, "opened_on"), &json!("2021-03-15"));
     assert_eq!(
         extra(&cel, "interest_periods"),
         &json!([{"closed_on": "2025-12-31", "rate_percent": "2.00", "gross_interest": "4.60"}])

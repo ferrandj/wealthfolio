@@ -20,7 +20,7 @@ use crate::py;
 
 pub const DATE_RE: &str = r"^\d{1,2}/\d{1,2}/\d{4}$";
 pub const AMOUNT_RE: &str = r"^\d{1,3}(?:\.\d{3})*,\d{2}$|^\d+,\d{2}$";
-pub const PERIOD_RE: &str = r"du\s+(\d{1,2}/\d{1,2}/\d{4})\s+au\s+(\d{1,2}/\d{1,2}/\d{4})";
+pub const PERIOD_RE: &str = r"\bdu\s*(\d{1,2}/\d{1,2}/\d{4})\s*au\s*(\d{1,2}/\d{1,2}/\d{4})";
 const REF_RE: &str = r"^R[^\W\d_]f\s*:?\s*(\S.*)$";
 const RUM_RE: &str = r"^RUM\s+(\S.*)$";
 const CARD_RE: &str = r"^CARTE\s+(\d{2}/\d{2}/\d{2})\s+(.*?)(?:\s+CB\*(\d{4}))?\s*$";
@@ -550,6 +550,13 @@ mod reader_fix_tests {
         assert!(is_date("23/11/2020"));
         assert!(!is_date("23/11/20"));
         assert!(py_match(PERIOD_RE, "du 1/12/2020 au 31/12/2020").is_some());
+        // the first statement of an account glues the period's end to "au"
+        let glued = crate::adapters::re::search(
+            PERIOD_RE,
+            "16/03/2021 00012345678 EUR du 15/03/2021au 15/03/2021 1",
+        )
+        .unwrap();
+        assert_eq!((&glued[1], &glued[2]), ("15/03/2021", "15/03/2021"));
     }
 
     #[test]
