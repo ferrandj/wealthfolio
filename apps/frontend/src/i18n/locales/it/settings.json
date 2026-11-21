@@ -2241,6 +2241,7 @@
       "loan_offer": "Loan offer",
       "loan_schedule": "Repayment schedule",
       "loan_event": "Early repayment",
+      "loan_statement": "Informativa annuale sul prestito",
       "info": "Letters",
       "tax_form": "IFU",
       "bank_certificate": "Bank certificates",
@@ -2576,7 +2577,8 @@
     "kind": {
       "loan_offer": "Loan offer",
       "loan_schedule": "Amortization table",
-      "loan_event": "Early repayment"
+      "loan_event": "Early repayment",
+      "loan_statement": "Informativa annuale sul prestito"
     },
     "status": {
       "stored": "Stored",

@@ -216,12 +216,13 @@ pub async fn revalidate_outdated_statement_documents(
 #[tauri::command]
 pub async fn revalidate_statement_documents(
     ids: Vec<String>,
+    finish: Option<bool>,
     state: ProfileAccess,
 ) -> Result<RevalidationResult, String> {
     let context = state.context()?;
     let result = context
         .statement_service()
-        .revalidate_documents(&ids)
+        .revalidate_documents(&ids, finish.unwrap_or(true))
         .await
         .map_err(|e| e.to_string())?;
     context.health_service().clear_cache().await;

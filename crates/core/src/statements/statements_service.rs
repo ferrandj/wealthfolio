@@ -430,6 +430,57 @@ struct ImportRun {
     /// Look for transfers between own accounts once the document is in. Off while every document is read again:
     /// they are looked for once, at the end.
     link_transfers: bool,
+    /// While many documents are read again: what every document needs, loaded once for all of them. The steps that
+    /// concern every document (statements next to it, loans) wait for the end of the run.
+    cache: Option<Arc<std::sync::Mutex<RunCache>>>,
+}
+
+/// What a reading again of many documents loads once instead of once per document.
+#[derive(Default)]
+struct RunCache {
+    /// How often a person or a rule gave each category to the operations of each payee (see
+    /// `remembered_categories`), kept up to date as the operations come back.
+    remembered: HashMap<String, HashMap<(String, String), u32>>,
+    /// Every stored document, as the run leaves it.
+    documents: Vec<StatementDocument>,
+}
+
+fn locked<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// The category most often given to each payee.
+fn pick_remembered(
+    counts: &HashMap<String, HashMap<(String, String), u32>>,
+) -> HashMap<String, (String, String)> {
+    counts
+        .iter()
+        .filter_map(|(key, choices)| {
+            choices
+                .iter()
+                .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
+                .map(|(choice, _)| (key.clone(), choice.clone()))
+        })
+        .collect()
+}
+
+/// A fingerprint of what a document brings in: the reader, and each statement as read with the account it goes to.
+/// Read again the same, nothing it brought needs redoing.
+fn reading_fingerprint<'a>(
+    adapter_id: Option<&str>,
+    statements: impl Iterator<Item = (&'a StatementPreview, ImportMode, Option<&'a str>)>,
+) -> String {
+    let items: Vec<serde_json::Value> = statements
+        .map(|(preview, mode, account)| {
+            serde_json::json!({
+                "preview": preview,
+                "mode": format!("{mode:?}"),
+                "account": account,
+            })
+        })
+        .collect();
+    let all = serde_json::json!({ "adapter": adapter_id, "statements": items });
+    sha256_hex(all.to_string().as_bytes())
 }
 
 impl Default for ImportRun {
@@ -440,6 +491,7 @@ impl Default for ImportRun {
             carry: HashMap::new(),
             fallback_account: None,
             link_transfers: true,
+            cache: None,
         }
     }
 }
@@ -684,6 +736,9 @@ impl Drop for RevalidationRun<'_> {
 
 pub struct StatementService {
     revalidation: std::sync::Mutex<RevalidationProgress>,
+    /// The documents read again by the parts of an update done in parts, whose neighbours and loans wait for its
+    /// last part.
+    followups: std::sync::Mutex<Vec<StatementDocument>>,
     /// Two imports of papers of the same new contract (two files sent at once) must not each create its account:
     /// the account is looked for again and created under this lock, its identity saved before it is released.
     account_creation: tokio::sync::Mutex<()>,
@@ -699,12 +754,25 @@ pub struct StatementService {
     settings: std::sync::OnceLock<Arc<dyn crate::settings::SettingsServiceTrait>>,
 }
 
+/// A document read by code that changed since: the code of its own reader (another bank's change leaves it alone).
+fn is_outdated(document: &StatementDocument) -> bool {
+    let current = wealthfolio_statement_import::reader_version_of(document.adapter_id.as_deref());
+    document.reader_version.as_deref() != Some(current)
+}
+
 impl StatementService {
     /// Read the given documents again with the current readers, oldest first: their operations are undone, then
     /// brought back from what is read now; the transfers between own accounts are looked for once at the end.
+    ///
+    /// `skip_unchanged`: a document that reads the same as when its operations were brought in (and still has them
+    /// all) is left as it is, only marked as read by today's readers. `finish`: the last part of an update done in
+    /// parts, or a whole one: what concerns every document (the statements next to the ones read, the loans, the
+    /// transfers between own accounts) is done now, once for all the parts.
     async fn revalidate(
         &self,
         mut documents: Vec<StatementDocument>,
+        skip_unchanged: bool,
+        finish: bool,
     ) -> Result<RevalidationResult> {
         documents.sort_by(logical_order);
         // one reading again at a time: two at once (one given up by its request but still going, another started
@@ -724,6 +792,15 @@ impl StatementService {
             };
         }
         let run = RevalidationRun(&self.revalidation);
+        // the portfolio is valued again once the documents are in, not after each one
+        let _hold = crate::events::EventHold::new();
+        let started = std::time::Instant::now();
+        let mut laps: Vec<(&str, u128)> = Vec::new();
+        let mut lap = std::time::Instant::now();
+        let mut tick = |name: &'static str| {
+            laps.push((name, lap.elapsed().as_millis()));
+            lap = std::time::Instant::now();
+        };
         let mut result = RevalidationResult {
             total: documents.len(),
             ..RevalidationResult::default()
@@ -742,31 +819,81 @@ impl StatementService {
         //    kept for the import that follows, so no file is read twice.
         run.set(|p| p.file_name = None);
         self.read_ahead(&documents).await;
-        let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
-        let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
-        for document in documents.iter() {
-            let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
-                run.set(|p| p.done += 1);
-                continue;
-            };
-            match self.check_readable(&doc, content.clone()).await {
-                Ok(()) => readable.push((doc, content)),
-                Err(e) => {
-                    outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
-                    run.set(|p| p.done += 1);
-                }
-            }
-        }
-
-        // 2. every document's operations go first, so that the oldest statement of an account carries its
-        //    opening balance again when they are read back
-        //    The operations are loaded once for all the documents.
+        tick("read");
+        // the operations, loaded once for all the documents
         let mut by_run: HashMap<String, Vec<crate::activities::Activity>> = HashMap::new();
         for activity in self.activity_service.get_activities()? {
             if let Some(run) = activity.import_run_id.clone() {
                 by_run.entry(run).or_default().push(activity);
             }
         }
+        let accounts = self.account_service.get_all_accounts()?;
+        let identities = self.repository.list_identities()?;
+        let mut readable: Vec<(StatementDocument, Vec<u8>)> = Vec::new();
+        let mut outcomes: HashMap<String, RevalidationOutcome> = HashMap::new();
+        let mut unchanged = 0usize;
+        for document in documents.iter() {
+            let Some((doc, content)) = self.repository.get_document_content(&document.id)? else {
+                run.set(|p| p.done += 1);
+                continue;
+            };
+            if let Err(e) = self.check_readable(&doc, content.clone()).await {
+                outcomes.insert(doc.id.clone(), outcome_of(&doc, Some(e.to_string())));
+                run.set(|p| p.done += 1);
+                continue;
+            }
+            // read the same as when its operations came in, and they are all still there: nothing to redo
+            if skip_unchanged {
+                if let Some(kept) = doc.reading_fingerprint.as_deref() {
+                    let reading = self.reading_of(&doc, None).await?;
+                    let read = sold_through((*reading).clone(), doc.institution.as_deref());
+                    // the account each statement would go to when read again (see `run_import`)
+                    let lone = read.statements.len() == 1;
+                    let matched: Vec<Option<String>> = read
+                        .statements
+                        .iter()
+                        .map(|p| {
+                            self.match_account(p, &accounts, &identities)
+                                .map(|m| m.id)
+                                .or_else(|| {
+                                    doc.account_id.clone().filter(|_| lone && !is_bank_paper(p))
+                                })
+                        })
+                        .collect();
+                    let now = reading_fingerprint(
+                        read.chosen_adapter_id.as_deref(),
+                        read.statements
+                            .iter()
+                            .zip(&matched)
+                            .map(|(p, m)| (p, mode_of(p), m.as_deref())),
+                    );
+                    let brought = doc
+                        .import_run_id
+                        .as_ref()
+                        .and_then(|r| by_run.get(r))
+                        .map(Vec::len)
+                        .unwrap_or(0);
+                    if now == kept && brought == doc.imported_count.max(0) as usize {
+                        let mut same = doc.clone();
+                        same.reader_version = Some(read.reader_version.clone());
+                        let saved = if same.reader_version != doc.reader_version {
+                            self.repository.update_document(same).await?
+                        } else {
+                            doc.clone()
+                        };
+                        outcomes.insert(saved.id.clone(), outcome_of(&saved, None));
+                        unchanged += 1;
+                        run.set(|p| p.done += 1);
+                        continue;
+                    }
+                }
+            }
+            readable.push((doc, content));
+        }
+        tick("compare");
+
+        // 2. every document's operations go first, so that the oldest statement of an account carries its
+        //    opening balance again when they are read back
         let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
         // what each validated document brought, to tell whether the newer readers change it
         let mut before: HashMap<String, Brought> = HashMap::new();
@@ -781,16 +908,29 @@ impl StatementService {
             }
             carries.insert(document.id.clone(), self.undo_operations(activities).await?);
         }
+        tick("undo");
 
-        // 3. oldest first
+        // 3. oldest first; what every document needs is loaded once
+        let cache = if readable.is_empty() {
+            None
+        } else {
+            Some(Arc::new(std::sync::Mutex::new(RunCache {
+                remembered: self.remembered_counts().await.unwrap_or_default(),
+                documents: self.repository.list_documents()?,
+            })))
+        };
+        let mut read_again: Vec<StatementDocument> = Vec::new();
         for (document, content) in &readable {
             let carry = carries.remove(&document.id).unwrap_or_default();
             run.set(|p| p.file_name = Some(document.file_name.clone()));
-            let read = self.reimport(document, content, carry, false).await;
+            let read = self
+                .reimport(document, content, carry, false, cache.clone())
+                .await;
             run.set(|p| p.done += 1);
             match read {
                 Ok(updated) => {
                     outcomes.insert(updated.id.clone(), outcome_of(&updated, None));
+                    read_again.push(updated);
                 }
                 Err(e) => {
                     // its operations are gone: say so instead of leaving it looking validated
@@ -798,6 +938,8 @@ impl StatementService {
                     broken.import_run_id = None;
                     broken.imported_count = 0;
                     broken.duplicate_count = 0;
+                    // what it reads is no reason to leave it alone next time
+                    broken.reading_fingerprint = None;
                     apply_reason(
                         &mut broken,
                         &ReviewReason {
@@ -816,11 +958,7 @@ impl StatementService {
                 }
             }
         }
-
-        // the transfers between own accounts, once every document is in
-        if let Err(e) = self.link_own_transfers().await {
-            warn!("could not look for transfers between own accounts: {e}");
-        }
+        tick("import");
 
         // a validated document read the same as before stays validated; one the newer readers changed waits for the
         // person, who sees why
@@ -865,6 +1003,19 @@ impl StatementService {
             }
         }
 
+        tick("check");
+
+        // what concerns every document, once for all the parts of the update
+        locked(&self.followups).extend(read_again);
+        if finish {
+            let followups = std::mem::take(&mut *locked(&self.followups));
+            self.follow_up(&followups).await;
+            if let Err(e) = self.link_own_transfers().await {
+                warn!("could not look for transfers between own accounts: {e}");
+            }
+        }
+        tick("follow-up");
+
         for document in &documents {
             if let Some(outcome) = outcomes.remove(&document.id) {
                 if outcome.error.is_some() {
@@ -877,7 +1028,67 @@ impl StatementService {
                 result.outcomes.push(outcome);
             }
         }
+        log::info!(
+            "read again {} document(s) ({} unchanged) in {} ms: {}",
+            documents.len(),
+            unchanged,
+            started.elapsed().as_millis(),
+            laps.iter()
+                .map(|(name, ms)| format!("{name} {ms} ms"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         Ok(result)
+    }
+
+    /// After documents were read again: the validated statements next to them (that are not among them) go back to
+    /// check, and the loan papers are brought in line with the rebuilt loans. Once for the whole run.
+    async fn follow_up(&self, read_again: &[StatementDocument]) {
+        if read_again.is_empty() {
+            return;
+        }
+        let ids: HashSet<&str> = read_again.iter().map(|d| d.id.as_str()).collect();
+        let all = match self.repository.list_documents() {
+            Ok(all) => all,
+            Err(e) => {
+                warn!("could not look for the statements next to the ones read again: {e}");
+                return;
+            }
+        };
+        let current: Vec<&StatementDocument> =
+            all.iter().filter(|d| ids.contains(d.id.as_str())).collect();
+        let mut reopen: Vec<String> = Vec::new();
+        for document in &current {
+            reopen.extend(super::statements_review::neighbours_to_reopen(
+                document, &all,
+            ));
+        }
+        let loan_papers = current
+            .iter()
+            .any(|d| d.document_kind.as_deref().is_some_and(super::is_loan_kind));
+        if loan_papers {
+            if let Ok(views) = self.build_loans(Utc::now().date_naive()) {
+                for view in views.iter().filter(|v| v.key != "?") {
+                    if view
+                        .documents
+                        .iter()
+                        .any(|d| ids.contains(d.document_id.as_str()))
+                    {
+                        reopen.extend(view.documents.iter().map(|d| d.document_id.clone()));
+                    }
+                }
+            }
+        }
+        // each document read again has its own outcome already
+        reopen.retain(|id| !ids.contains(id.as_str()));
+        reopen.sort();
+        reopen.dedup();
+        self.reopen(&reopen).await;
+        if loan_papers {
+            if let Err(e) = self.sync_loan_statuses().await {
+                warn!("could not update the loan documents: {e}");
+            }
+        }
     }
 
     /// Apply a review the person (or the automatic review) confirmed: the decisions, then every other category
@@ -978,6 +1189,7 @@ impl StatementService {
     ) -> Self {
         Self {
             revalidation: std::sync::Mutex::new(RevalidationProgress::default()),
+            followups: std::sync::Mutex::new(Vec::new()),
             account_creation: tokio::sync::Mutex::new(()),
             readings: std::sync::Mutex::new(Readings::default()),
             repository,
@@ -1142,6 +1354,12 @@ impl StatementService {
     /// What the repository and the accounts add to a reading: the stored copy of the same file, the account each
     /// statement belongs to, what it would be called, and which operations are already there.
     fn enrich(&self, analysis: Analysis) -> Result<StatementAnalysis> {
+        self.enrich_with(analysis, true)
+    }
+
+    /// `shown`: also what the person is shown before importing (the operations already there, the statements whose
+    /// period overlaps). A document read again does not need it.
+    fn enrich_with(&self, analysis: Analysis, shown: bool) -> Result<StatementAnalysis> {
         let existing_document = self.repository.find_document_by_sha256(&analysis.sha256)?;
         let accounts = self.account_service.get_all_accounts()?;
         let identities = self.repository.list_identities()?;
@@ -1153,17 +1371,21 @@ impl StatementService {
                 let matched_account = self.match_account(preview, &accounts, &identities);
                 let mode = mode_of(preview);
                 let known_duplicates = match (&matched_account, mode) {
-                    (Some(account), ImportMode::Transactions) => {
+                    (Some(account), ImportMode::Transactions) if shown => {
                         self.count_known(&account.id, preview)
                     }
                     _ => 0,
                 };
-                let overlaps = self.overlaps_of(
-                    matched_account.as_ref().map(|a| a.id.as_str()),
-                    mode,
-                    preview,
-                    &analysis.sha256,
-                );
+                let overlaps = if shown {
+                    self.overlaps_of(
+                        matched_account.as_ref().map(|a| a.id.as_str()),
+                        mode,
+                        preview,
+                        &analysis.sha256,
+                    )
+                } else {
+                    Vec::new()
+                };
                 AnalyzedStatement {
                     preview: preview.clone(),
                     mode,
@@ -1417,7 +1639,11 @@ impl StatementService {
                 .as_ref()
                 .and_then(|previous| previous.institution.clone())
         });
-        let analyzed = self.enrich(sold_through(reading, bank.as_deref()))?;
+        let analyzed = self.enrich_with(
+            sold_through(reading, bank.as_deref()),
+            run.reimport_of.is_none(),
+        )?;
+
         if let Some(error) = &analyzed.analysis.error {
             return Err(invalid(error.clone()));
         }
@@ -1604,7 +1830,11 @@ impl StatementService {
                         // a category for every operation that was added, and a flag on the doubtful ones
                         let mut items = Vec::new();
                         let mut doubts = 0u32;
-                        let remembered = match self.remembered_categories().await {
+                        let remembered = match &run.cache {
+                            Some(cache) => Ok(pick_remembered(&locked(cache).remembered)),
+                            None => self.remembered_categories().await,
+                        };
+                        let remembered = match remembered {
                             Ok(found) => found,
                             Err(e) => {
                                 warn!("could not read the categories chosen before: {e}");
@@ -1703,13 +1933,57 @@ impl StatementService {
                                 .filter(|i| !unsure.contains(&i.activity_id))
                                 .cloned()
                                 .collect();
+                            // what a person or a rule chose counts for the payees of the documents still to come
+                            let learned: Vec<(String, (String, String))> = if run.cache.is_some() {
+                                let key_of: HashMap<&str, String> = result
+                                    .persisted_rows
+                                    .iter()
+                                    .filter_map(|persisted| {
+                                        let comment = rows[persisted.index].comment.as_deref()?;
+                                        if comment == OPENING_BALANCE_NOTE {
+                                            return None;
+                                        }
+                                        Some((
+                                            persisted.activity_id.as_str(),
+                                            equivalence_key(comment)?,
+                                        ))
+                                    })
+                                    .collect();
+                                items
+                                    .iter()
+                                    .filter(|i| i.source == "manual" || i.source == "rule")
+                                    .filter_map(|i| {
+                                        key_of.get(i.activity_id.as_str()).map(|key| {
+                                            (
+                                                key.clone(),
+                                                (i.taxonomy_id.clone(), i.category_id.clone()),
+                                            )
+                                        })
+                                    })
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            };
                             if let Err(e) = self.category_assigner.assign(items).await {
                                 warn!("could not categorize the imported operations: {e}");
                                 outcome.messages.push(format!(
                                     "The operations were imported but could not be categorized: {e}"
                                 ));
-                            } else if let Err(e) = self.mark_own_transfers(&assigned).await {
-                                warn!("could not mark the transfers between own accounts: {e}");
+                            } else {
+                                if let Some(cache) = &run.cache {
+                                    let mut cache = locked(cache);
+                                    for (key, choice) in learned {
+                                        *cache
+                                            .remembered
+                                            .entry(key)
+                                            .or_default()
+                                            .entry(choice)
+                                            .or_default() += 1;
+                                    }
+                                }
+                                if let Err(e) = self.mark_own_transfers(&assigned).await {
+                                    warn!("could not mark the transfers between own accounts: {e}");
+                                }
                             }
                         }
                     }
@@ -1733,6 +2007,17 @@ impl StatementService {
             outcomes.push(outcome);
         }
 
+        // what it brought, and where: read again the same into the same accounts, nothing needs redoing
+        let fingerprint = reading_fingerprint(
+            analyzed.analysis.chosen_adapter_id.as_deref(),
+            analyzed.statements.iter().map(|item| {
+                let account = outcomes
+                    .iter()
+                    .find(|o| o.index == item.preview.index)
+                    .and_then(|o| o.account_id.as_deref());
+                (&item.preview, item.mode, account)
+            }),
+        );
         // the original, under its standard name
         let head = analyzed.analysis.statements.first();
         let date = head.and_then(|p| {
@@ -1783,6 +2068,7 @@ impl StatementService {
             validated_at: None,
             opening_balance: head.and_then(|p| p.opening_balance.clone()),
             closing_balance: head.and_then(|p| p.balance.clone()),
+            reading_fingerprint: Some(fingerprint),
             created_at: Utc::now().to_rfc3339(),
         };
         let mut document = document;
@@ -1793,9 +2079,11 @@ impl StatementService {
         if has_operations {
             // a statement that does not follow the previous one of its account (missing days, overlap, an opening
             // balance that is not the previous closing balance) waits for the person
-            let others: Vec<StatementDocument> = self
-                .repository
-                .list_documents()?
+            let all = match &run.cache {
+                Some(cache) => locked(cache).documents.clone(),
+                None => self.repository.list_documents()?,
+            };
+            let others: Vec<StatementDocument> = all
                 .into_iter()
                 .filter(|d| {
                     run.reimport_of
@@ -1833,9 +2121,23 @@ impl StatementService {
             updated.validated_at = document.validated_at.clone();
             updated.opening_balance = document.opening_balance.clone();
             updated.closing_balance = document.closing_balance.clone();
+            updated.reading_fingerprint = document.reading_fingerprint.clone();
             let stored = self.repository.update_document(updated).await?;
-            self.record_loan(&stored, head.map(|p| &p.extra)).await;
-            self.reopen_neighbours(&stored).await;
+            self.keep_loan(&stored, head.map(|p| &p.extra)).await;
+            match &run.cache {
+                // the statements next to it and the loans: once, at the end of the run
+                Some(cache) => {
+                    let mut cache = locked(cache);
+                    match cache.documents.iter_mut().find(|d| d.id == stored.id) {
+                        Some(d) => *d = stored.clone(),
+                        None => cache.documents.push(stored.clone()),
+                    }
+                }
+                None => {
+                    self.sync_loans_of(&stored).await;
+                    self.reopen_neighbours(&stored).await;
+                }
+            }
             return Ok(StatementImportResult {
                 document: Some(stored),
                 already_imported: false,
@@ -1877,6 +2179,26 @@ impl StatementService {
 impl StatementService {
     /// Keep what a loan paper says, then bring the status of every loan paper in line with the rebuilt loans.
     async fn record_loan(&self, document: &StatementDocument, extra: Option<&serde_json::Value>) {
+        self.keep_loan(document, extra).await;
+        self.sync_loans_of(document).await;
+    }
+
+    /// Bring the status of every loan paper in line with the rebuilt loans, after a loan paper came in.
+    async fn sync_loans_of(&self, document: &StatementDocument) {
+        if !document
+            .document_kind
+            .as_deref()
+            .is_some_and(super::is_loan_kind)
+        {
+            return;
+        }
+        if let Err(e) = self.sync_loan_statuses().await {
+            warn!("could not update the loan documents: {e}");
+        }
+    }
+
+    /// Keep what a loan paper says.
+    async fn keep_loan(&self, document: &StatementDocument, extra: Option<&serde_json::Value>) {
         let Some(kind) = document
             .document_kind
             .as_deref()
@@ -1905,9 +2227,6 @@ impl StatementService {
                     document.file_name
                 );
             }
-        }
-        if let Err(e) = self.sync_loan_statuses().await {
-            warn!("could not update the loan documents: {e}");
         }
     }
 
@@ -2324,16 +2643,6 @@ impl StatementService {
         Ok(())
     }
 
-    /// Read a stored original again.
-    async fn read_stored(
-        &self,
-        document: &StatementDocument,
-        content: Vec<u8>,
-    ) -> Result<StatementAnalysis> {
-        let reading = self.reading_of(document, Some(content)).await?;
-        self.enrich((*reading).clone())
-    }
-
     fn kept_reading(&self, key: &str) -> Option<Arc<Analysis>> {
         self.readings
             .lock()
@@ -2461,6 +2770,11 @@ impl StatementService {
     /// What was decided before for each payee: the category most often given by a person or a rule to the
     /// operations whose label is equivalent. A guess from the import never counts.
     async fn remembered_categories(&self) -> Result<HashMap<String, (String, String)>> {
+        Ok(pick_remembered(&self.remembered_counts().await?))
+    }
+
+    /// How often a person or a rule gave each category to the operations of each payee.
+    async fn remembered_counts(&self) -> Result<HashMap<String, HashMap<(String, String), u32>>> {
         let activities = self.activity_service.get_activities()?;
         let key_of: HashMap<&str, String> = activities
             .iter()
@@ -2486,15 +2800,7 @@ impl StatementService {
                     .or_default() += 1;
             }
         }
-        Ok(counts
-            .into_iter()
-            .filter_map(|(key, choices)| {
-                choices
-                    .into_iter()
-                    .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
-                    .map(|(choice, _)| (key, choice))
-            })
-            .collect())
+        Ok(counts)
     }
 
     /// The category a person chose, carried to the other operations with an equivalent label. A category chosen by
@@ -2566,7 +2872,8 @@ impl StatementService {
             })
             .collect();
         let mut updates = Vec::new();
-        for a in self.activity_service.get_activities()? {
+        let ids: Vec<String> = wanted.keys().map(|id| id.to_string()).collect();
+        for a in self.activity_service.get_activities_by_ids(&ids)? {
             let Some(&want) = wanted.get(a.id.as_str()) else {
                 continue;
             };
@@ -2799,6 +3106,7 @@ impl StatementService {
         content: &[u8],
         carry: HashMap<OperationKey, (String, String)>,
         link_transfers: bool,
+        cache: Option<Arc<std::sync::Mutex<RunCache>>>,
     ) -> Result<StatementDocument> {
         let result = self
             .run_import(
@@ -2817,6 +3125,7 @@ impl StatementService {
                     carry,
                     fallback_account: document.account_id.clone(),
                     link_transfers,
+                    cache,
                 },
             )
             .await?;
@@ -2827,11 +3136,11 @@ impl StatementService {
 
     /// Check that a stored original can still be read into statements before anything is undone.
     async fn check_readable(&self, document: &StatementDocument, content: Vec<u8>) -> Result<()> {
-        let analyzed = self.read_stored(document, content).await?;
-        if let Some(error) = analyzed.analysis.error {
-            return Err(invalid(error));
+        let reading = self.reading_of(document, Some(content)).await?;
+        if let Some(error) = &reading.error {
+            return Err(invalid(error.clone()));
         }
-        if analyzed.statements.is_empty() {
+        if reading.statements.is_empty() {
             return Err(invalid("Nothing could be read from this file"));
         }
         Ok(())
@@ -3374,7 +3683,7 @@ impl StatementServiceTrait for StatementService {
         // nothing is undone unless the file can still be read
         self.check_readable(&document, content.clone()).await?;
         let carry = self.undo_document(&document).await?;
-        self.reimport(&document, &content, carry, true).await
+        self.reimport(&document, &content, carry, true, None).await
     }
 
     async fn invalidate_all(&self) -> Result<u32> {
@@ -3624,21 +3933,25 @@ impl StatementServiceTrait for StatementService {
 
     async fn revalidate_all(&self) -> Result<RevalidationResult> {
         let documents = self.repository.list_documents()?;
-        self.revalidate(documents).await
+        // everything is read again and redone, even what reads the same
+        self.revalidate(documents, false, true).await
     }
 
     async fn revalidate_outdated(&self) -> Result<RevalidationResult> {
-        let current = wealthfolio_statement_import::reader_version().to_string();
         let documents = self
             .repository
             .list_documents()?
             .into_iter()
-            .filter(|d| d.reader_version.as_deref() != Some(current.as_str()))
+            .filter(is_outdated)
             .collect();
-        self.revalidate(documents).await
+        self.revalidate(documents, true, true).await
     }
 
-    async fn revalidate_documents(&self, ids: &[String]) -> Result<RevalidationResult> {
+    async fn revalidate_documents(
+        &self,
+        ids: &[String],
+        finish: bool,
+    ) -> Result<RevalidationResult> {
         let wanted: HashSet<&str> = ids.iter().map(String::as_str).collect();
         let documents = self
             .repository
@@ -3646,7 +3959,7 @@ impl StatementServiceTrait for StatementService {
             .into_iter()
             .filter(|d| wanted.contains(d.id.as_str()))
             .collect();
-        self.revalidate(documents).await
+        self.revalidate(documents, true, finish).await
     }
 
     fn outdated_documents(&self) -> Result<super::OutdatedDocuments> {
@@ -3656,7 +3969,7 @@ impl StatementServiceTrait for StatementService {
             .repository
             .list_documents()?
             .into_iter()
-            .filter(|d| d.reader_version.as_deref() != Some(current.as_str()))
+            .filter(is_outdated)
             .collect();
         documents.sort_by(logical_order);
         let document_ids = documents.into_iter().map(|d| d.id).collect();
@@ -4449,6 +4762,7 @@ mod tests {
             validated_at: None,
             opening_balance: None,
             closing_balance: None,
+            reading_fingerprint: None,
         }
     }
 

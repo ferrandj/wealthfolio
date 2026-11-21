@@ -375,7 +375,9 @@ paper_adapter!(
     BoursoBankLoanYearlyPdf,
     "boursobank.loan_yearly_pdf",
     "BoursoBank · information annuelle sur un prêt (capital restant dû, PDF)",
-    "L'information annuelle d'un prêt (article L 312-32 du code de la consommation) : capital restant dû au 31 décembre, dernière échéance réglée, échéance finale, à classer avec le prêt."
+    "L'information annuelle d'un prêt (article L 312-32 du code de la consommation) : capital restant dû au 31 décembre, dernière échéance réglée, échéance finale, à classer avec le prêt.",
+    INSTITUTION,
+    "loan_statement"
 );
 
 impl BoursoBankLoanYearlyPdf {
@@ -403,12 +405,13 @@ impl BoursoBankLoanYearlyPdf {
         let mut st = paper(self);
         loan_paper(&mut st);
         let text = rows_text(doc)?;
-        // the loan account is the only one of its kind at the bank: the letter has no account number of it
-        st.set_extra("match_by_type", true);
-        if let Some(r) = search(r"(?i)pr[eê]t\s+\w+\s+n°\s*(\d{5}\s*-?\s*\d{11})", &text)
-            .and_then(|m| reference(&m[1]))
-        {
-            st.set_extra("loan_reference", r);
+        // filed with the loan its number names, like the other papers of the loan
+        let mut loan = Map::new();
+        let reference_found = search(r"(?i)pr[eê]t\s+\w+\s+n°\s*(\d{5}\s*-?\s*\d{11})", &text)
+            .and_then(|m| reference(&m[1]));
+        if let Some(r) = &reference_found {
+            st.set_extra("loan_reference", r.as_str());
+            loan.insert("reference".into(), json!(r));
         }
         if let Some(m) = search(
             r"(?i)Boulogne[- ]Billancourt,\s+le\s+(\d{1,2})(?:er)?\s+([a-zéû]+)\s+(\d{4})",
@@ -438,6 +441,14 @@ impl BoursoBankLoanYearlyPdf {
             amount(r"Montant de la derni[èe]re [ée]ch[ée]ance r[ée]gl[ée]e"),
         );
         put_amount(&mut st, "unpaid", amount(r"Solde impay[ée]"));
+        for key in ["principal", "remaining", "last_instalment", "unpaid"] {
+            if let Some(v) = st.extra.get(key).cloned() {
+                loan.insert(key.into(), v);
+            }
+        }
+        if let Some(d) = as_of {
+            loan.insert("as_of".into(), json!(iso(d)));
+        }
         if let Some(d) = search(
             r"(?i)Date de l'[ée]ch[ée]ance finale\s+(\d{2}/\d{2}/\d{4})",
             &text,
@@ -454,6 +465,21 @@ impl BoursoBankLoanYearlyPdf {
         let product = search(r"(?i)relatives [àa] votre\s+(PRET\s+\w+)", &text)
             .map(|m| sentence(&m[1]).replace("Pret", "Prêt"))
             .unwrap_or_else(|| "Prêt".to_string());
+        if let Some(d) = st.extra.get("final_due").cloned() {
+            loan.insert("final_due".into(), d);
+        }
+        loan.insert("product".into(), json!(product));
+        // named like the loan its other papers make
+        st.account_label = Some(match &reference_found {
+            Some(r) => format!("{product} …{}", &r[r.len() - 4..]),
+            None => product.clone(),
+        });
+        if reference_found.is_none() {
+            st.warnings
+                .push("Le numéro du crédit n'a pas été trouvé".into());
+            st.confidence = "medium".into();
+        }
+        st.set_extra("loan", Value::Object(loan));
         st.set_extra(
             "title",
             match as_of {

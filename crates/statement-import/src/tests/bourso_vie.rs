@@ -199,3 +199,65 @@ fn test_the_statement_of_situation_gives_the_holdings_of_the_contract() {
     );
     assert!(st.warnings.is_empty(), "{:?}", st.warnings);
 }
+
+#[test]
+fn test_the_yearly_statement_gives_the_funds_on_the_last_day_and_the_operations_of_the_year() {
+    let st = read(&[
+        vec![(10.0, "Bourso Vie")],
+        vec![(10.0, "Contrat N° : 12345678")],
+        vec![(10.0, "Date d'effet : 16/01/2021")],
+        vec![(110.0, "Paris, le 27 février 2026")],
+        vec![(10.0, "Vous faites confiance à Generali pour la gestion de votre épargne")],
+        vec![(10.0, "EPARGNE ATTEINTE DE VOTRE CONTRAT AU 31/12/2025"), (300.0, "1 251,50 €")],
+        vec![(10.0, "Supports Unités de Compte A la date du Valeur de la Nombre de PAM (1) Epargne atteinte")],
+        vec![(10.0, "Fonds Actions Monde A"), (150.0, "31/12/2025"), (200.0, "48,12 €"), (250.0, "2,4115"), (300.0, "47,47 €"), (350.0, "116,04 €")],
+        vec![(10.0, "Fonds Obligations B"), (150.0, "31/12/2025"), (200.0, "10 421,05 €"), (250.0, "0,1089"), (300.0, "8 754,44 €"), (350.0, "1 135,46 €"), (400.0, "10RPBGSE")],
+        vec![(10.0, "OPERATIONS REALISEES DU 01/01/2025 AU 31/12/2025")],
+        vec![(10.0, "Versement libre programmé de 50,00 € du 10/01/2025 (Frais : 0,00%)")],
+        vec![(10.0, "Fonds Actions Monde A"), (150.0, "50,00 €"), (200.0, "15/01/2025"), (250.0, "46,77 €"), (300.0, "1,0690")],
+        vec![(10.0, "Frais de gestion de 5,66 € du 24/03/2025 (Frais : 0,17314%)")],
+        vec![(10.0, "Fonds Actions Monde A"), (150.0, "-5,66 €"), (200.0, "24/03/2025"), (250.0, "47,21 €"), (300.0, "-0,1199")],
+        vec![(10.0, "OPERATIONS REALISEES DU 01/01/2025 AU 31/12/2025 (suite)")],
+        vec![(10.0, "Frais de gestion de 5,66 € du 24/03/2025 (Frais : 0,17314%)")],
+        vec![(10.0, "Changement d'Allocation du 06/03/2025 (Frais : 0,00%)")],
+        vec![(10.0, "Distribution de dividendes de 0,13 € du 02/01/2025 (Frais : 0,00%)")],
+    ]);
+    assert_eq!(st.adapter_id.as_deref(), Some("boursobank.life_yearly_pdf"));
+    assert_eq!(st.document_kind.as_deref(), Some("positions"));
+    assert_eq!(st.account_number.as_deref(), Some("12345678"));
+    assert_eq!(st.account_type.as_deref(), Some("life_insurance"));
+    assert_eq!(
+        st.balance.map(|b| b.to_string()).as_deref(),
+        Some("1251.50")
+    );
+    assert_eq!(
+        st.balance_date.map(|d| d.to_string()).as_deref(),
+        Some("2025-12-31")
+    );
+    assert_eq!(
+        st.period_start.map(|d| d.to_string()).as_deref(),
+        Some("2025-01-01")
+    );
+    assert!(st.warnings.is_empty(), "{:?}", st.warnings);
+    let h = st.holdings.clone().unwrap();
+    assert_eq!(h.len(), 2);
+    assert_eq!(h[1].name.as_deref(), Some("Fonds Obligations B"));
+    assert_eq!(h[1].quantity.to_string(), "0.1089");
+    assert_eq!(
+        h[1].unit_price.map(|p| p.to_string()).as_deref(),
+        Some("10421.05")
+    );
+    assert_eq!(
+        h[1].cost_basis.map(|p| p.to_string()).as_deref(),
+        Some("8754.44")
+    );
+    assert_eq!(extra(&st, "issued_on"), &json!("2026-02-27"));
+    assert_eq!(extra(&st, "deposits_total"), &json!("50.00"));
+    // the heading printed again on the next page is counted once
+    assert_eq!(extra(&st, "fees_total"), &json!("5.66"));
+    assert_eq!(extra(&st, "dividends_total"), &json!("0.13"));
+    let ops = extra(&st, "operations").as_array().unwrap();
+    assert_eq!(ops.len(), 4);
+    assert_eq!(ops[2]["kind"], json!("allocation"));
+    assert_eq!(ops[2]["date"], json!("2025-03-06"));
+}

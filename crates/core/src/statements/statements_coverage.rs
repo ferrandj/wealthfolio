@@ -197,6 +197,7 @@ mod tests {
             validated_at: None,
             opening_balance: Some(open.into()),
             closing_balance: Some(close.into()),
+            reading_fingerprint: None,
         }
     }
 

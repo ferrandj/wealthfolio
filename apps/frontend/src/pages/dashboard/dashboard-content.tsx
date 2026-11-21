@@ -26,6 +26,7 @@ import { PrivacyToggle } from "@/components/privacy-toggle";
 import type { AccountScope } from "@/lib/types";
 import { accountScopeKey } from "@/pages/allocation-targets/components/target-scope";
 import { AccountsSummary } from "./accounts-summary";
+import { LoansSummary } from "./loans-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
@@ -333,6 +334,9 @@ export function DashboardContent({
                 currentAccountValuations={portfolioCurrentValuation?.accounts}
                 isLoadingCurrentValuations={isCurrentValuationLoading}
               />
+              <div className="mt-8">
+                <LoansSummary />
+              </div>
             </div>
             <div className="space-y-6">
               <HoldingsScopeNotice {...holdingsQuery} />

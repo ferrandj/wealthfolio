@@ -6754,6 +6754,10 @@ impl ActivityServiceTrait for ActivityService {
         self.activity_repository.get_activities()
     }
 
+    fn get_activities_by_ids(&self, activity_ids: &[String]) -> Result<Vec<Activity>> {
+        self.activity_repository.get_activities_by_ids(activity_ids)
+    }
+
     fn get_activities_including_archived_accounts(&self) -> Result<Vec<Activity>> {
         self.activity_repository
             .get_activities_including_archived_accounts()

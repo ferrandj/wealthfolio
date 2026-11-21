@@ -117,5 +117,9 @@
     "unavailable": "Il portafoglio selezionato non è più disponibile. Sono visualizzati tutti i conti.",
     "load_error": "Impossibile caricare il portafoglio selezionato.",
     "empty": "Nessun conto da visualizzare in questo portafoglio."
+  },
+  "loans": {
+    "title": "Prestiti",
+    "still_owed": "Capitale residuo"
   }
 }

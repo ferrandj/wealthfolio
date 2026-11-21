@@ -117,5 +117,9 @@
     "unavailable": "Le portefeuille sélectionné n’est plus disponible. Tous les comptes sont affichés.",
     "load_error": "Impossible de charger le portefeuille sélectionné.",
     "empty": "Aucun compte à afficher dans ce portefeuille."
+  },
+  "loans": {
+    "title": "Crédits",
+    "still_owed": "Capital restant dû"
   }
 }

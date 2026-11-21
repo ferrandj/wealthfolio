@@ -14,9 +14,14 @@ use super::statements_model::StatementDocument;
 pub const KIND_OFFER: &str = "loan_offer";
 pub const KIND_SCHEDULE: &str = "loan_schedule";
 pub const KIND_EVENT: &str = "loan_event";
+/// A yearly information on the loan (the capital still owed at the end of a year): filed with its loan by its number.
+pub const KIND_STATEMENT: &str = "loan_statement";
 
 pub fn is_loan_kind(kind: &str) -> bool {
-    matches!(kind, KIND_OFFER | KIND_SCHEDULE | KIND_EVENT)
+    matches!(
+        kind,
+        KIND_OFFER | KIND_SCHEDULE | KIND_EVENT | KIND_STATEMENT
+    )
 }
 
 /// What a loan paper says, as the reader saw it.

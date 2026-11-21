@@ -619,3 +619,220 @@ impl BoursoVieSituationPdf {
         Ok(vec![st])
     }
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+
+/// The yearly statement of the contract sent by the insurer ("Relevé de Situation au 31/12/…", with the letter of
+/// Generali): the savings reached on the last day of the year spread over the funds, then every operation of the
+/// year (scheduled deposits, management fees, income, changes of allocation).
+pub struct BoursoVieYearlyPdf;
+
+paper_adapter!(
+    BoursoVieYearlyPdf,
+    "boursobank.life_yearly_pdf",
+    "Bourso Vie · situation annuelle au 31 décembre (PDF)",
+    "Le relevé annuel d'un contrat Bourso Vie (Generali) : l'épargne atteinte au 31 décembre répartie sur les supports (valeur de part, nombre de parts, prix d'achat moyen) devient les positions du contrat à cette date ; les opérations de l'année (versements, frais de gestion, dividendes, changements d'allocation) sont gardées avec le document.",
+    INSTITUTION,
+    "positions"
+);
+
+/// The kind of an operation of the year, from its heading.
+fn yearly_kind(label: &str) -> &'static str {
+    let n = norm(label);
+    if n.starts_with("versement") {
+        "deposit"
+    } else if n.starts_with("frais") {
+        "fee"
+    } else if n.starts_with("distribution") {
+        "dividend"
+    } else if n.starts_with("changement d'allocation") || n.starts_with("arbitrage") {
+        "allocation"
+    } else if n.starts_with("rachat") {
+        "withdrawal"
+    } else {
+        "other"
+    }
+}
+
+impl BoursoVieYearlyPdf {
+    fn score(&self, c: &str) -> Detection {
+        detection(
+            &[
+                (is_bourso_vie(c), 0.3, "Bourso Vie"),
+                (
+                    c.contains("epargneatteintedevotrecontratau"),
+                    0.35,
+                    "« Epargne atteinte de votre contrat au »",
+                ),
+                (
+                    c.contains("operationsrealiseesdu"),
+                    0.2,
+                    "« Opérations réalisées du … au … »",
+                ),
+                (c.contains("generali"), 0.1, "Generali"),
+            ],
+            is_bourso_vie(c),
+        )
+    }
+
+    fn read(&self, doc: &SourceDocument) -> ParseResult {
+        let mut st = paper(self);
+        let text = rows_text(doc)?;
+        let number_of = search(r"(?im)^Contrat N°\s*:\s*(\d{6,})", &text).map(|m| m[1].to_string());
+        contract(&mut st, number_of);
+        if let Some(m) = search(
+            r"(?i)Paris,\s+le\s+(\d{1,2})(?:er)?\s+([a-zéû]+)\s+(\d{4})",
+            &text,
+        ) {
+            if let Some(d) = french_day(&m[1], &m[2], &m[3]) {
+                st.set_extra("issued_on", iso(d));
+            }
+        }
+        if let Some(d) = search(&format!(r"(?i)Date d'effet\s*:\s*{DATE}"), &text)
+            .and_then(|m| parse_date_s(&m[1]))
+        {
+            st.set_extra("opened_on", iso(d));
+        }
+        // the savings on the last day of the year: the date of the holdings
+        let reached = search(
+            &format!(r"(?im)^EPARGNE ATTEINTE DE VOTRE CONTRAT AU\s*{DATE}\s+{AMOUNT}\s*€"),
+            &text,
+        );
+        let as_of = reached.as_ref().and_then(|m| parse_date_s(&m[1]));
+        let savings = reached.as_ref().and_then(|m| number(&m[2]));
+        put_amount(&mut st, "savings", savings);
+        st.balance = savings;
+        st.balance_date = as_of;
+        st.period_end = as_of;
+        if let Some(m) = search(
+            &format!(r"(?i)OPERATIONS REALISEES DU\s*{DATE}\s*AU\s*{DATE}"),
+            &text,
+        ) {
+            st.period_start = parse_date_s(&m[1]);
+        }
+
+        // the funds: "Name 31/12/2025 48,12 € 2,4115 47,47 € 116,04 €" (value date, unit value, units, average
+        // purchase price, savings)
+        let rows: Vec<&str> = text.lines().collect();
+        let start = rows
+            .iter()
+            .position(|r| norm(r).starts_with("epargne atteinte de votre contrat"))
+            .unwrap_or(0);
+        let end = rows
+            .iter()
+            .position(|r| norm(r).starts_with("operations realisees du"))
+            .unwrap_or(rows.len());
+        let fund = format!(
+            // a page code is sometimes glued at the end of the row ("… 70,40 € 10RPBGSE")
+            r"^(.+?)\s+{DATE}\s+{NUMBER}\s*€\s+{NUMBER}\s+{NUMBER}\s*€\s+{AMOUNT}\s*€(?:\s+[A-Z0-9]+)?$"
+        );
+        let mut holdings: Vec<HoldingData> = vec![];
+        let mut total = Decimal::ZERO;
+        for row in rows[start..end.max(start)].iter() {
+            let Some(m) = search(&fund, py::strip(row)) else {
+                continue;
+            };
+            let (Some(price), Some(units), Some(amount)) =
+                (number(&m[3]), number(&m[4]), number(&m[6]))
+            else {
+                continue;
+            };
+            let name = py::strip(&m[1]).to_string();
+            total += amount;
+            let mut extra = Map::new();
+            if let Some(d) = parse_date_s(&m[2]) {
+                extra.insert("value_date".into(), json!(iso(d)));
+            }
+            holdings.push(HoldingData {
+                symbol: Some(name.clone()),
+                quantity: units,
+                name: Some(name),
+                isin: None,
+                asset_class: "fund".into(),
+                unit_price: Some(price),
+                value: Some(amount),
+                value_currency: Some("EUR".into()),
+                cost_basis: number(&m[5]),
+                extra: Some(extra),
+            });
+        }
+
+        // the operations of the year: a heading "Versement libre programmé de 50,00 € du 10/01/2025 (Frais : 0,00%)"
+        // above the funds it moved
+        let heading = format!(
+            r"^(.+?)(?:\s+de\s+{AMOUNT}\s*€)?\s+du\s+{DATE}\s*\(Frais\s*:\s*([\d,]+)\s*%\)"
+        );
+        let mut operations: Vec<Value> = vec![];
+        let mut totals: std::collections::BTreeMap<&str, Decimal> = Default::default();
+        let mut seen: std::collections::HashSet<String> = Default::default();
+        for row in rows[end.min(rows.len())..].iter() {
+            let Some(m) = search(&heading, py::strip(row)) else {
+                continue;
+            };
+            // a heading is printed again at the top of the next page when its funds go on there
+            if !seen.insert(py::strip(row).to_string()) {
+                continue;
+            }
+            let label = py::strip(&m[1]).to_string();
+            let kind = yearly_kind(&label);
+            let amount = m.get(2).and_then(|a| number(a.as_str()));
+            let mut op = Map::new();
+            if let Some(d) = parse_date_s(&m[3]) {
+                op.insert("date".into(), json!(iso(d)));
+            }
+            op.insert("kind".into(), json!(kind));
+            op.insert("label".into(), json!(label));
+            if let Some(a) = amount {
+                op.insert("amount".into(), dec(a));
+                *totals.entry(kind).or_default() += a;
+            }
+            if let Some(f) = number(&m[4]) {
+                op.insert("fee_percent".into(), dec(f));
+            }
+            operations.push(Value::Object(op));
+        }
+        for (kind, key) in [
+            ("deposit", "deposits_total"),
+            ("fee", "fees_total"),
+            ("dividend", "dividends_total"),
+            ("withdrawal", "withdrawals_total"),
+        ] {
+            if let Some(v) = totals.get(kind) {
+                st.set_extra(key, py::dec_str(v));
+            }
+        }
+        st.set_extra("operations", Value::Array(operations));
+
+        if holdings.is_empty() {
+            st.warnings
+                .push("Les supports du contrat n'ont pas pu être lus".into());
+            st.confidence = "low".into();
+        } else if let Some(s) = savings {
+            let tolerance = Decimal::new(2, 2) * Decimal::from(holdings.len() as u64);
+            if (total - s).abs() > tolerance {
+                st.warnings.push(format!(
+                    "Les supports ({}) ne correspondent pas à l'épargne atteinte ({})",
+                    py::dec_str(&total),
+                    py::dec_str(&s)
+                ));
+                st.confidence = "medium".into();
+            }
+        }
+        if st.account_number.is_none() {
+            st.warnings
+                .push("Le numéro du contrat n'a pas été trouvé".into());
+            st.confidence = "low".into();
+        }
+        st.set_extra("funds_total", py::dec_str(&total));
+        st.holdings = Some(holdings);
+        st.set_extra(
+            "title",
+            match as_of {
+                Some(d) => format!("Situation annuelle Bourso Vie · {}", d.format("%d/%m/%Y")),
+                None => "Situation annuelle Bourso Vie".to_string(),
+            },
+        );
+        st.set_extra("category", "Assurance-vie");
+        Ok(vec![st])
+    }
+}

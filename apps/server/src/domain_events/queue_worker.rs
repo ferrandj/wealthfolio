@@ -107,6 +107,11 @@ pub async fn event_queue_worker(
             None => {}
         }
 
+        // a long run of changes (documents read again): the events wait until it is over
+        if wealthfolio_core::events::events_held() {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            continue;
+        }
         if is_processing.load(Ordering::SeqCst) {
             tracing::debug!("Debounce expired but previous batch still processing, continuing to collect events");
             continue;

@@ -139,6 +139,10 @@ pub struct StatementDocument {
     /// Balances the statement states, to check that consecutive statements follow each other.
     pub opening_balance: Option<String>,
     pub closing_balance: Option<String>,
+    /// What the readers found in it when its operations were brought in (see `reading_fingerprint`): read again the
+    /// same, nothing needs redoing.
+    #[serde(default, skip_serializing)]
+    pub reading_fingerprint: Option<String>,
 }
 
 /// The room the kept originals take: as they were brought, and as they are stored (compressed).

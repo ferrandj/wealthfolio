@@ -945,12 +945,19 @@ diesel::table! {
         import_run_id -> Nullable<Text>,
         status -> Text,
         created_at -> Text,
-        content -> Binary,
         review_reason -> Nullable<Text>,
         to_review_count -> Integer,
         validated_at -> Nullable<Text>,
         opening_balance -> Nullable<Text>,
         closing_balance -> Nullable<Text>,
+        reading_fingerprint -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    statement_document_contents (document_id) {
+        document_id -> Text,
+        content -> Binary,
     }
 }
 
@@ -1075,6 +1082,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     contact_linked_accounts,
     activity_counterparties,
     account_identities,
+    statement_document_contents,
     statement_documents,
     statement_gap_marks,
     loan_documents,

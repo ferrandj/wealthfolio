@@ -117,5 +117,9 @@
     "unavailable": "A carteira selecionada já não está disponível. São apresentadas todas as contas.",
     "load_error": "Não foi possível carregar a carteira selecionada.",
     "empty": "Não há contas para exibir nesta carteira."
+  },
+  "loans": {
+    "title": "Empréstimos",
+    "still_owed": "Capital em dívida"
   }
 }

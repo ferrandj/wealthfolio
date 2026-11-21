@@ -147,8 +147,14 @@ pub trait StatementServiceTrait: Send + Sync {
     /// Read again, the same way, only the documents read by an older version of the readers.
     async fn revalidate_outdated(&self) -> Result<RevalidationResult>;
     /// Read again, the same way, the given documents: a long update is done in parts, a few documents per call,
-    /// in the order `outdated_documents` gives.
-    async fn revalidate_documents(&self, ids: &[String]) -> Result<RevalidationResult>;
+    /// in the order `outdated_documents` gives. A document that reads the same as when its operations were brought
+    /// in is left as it is. What concerns every document (the transfers between own accounts, the loans, the
+    /// statements next to the ones read) is done once, by the call with `finish` (the last part).
+    async fn revalidate_documents(
+        &self,
+        ids: &[String],
+        finish: bool,
+    ) -> Result<RevalidationResult>;
     /// How far a running `revalidate_all` is (not running: the last one's end, or nothing).
     fn revalidation_progress(&self) -> RevalidationProgress;
     /// The room the kept originals take: as they were brought, and as stored.

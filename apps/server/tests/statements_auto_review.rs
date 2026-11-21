@@ -156,7 +156,7 @@ async fn the_automatic_review_validates_what_raises_no_alert_and_says_why_for_th
         .unwrap();
     let part = state
         .statement_service
-        .revalidate_documents(std::slice::from_ref(&first.id))
+        .revalidate_documents(std::slice::from_ref(&first.id), true)
         .await
         .unwrap();
     assert_eq!(part.total, 1);
@@ -255,7 +255,7 @@ async fn reading_again_keeps_what_did_not_change_validated_and_runs_once_at_a_ti
     let ids: Vec<String> = documents.iter().map(|d| d.id.clone()).collect();
     let result = state
         .statement_service
-        .revalidate_documents(&ids)
+        .revalidate_documents(&ids, true)
         .await
         .unwrap();
     assert_eq!(result.failed, 0);
@@ -266,11 +266,103 @@ async fn reading_again_keeps_what_did_not_change_validated_and_runs_once_at_a_ti
         assert!(!d.review_reason.as_deref().unwrap_or("").contains("changed"));
     }
 
-    // two readings at once: the second is refused instead of undoing what the first brings back
+    // two readings at once (everything redone): the second is refused instead of undoing what the first brings back
     let service = &state.statement_service;
-    let (first, second) = tokio::join!(
-        service.revalidate_documents(&ids),
-        service.revalidate_documents(&ids)
-    );
+    let (first, second) = tokio::join!(service.revalidate_all(), service.revalidate_all());
     assert!(first.is_ok() != second.is_ok(), "{first:?} {second:?}");
+}
+
+#[tokio::test]
+async fn a_document_that_reads_the_same_is_left_as_it_is() {
+    let root = tempdir().unwrap();
+    let state = build_state(&test_config(root.path())).await.unwrap();
+    let account = state
+        .account_service
+        .create_account(new_account("55555555555"))
+        .await
+        .unwrap();
+    for month in [1, 2] {
+        state
+            .statement_service
+            .import(StatementImportRequest {
+                file_name: format!("55555555555-{month}.ofx"),
+                content_base64: base64::engine::general_purpose::STANDARD.encode(ofx(
+                    "55555555555",
+                    month,
+                    3,
+                    "PRLV SEPA EDF CLIENTS",
+                )),
+                adapter_id: None,
+                overrides: vec![StatementOverride {
+                    index: 0,
+                    account_id: Some(account.id.clone()),
+                    new_account_name: None,
+                    skip: false,
+                    identity: None,
+                }],
+                allow_duplicate_document: false,
+                replace_document_ids: vec![],
+                institution: None,
+            })
+            .await
+            .unwrap();
+    }
+    let ids_of = |state: &wealthfolio_server::AppState| {
+        let mut ids: Vec<String> = state
+            .activity_service
+            .get_activities()
+            .unwrap()
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+        ids.sort();
+        ids
+    };
+    let before = ids_of(&state);
+    assert!(!before.is_empty());
+    let documents = state.statement_service.list_documents().unwrap();
+    let ids: Vec<String> = documents.iter().map(|d| d.id.clone()).collect();
+
+    // read again in two parts: the operations are those already there, not brought back again
+    let first = state
+        .statement_service
+        .revalidate_documents(&ids[..1], false)
+        .await
+        .unwrap();
+    let last = state
+        .statement_service
+        .revalidate_documents(&ids[1..], true)
+        .await
+        .unwrap();
+    assert_eq!(first.failed + last.failed, 0);
+    assert_eq!(ids_of(&state), before);
+    let after = state.statement_service.list_documents().unwrap();
+    for d in &documents {
+        let now = after.iter().find(|a| a.id == d.id).unwrap();
+        assert_eq!(now.status, d.status);
+        assert_eq!(now.import_run_id, d.import_run_id);
+    }
+
+    // an operation removed by hand: its document is read again and brings it back
+    let gone = before[0].clone();
+    state
+        .activity_service
+        .bulk_mutate_activities(wealthfolio_core::activities::ActivityBulkMutationRequest {
+            creates: vec![],
+            updates: vec![],
+            delete_ids: vec![gone],
+        })
+        .await
+        .unwrap();
+    state
+        .statement_service
+        .revalidate_documents(&ids, true)
+        .await
+        .unwrap();
+    assert_eq!(ids_of(&state).len(), before.len());
+
+    // reading everything again redoes everything
+    let kept = ids_of(&state);
+    state.statement_service.revalidate_all().await.unwrap();
+    assert_ne!(ids_of(&state), kept);
 }

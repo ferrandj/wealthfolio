@@ -126,9 +126,15 @@ export const revalidateOutdatedStatementDocuments = async (): Promise<Revalidati
   return invoke<RevalidationResult>("revalidate_outdated_statement_documents");
 };
 
-/** Read again the given documents, oldest first: a long update goes a few documents per call. */
-export const revalidateStatementDocuments = async (ids: string[]): Promise<RevalidationResult> => {
-  return invoke<RevalidationResult>("revalidate_statement_documents", { ids });
+/**
+ * Read again the given documents, oldest first: a long update goes a few dozen documents per call, `finish` on the
+ * last one (what concerns every document is done then).
+ */
+export const revalidateStatementDocuments = async (
+  ids: string[],
+  finish = true,
+): Promise<RevalidationResult> => {
+  return invoke<RevalidationResult>("revalidate_statement_documents", { ids, finish });
 };
 
 /** Every validated statement goes back to waiting for review; returns how many. */

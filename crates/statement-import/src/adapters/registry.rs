@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use super::base::{Adapter, ParsedStatement, SourceDocument};
 use super::boursobank::fees_pdf::BoursoBankFeesPdf;
 use super::boursobank::life_csv::BoursoVieLifePositionsCsv;
-use super::boursobank::life_pdf::{BoursoVieLetterPdf, BoursoVieSituationPdf};
+use super::boursobank::life_pdf::{BoursoVieLetterPdf, BoursoVieSituationPdf, BoursoVieYearlyPdf};
 use super::boursobank::loan_pdf::{
     BoursoBankLoanContractPdf, BoursoBankLoanSchedulePdf, BoursoBankLoanYearlyPdf,
 };
@@ -50,6 +50,17 @@ pub fn reader_version() -> &'static str {
     env!("STATEMENT_READER_VERSION")
 }
 
+include!(concat!(env!("OUT_DIR"), "/reader_versions.rs"));
+
+/// The fingerprint of the code one adapter reads with (its file and every module it uses): a document read by this
+/// adapter is out of date only when that code changed. An unknown or missing adapter falls back to `reader_version`.
+pub fn reader_version_of(adapter_id: Option<&str>) -> &'static str {
+    adapter_id
+        .and_then(|id| READER_VERSIONS.iter().find(|(known, _)| *known == id))
+        .map(|(_, version)| *version)
+        .unwrap_or_else(reader_version)
+}
+
 /// One entry per kind of document per institution. To support a new one: write the adapter, add it here.
 pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoBankStatementPdf,
@@ -69,6 +80,7 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoBankLoanYearlyPdf,
     &BoursoVieLetterPdf,
     &BoursoVieSituationPdf,
+    &BoursoVieYearlyPdf,
     &BoursoVieLifePositionsCsv,
     &OradeaTaxFormPdf,
     &OradeaPerContributionsPdf,

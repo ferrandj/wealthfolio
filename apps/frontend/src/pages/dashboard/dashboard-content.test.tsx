@@ -137,6 +137,10 @@ vi.mock("./accounts-summary", () => ({
   AccountsSummary: vi.fn(() => <div>accounts-summary</div>),
 }));
 
+vi.mock("./loans-summary", () => ({
+  LoansSummary: () => null,
+}));
+
 vi.mock("./balance", () => ({
   default: ({ targetValue, isUnavailable }: { targetValue: number; isUnavailable?: boolean }) => (
     <div>{isUnavailable ? "balance:N/A" : `balance:${targetValue}`}</div>

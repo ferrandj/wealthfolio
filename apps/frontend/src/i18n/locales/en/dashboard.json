@@ -112,5 +112,9 @@
     "unavailable": "The selected portfolio is no longer available. Showing all accounts.",
     "load_error": "Unable to load the selected portfolio.",
     "empty": "No accounts to display in this portfolio."
+  },
+  "loans": {
+    "title": "Loans",
+    "still_owed": "Still owed"
   }
 }

@@ -5,7 +5,9 @@
 //! the sink to translate domain events into platform-specific actions.
 
 mod domain_event;
+mod hold;
 mod sink;
 
 pub use domain_event::*;
+pub use hold::*;
 pub use sink::*;

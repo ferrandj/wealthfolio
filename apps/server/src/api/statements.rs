@@ -220,11 +220,11 @@ async fn revalidate_documents(
 ) -> ApiResult<Json<RevalidationResult>> {
     let service = state.statement_service.clone();
     let ids = body.ids;
+    let finish = body.finish.unwrap_or(true);
     Ok(Json(
-        to_the_end(
-            &state,
-            async move { service.revalidate_documents(&ids).await },
-        )
+        to_the_end(&state, async move {
+            service.revalidate_documents(&ids, finish).await
+        })
         .await?,
     ))
 }
@@ -253,6 +253,9 @@ struct DocumentIdsBody {
     ids: Vec<String>,
     #[serde(default)]
     dry_run: bool,
+    /// The last part of a reading again done in parts (what concerns every document is done then). Default: yes.
+    #[serde(default)]
+    finish: Option<bool>,
 }
 
 async fn document_sources(

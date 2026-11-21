@@ -132,5 +132,9 @@
     "updating_quotes": "جارٍ تحديث الأسعار..."
   },
   "view_all": "عرض الكل",
-  "welcome_message": "مرحبًا بك في Wealthfolio"
+  "welcome_message": "مرحبًا بك في Wealthfolio",
+  "loans": {
+    "title": "القروض",
+    "still_owed": "المتبقي"
+  }
 }

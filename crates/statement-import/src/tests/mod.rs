@@ -7,3 +7,4 @@ mod boursobank_papers;
 mod fortuneo;
 mod hellobank;
 mod oradea;
+mod reader_versions;

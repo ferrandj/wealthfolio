@@ -2241,6 +2241,7 @@
       "loan_offer": "Offre de prêt",
       "loan_schedule": "Tableau d'amortissement",
       "loan_event": "Remboursement anticipé",
+      "loan_statement": "Information annuelle",
       "info": "Courriers",
       "tax_form": "IFU",
       "bank_certificate": "Attestations de la banque",
@@ -2576,7 +2577,8 @@
     "kind": {
       "loan_offer": "Offre de prêt",
       "loan_schedule": "Tableau d'amortissement",
-      "loan_event": "Remboursement anticipé"
+      "loan_event": "Remboursement anticipé",
+      "loan_statement": "Information annuelle"
     },
     "status": {
       "stored": "Conservé",

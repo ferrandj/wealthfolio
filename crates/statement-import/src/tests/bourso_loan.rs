@@ -165,8 +165,13 @@ fn test_the_yearly_information_gives_the_capital_still_owed() {
     ]);
     assert_eq!(st.adapter_id.as_deref(), Some("boursobank.loan_yearly_pdf"));
     assert_eq!(st.account_type.as_deref(), Some("loan"));
-    assert_eq!(extra(&st, "match_by_type"), &json!(true));
+    // a paper of the loan, filed with it by its number, named like it
+    assert_eq!(st.document_kind.as_deref(), Some("loan_statement"));
+    assert_eq!(st.account_label.as_deref(), Some("Prêt personnel …5678"));
     assert_eq!(extra(&st, "loan_reference"), &json!("12345-00012345678"));
+    assert_eq!(extra(&st, "loan")["reference"], json!("12345-00012345678"));
+    assert_eq!(extra(&st, "loan")["remaining"], json!("1956.80"));
+    assert_eq!(extra(&st, "loan")["as_of"], json!("2024-12-31"));
     assert_eq!(extra(&st, "as_of"), &json!("2024-12-31"));
     assert_eq!(extra(&st, "remaining"), &json!("1956.80"));
     assert_eq!(extra(&st, "last_instalment"), &json!("256.60"));

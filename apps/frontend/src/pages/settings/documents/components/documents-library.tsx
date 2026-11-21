@@ -55,7 +55,7 @@ import { matchesHolderFilter, type HolderFilter } from "../holders";
 const NO_ACCOUNT = "none";
 
 /** Documents read again per request when the readers are updated. */
-const REVALIDATION_BATCH = 10;
+const REVALIDATION_BATCH = 40;
 
 export function DocumentsLibrary() {
   const { t } = useTranslation();
@@ -142,11 +142,11 @@ export function DocumentsLibrary() {
   const [batch, setBatch] = useState<{ done: number; total: number } | null>(null);
 
   const revalidateAll = useMutation({
-    // with documents read by an older reader, only those are read again, a few per request (oldest first) so that no
-    // request lasts long enough to time out
+    // with documents read by an older reader, only those are read again, a few dozen per request (oldest first) so
+    // that no request lasts long enough to time out. What concerns every document is done by the last part. A part
+    // whose request gave up (it goes on on the server) is waited for, then the update goes on with what is left.
     mutationFn: async (onlyOutdated: boolean): Promise<RevalidationResult> => {
       if (!onlyOutdated) return revalidateAllStatementDocuments();
-      const ids = (await getStatementOutdated()).documentIds;
       const total: RevalidationResult = {
         total: 0,
         validated: 0,
@@ -154,18 +154,33 @@ export function DocumentsLibrary() {
         failed: 0,
         outcomes: [],
       };
-      setBatch({ done: 0, total: ids.length });
+      const tried = new Set<string>();
+      const first = (await getStatementOutdated()).documentIds;
+      setBatch({ done: 0, total: first.length });
       try {
-        for (let start = 0; start < ids.length; start += REVALIDATION_BATCH) {
-          const part = await revalidateStatementDocuments(
-            ids.slice(start, start + REVALIDATION_BATCH),
-          );
-          total.total += part.total;
-          total.validated += part.validated;
-          total.pending += part.pending;
-          total.failed += part.failed;
-          total.outcomes.push(...part.outcomes);
-          setBatch({ done: Math.min(start + REVALIDATION_BATCH, ids.length), total: ids.length });
+        let left = first;
+        while (left.length > 0) {
+          const part = left.slice(0, REVALIDATION_BATCH);
+          part.forEach((id) => tried.add(id));
+          const finish = left.length <= REVALIDATION_BATCH;
+          try {
+            const done = await revalidateStatementDocuments(part, finish);
+            total.total += done.total;
+            total.validated += done.validated;
+            total.pending += done.pending;
+            total.failed += done.failed;
+            total.outcomes.push(...done.outcomes);
+          } catch (e) {
+            // the request gave up but the reading again goes on: wait for its end, then carry on
+            if (!(await getStatementRevalidationProgress()).running) throw e;
+            while ((await getStatementRevalidationProgress()).running) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+            total.total += part.length;
+          }
+          setBatch({ done: tried.size, total: first.length });
+          // what is still out of date, without the documents already tried (one that cannot be read stays so)
+          left = (await getStatementOutdated()).documentIds.filter((id) => !tried.has(id));
         }
       } finally {
         setBatch(null);

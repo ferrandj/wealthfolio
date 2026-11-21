@@ -10,7 +10,7 @@ import {
   LoanPlan,
 } from "../../loans/loan-details";
 
-export const LOAN_KINDS = ["loan_offer", "loan_schedule", "loan_event"];
+export const LOAN_KINDS = ["loan_offer", "loan_schedule", "loan_event", "loan_statement"];
 
 export { loanOfDocument } from "../../loans/loans-utils";
 

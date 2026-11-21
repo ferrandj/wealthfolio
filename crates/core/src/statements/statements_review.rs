@@ -397,6 +397,7 @@ mod chain_tests {
             validated_at: None,
             opening_balance: Some(opening.into()),
             closing_balance: Some(closing.into()),
+            reading_fingerprint: None,
         }
     }
 
@@ -680,6 +681,7 @@ mod tests {
             validated_at: None,
             opening_balance: None,
             closing_balance: None,
+            reading_fingerprint: None,
         };
         let mut docs = [
             doc("dec", Some("a"), "2020-12-01"),
@@ -722,6 +724,7 @@ mod tests {
             validated_at: None,
             opening_balance: None,
             closing_balance: None,
+            reading_fingerprint: None,
         };
         let p = preview("0", "10", &["10"]);
         let mut clear = doc("clear");

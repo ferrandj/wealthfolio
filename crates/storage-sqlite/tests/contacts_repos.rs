@@ -547,8 +547,8 @@ async fn a_joint_account_is_split_between_its_holders_and_each_sees_their_part()
     // 70 + 50 does not add up to 100: said so
     sql(
         &env,
-        "INSERT INTO statement_documents (id,account_id,file_name,stored_name,content_type,size_bytes,sha256,document_kind,period_start,period_end,status,created_at,content,closing_balance)
-         VALUES ('d1','acc1','r.pdf','r.pdf','application/pdf',1,'h1','statement','2026-09-01','2026-09-30','VALIDATED','2026-10-01',x'00','1000.00')",
+        "INSERT INTO statement_documents (id,account_id,file_name,stored_name,content_type,size_bytes,sha256,document_kind,period_start,period_end,status,created_at,closing_balance)
+         VALUES ('d1','acc1','r.pdf','r.pdf','application/pdf',1,'h1','statement','2026-09-01','2026-09-30','VALIDATED','2026-10-01','1000.00')",
     );
     let overview = env.service.person_overview(&marie_id, None, None).unwrap();
     assert_eq!(

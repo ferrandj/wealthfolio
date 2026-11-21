@@ -92,6 +92,7 @@ pub struct StatementDocumentRow {
     pub validated_at: Option<String>,
     pub opening_balance: Option<String>,
     pub closing_balance: Option<String>,
+    pub reading_fingerprint: Option<String>,
 }
 
 impl From<StatementDocumentRow> for StatementDocument {
@@ -124,6 +125,7 @@ impl From<StatementDocumentRow> for StatementDocument {
             validated_at: row.validated_at,
             opening_balance: row.opening_balance,
             closing_balance: row.closing_balance,
+            reading_fingerprint: row.reading_fingerprint,
         }
     }
 }
@@ -153,16 +155,16 @@ pub struct NewStatementDocumentRow {
     pub import_run_id: Option<String>,
     pub status: String,
     pub created_at: String,
-    pub content: Vec<u8>,
     pub review_reason: Option<String>,
     pub to_review_count: i32,
     pub validated_at: Option<String>,
     pub opening_balance: Option<String>,
     pub closing_balance: Option<String>,
+    pub reading_fingerprint: Option<String>,
 }
 
 impl NewStatementDocumentRow {
-    pub fn new(document: StatementDocument, content: Vec<u8>) -> Self {
+    pub fn new(document: StatementDocument) -> Self {
         Self {
             id: document.id,
             account_id: document.account_id,
@@ -186,12 +188,20 @@ impl NewStatementDocumentRow {
             import_run_id: document.import_run_id,
             status: document.status,
             created_at: document.created_at,
-            content,
             review_reason: document.review_reason,
             to_review_count: document.to_review_count,
             validated_at: document.validated_at,
             opening_balance: document.opening_balance,
             closing_balance: document.closing_balance,
+            reading_fingerprint: document.reading_fingerprint,
         }
     }
+}
+
+/// The bytes of a kept original, in a table of their own.
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = crate::schema::statement_document_contents)]
+pub struct NewStatementContentRow {
+    pub document_id: String,
+    pub content: Vec<u8>,
 }

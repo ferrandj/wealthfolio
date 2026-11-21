@@ -419,6 +419,16 @@ pub trait ActivityRepositoryTrait: Send + Sync {
 pub trait ActivityServiceTrait: Send + Sync {
     fn get_activity(&self, activity_id: &str) -> Result<Activity>;
     fn get_activities(&self) -> Result<Vec<Activity>>;
+    /// The given activities (of accounts that are not archived), without loading the others.
+    fn get_activities_by_ids(&self, activity_ids: &[String]) -> Result<Vec<Activity>> {
+        if activity_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let requested: HashSet<&str> = activity_ids.iter().map(String::as_str).collect();
+        let mut activities = self.get_activities()?;
+        activities.retain(|activity| requested.contains(activity.id.as_str()));
+        Ok(activities)
+    }
     /// Returns activities from both active and archived accounts.
     fn get_activities_including_archived_accounts(&self) -> Result<Vec<Activity>>;
     fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>>;

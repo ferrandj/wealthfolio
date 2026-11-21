@@ -10,12 +10,15 @@ use wealthfolio_core::statements::{
 };
 use wealthfolio_core::{Error, Result};
 
-use super::model::{AccountIdentityDB, NewStatementDocumentRow, StatementDocumentRow};
+use super::model::{
+    AccountIdentityDB, NewStatementContentRow, NewStatementDocumentRow, StatementDocumentRow,
+};
 use super::packing;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{
-    account_identities, loan_documents, loan_settings, statement_documents, statement_gap_marks,
+    account_identities, loan_documents, loan_settings, statement_document_contents,
+    statement_documents, statement_gap_marks,
 };
 
 pub struct StatementRepository {
@@ -30,12 +33,16 @@ impl StatementRepository {
 
     /// The documents whose original is stored as it was brought, from before compression existed.
     fn unpacked_ids(&self, conn: &mut SqliteConnection) -> Result<Vec<String>> {
-        Ok(statement_documents::table
+        Ok(statement_document_contents::table
+            .inner_join(
+                statement_documents::table
+                    .on(statement_documents::id.eq(statement_document_contents::document_id)),
+            )
             .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                "substr(content, 1, 3) <> X'{}'",
+                "substr(statement_document_contents.content, 1, 3) <> X'{}'",
                 packing::MARK_HEX
             )))
-            .select(statement_documents::id)
+            .select(statement_document_contents::document_id)
             .order(statement_documents::created_at.asc())
             .load::<String>(conn)
             .map_err(StorageError::from)?)
@@ -123,9 +130,9 @@ impl StatementRepositoryTrait for StatementRepository {
         else {
             return Ok(None);
         };
-        let stored = statement_documents::table
+        let stored = statement_document_contents::table
             .find(id)
-            .select(statement_documents::content)
+            .select(statement_document_contents::content)
             .first::<Vec<u8>>(&mut conn)
             .map_err(StorageError::from)?;
         let content = packing::unpack(stored).map_err(|e| {
@@ -136,13 +143,18 @@ impl StatementRepositoryTrait for StatementRepository {
 
     fn document_storage(&self) -> Result<DocumentStorage> {
         let mut conn = get_connection(&self.pool)?;
-        let (documents, original_bytes, stored_bytes) = statement_documents::table
+        let (documents, original_bytes) = statement_documents::table
             .select((
                 diesel::dsl::count_star(),
                 diesel::dsl::sql::<diesel::sql_types::BigInt>("COALESCE(SUM(size_bytes), 0)"),
-                diesel::dsl::sql::<diesel::sql_types::BigInt>("COALESCE(SUM(LENGTH(content)), 0)"),
             ))
-            .first::<(i64, i64, i64)>(&mut conn)
+            .first::<(i64, i64)>(&mut conn)
+            .map_err(StorageError::from)?;
+        let stored_bytes = statement_document_contents::table
+            .select(diesel::dsl::sql::<diesel::sql_types::BigInt>(
+                "COALESCE(SUM(LENGTH(content)), 0)",
+            ))
+            .first::<i64>(&mut conn)
             .map_err(StorageError::from)?;
         Ok(DocumentStorage {
             documents: documents as usize,
@@ -163,9 +175,9 @@ impl StatementRepositoryTrait for StatementRepository {
             let done = self
                 .writer
                 .exec(move |conn| -> Result<bool> {
-                    let Some(stored) = statement_documents::table
+                    let Some(stored) = statement_document_contents::table
                         .find(&id)
-                        .select(statement_documents::content)
+                        .select(statement_document_contents::content)
                         .first::<Vec<u8>>(conn)
                         .optional()
                         .map_err(StorageError::from)?
@@ -180,8 +192,8 @@ impl StatementRepositoryTrait for StatementRepository {
                     if packing::unpack(packed.clone()).ok().as_deref() != Some(stored.as_slice()) {
                         return Ok(false);
                     }
-                    diesel::update(statement_documents::table.find(&id))
-                        .set(statement_documents::content.eq(packed))
+                    diesel::update(statement_document_contents::table.find(&id))
+                        .set(statement_document_contents::content.eq(packed))
                         .execute(conn)
                         .map_err(StorageError::from)?;
                     Ok(true)
@@ -200,14 +212,19 @@ impl StatementRepositoryTrait for StatementRepository {
     ) -> Result<StatementDocument> {
         let document = new_document.document.clone();
         // stored compressed; `size_bytes` stays the size of the original
-        let row = NewStatementDocumentRow::new(
-            new_document.document,
-            packing::pack(&new_document.content),
-        );
+        let content = NewStatementContentRow {
+            document_id: new_document.document.id.clone(),
+            content: packing::pack(&new_document.content),
+        };
+        let row = NewStatementDocumentRow::new(new_document.document);
         self.writer
             .exec(move |conn| -> Result<StatementDocument> {
                 diesel::insert_into(statement_documents::table)
                     .values(&row)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::insert_into(statement_document_contents::table)
+                    .values(&content)
                     .execute(conn)
                     .map_err(StorageError::from)?;
                 Ok(document)
@@ -260,6 +277,7 @@ impl StatementRepositoryTrait for StatementRepository {
                         statement_documents::validated_at.eq(&document.validated_at),
                         statement_documents::opening_balance.eq(&document.opening_balance),
                         statement_documents::closing_balance.eq(&document.closing_balance),
+                        statement_documents::reading_fingerprint.eq(&document.reading_fingerprint),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -280,6 +298,9 @@ impl StatementRepositoryTrait for StatementRepository {
         let id = id.to_string();
         self.writer
             .exec(move |conn| -> Result<()> {
+                diesel::delete(statement_document_contents::table.find(&id))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
                 diesel::delete(statement_documents::table.find(&id))
                     .execute(conn)
                     .map_err(StorageError::from)?;

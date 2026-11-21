@@ -1263,7 +1263,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify({ keys, until });
       break;
     }
-    case "revalidate_statement_documents":
+    case "revalidate_statement_documents": {
+      const { ids, finish } = payload as { ids: string[]; finish?: boolean };
+      body = JSON.stringify({ ids, finish });
+      break;
+    }
     case "invalidate_statement_documents": {
       const { ids } = payload as { ids: string[] };
       body = JSON.stringify({ ids });

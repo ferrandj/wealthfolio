@@ -53,6 +53,7 @@ pub fn document_kind_label(kind: Option<&str>) -> String {
         "fees_summary" => "Récapitulatif des frais".into(),
         "loan_offer" => "Offre de prêt".into(),
         "loan_schedule" => "Tableau d'amortissement".into(),
+        "loan_statement" => "Information annuelle".into(),
         "loan_event" => "Remboursement anticipé".into(),
         "info" => "Courrier".into(),
         "tax_form" => "IFU".into(),

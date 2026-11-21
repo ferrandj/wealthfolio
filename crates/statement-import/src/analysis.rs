@@ -351,6 +351,7 @@ pub fn analyze(file_name: &str, data: &[u8], adapter_id: Option<&str>) -> Analys
         return analysis;
     };
     analysis.chosen_adapter_id = Some(chosen.clone());
+    analysis.reader_version = registry::reader_version_of(Some(&chosen)).to_string();
     if adapter_id.is_some() {
         analysis.decision = "chosen".into();
         analysis.message.clear();

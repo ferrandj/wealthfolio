@@ -92,6 +92,11 @@ pub async fn event_queue_worker(
 
         // Debounce expired, the batch is overdue, or the channel closed with
         // buffered events: process them.
+        // a long run of changes (documents read again): the events wait until it is over
+        if wealthfolio_core::events::events_held() {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            continue;
+        }
         if is_processing.load(Ordering::SeqCst) {
             debug!("Debounce expired but previous batch still processing, continuing to collect events");
             continue;

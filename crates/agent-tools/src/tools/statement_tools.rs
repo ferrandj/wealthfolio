@@ -243,11 +243,11 @@ service_tool!(
 service_tool!(
     RevalidateStatementDocuments, "revalidate_statement_documents", Write, additive = false,
     scopes = [DocumentsWrite],
-    description = "Read again, with today's readers, the given documents, oldest first. To update many documents, call it with a few ids at a time (about ten), in the order get_outdated_statement_documents gives.",
-    schema = object(json!({"documentIds": {"type": "array", "items": {"type": "string"}}}), &["documentIds"]),
+    description = "Read again, with today's readers, the given documents, oldest first. To update many documents, call it with a few dozen ids at a time (about forty), in the order get_outdated_statement_documents gives, with finish false on every part but the last: what concerns every document (transfers between own accounts, loans, neighbouring statements) is done once, by the last part. A document that reads the same as before is left as it is.",
+    schema = object(json!({"documentIds": {"type": "array", "items": {"type": "string"}}, "finish": {"type": "boolean", "description": "False on every part but the last of an update done in parts (default true)."}}), &["documentIds"]),
     |env, args| {
         let args: DocumentIdsArgs = serde_json::from_value(args)?;
-        let result = need(env.statement_service(), "Statements")?.revalidate_documents(&args.document_ids).await.map_err(fail)?;
+        let result = need(env.statement_service(), "Statements")?.revalidate_documents(&args.document_ids, args.finish.unwrap_or(true)).await.map_err(fail)?;
         env.health_service().clear_cache().await;
         reply(&result)
     }
@@ -860,6 +860,8 @@ struct DocumentIdsArgs {
     document_ids: Vec<String>,
     #[serde(default)]
     dry_run: bool,
+    #[serde(default)]
+    finish: Option<bool>,
 }
 
 service_tool!(

@@ -503,7 +503,7 @@ export interface LoanAnswers {
 export interface LoanGap {
   code: string;
   text: string;
-  /** loan_offer | loan_event | loan_schedule | statement */
+  /** loan_offer | loan_event | loan_schedule | loan_statement | statement */
   foundIn: string[];
   blocking: boolean;
   /** first_due | debit_account | no_early_repayment | payments_unchanged | attach_account */

@@ -189,6 +189,28 @@ held with the same cost per unit and nearly the same units.
 Removing the document takes those holdings back. The operations copied from the
 site (Date;Opération;Statut;Montant) are read like the CSV export.
 
+### Reading documents again after an update
+
+Each adapter has its own reader version (a fingerprint of its file and every
+module it uses): an update of one bank's reader leaves the documents of the
+other banks up to date (`get_outdated_statement_documents`). A document keeps a
+fingerprint of what it brought in (each statement as read, and its account); one
+that reads the same, with all its operations still there, is only marked as read
+by today's readers. `revalidate_statement_documents` takes a few dozen ids per
+call with `finish: false`, then the last part with `finish: true` (the default):
+the transfers between own accounts, the loans and the statements next to the
+ones read are done once, by that part. While documents are read again the
+portfolio is not valued after each one: the domain events wait for the end
+(`EventHold`), then are handled once. `revalidate_all_statement_documents`
+redoes everything, even what reads the same.
+
+### Loan papers
+
+The yearly information on a BoursoBank loan (`loan_statement`, capital still
+owed on December 31) is filed with its loan by its number, like the schedule
+and the offer. The loans (liabilities) show in the dashboard beside the
+accounts, each with what is still owed.
+
 ### Documents brought back regularly
 
 Each account and kind of reading is a source of documents. The user says once

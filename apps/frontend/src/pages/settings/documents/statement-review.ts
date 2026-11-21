@@ -13,7 +13,7 @@ export interface ReviewChoice {
 
 /** The papers of a loan come in their order: the contract, the dated tables, then the letters. */
 const loanRank = (kind: string | null | undefined): number =>
-  ({ loan_offer: 1, loan_schedule: 2, loan_event: 3 })[kind ?? ""] ?? 0;
+  ({ loan_offer: 1, loan_schedule: 2, loan_event: 3, loan_statement: 4 })[kind ?? ""] ?? 0;
 
 /**
  * The logical order to look at documents: account by account, oldest period first, so that each statement's

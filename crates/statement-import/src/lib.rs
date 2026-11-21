@@ -13,7 +13,8 @@ pub mod pdf;
 pub mod py;
 
 pub use adapters::registry::{
-    catalog, get_adapter, identify, parse_with, reader_version, Candidate, Identification,
+    catalog, get_adapter, identify, parse_with, reader_version, reader_version_of, Candidate,
+    Identification,
 };
 pub use adapters::{
     Adapter, Detection, HoldingData, ParsedStatement, SourceDocument, TransactionData,

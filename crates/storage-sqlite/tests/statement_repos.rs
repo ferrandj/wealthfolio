@@ -61,6 +61,7 @@ fn document(id: &str, account_id: Option<&str>, sha: &str) -> StatementDocument 
         validated_at: None,
         opening_balance: Some("1000.00".into()),
         closing_balance: Some("1500.00".into()),
+        reading_fingerprint: None,
         created_at: "2026-10-01T10:00:00Z".into(),
     }
 }
@@ -289,10 +290,10 @@ async fn the_originals_stored_before_are_compressed_once_and_stay_the_same() {
     }
     // as a version without compression left them: the original, as it is
     {
-        use wealthfolio_storage_sqlite::schema::statement_documents;
+        use wealthfolio_storage_sqlite::schema::statement_document_contents;
         let mut conn = pool.get().unwrap();
-        diesel::update(statement_documents::table)
-            .set(statement_documents::content.eq(original.clone()))
+        diesel::update(statement_document_contents::table)
+            .set(statement_document_contents::content.eq(original.clone()))
             .execute(&mut conn)
             .unwrap();
     }
