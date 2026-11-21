@@ -144,6 +144,10 @@ fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
         ("info", Some("per")) if preview.account_number.is_some() => {
             Some(account_types::SECURITIES)
         }
+        // a securities account: its statements of positions name it by its number
+        ("positions" | "info", Some("securities")) if preview.account_number.is_some() => {
+            Some(account_types::SECURITIES)
+        }
         _ => None,
     }
 }
@@ -227,6 +231,10 @@ fn is_bank_paper(preview: &StatementPreview) -> bool {
 /// The type of the account an import would create; empty when a document is kept without one.
 fn suggested_type(mode: ImportMode, preview: &StatementPreview) -> String {
     match mode {
+        // the operations of a securities account (purchases, sales, coupons) belong to a securities account
+        ImportMode::Transactions if preview.account_type.as_deref() == Some("securities") => {
+            account_types::SECURITIES.to_string()
+        }
         ImportMode::Transactions => account_types::CASH.to_string(),
         ImportMode::DocumentOnly => own_account_type(preview).unwrap_or_default().to_string(),
     }
@@ -4429,6 +4437,12 @@ mod tests {
             own("positions", Some("life_insurance"), Some("123")),
             Some(account_types::SECURITIES)
         );
+        // a securities account's statement of positions makes its account; the site's exports go by type
+        assert_eq!(
+            own("positions", Some("securities"), Some("123")),
+            Some(account_types::SECURITIES)
+        );
+        assert_eq!(own("positions", Some("securities"), None), None);
         // the papers of an insurance that protects make its account, even without a number (they go by type)
         assert_eq!(
             own("info", Some("prevoyance"), None),

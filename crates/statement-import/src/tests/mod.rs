@@ -1,5 +1,6 @@
 mod adapters_generic;
 mod bourso_loan;
+mod bourso_securities;
 mod bourso_vie;
 mod bourso_vie_csv;
 mod boursobank;

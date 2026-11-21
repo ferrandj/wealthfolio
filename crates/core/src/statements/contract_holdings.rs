@@ -220,7 +220,18 @@ impl ContractHoldingsTrait for ContractHoldings {
                 .unwrap_or_default(),
             &assets,
         );
+        // the cash of a securities account, beside its securities
+        let mut cash_balances = Vec::new();
         for h in holdings {
+            if h.asset_class == "cash" {
+                if let Some(amount) = dec(h.value.as_deref()).or_else(|| dec(Some(&h.quantity))) {
+                    cash_balances.push(crate::portfolio::snapshot::CashBalanceInput {
+                        currency: h.currency.clone(),
+                        amount,
+                    });
+                }
+                continue;
+            }
             let Some(symbol) = holding_symbol(h) else {
                 continue;
             };
@@ -255,10 +266,11 @@ impl ContractHoldingsTrait for ContractHoldings {
                 asset_kind: Some("INVESTMENT".to_string()),
                 quote_ccy: Some(h.currency.clone()),
                 instrument_type: Some(
-                    if h.asset_class == "fund_euro" {
-                        "BOND"
-                    } else {
-                        "MUTUALFUND"
+                    match h.asset_class.as_str() {
+                        "fund_euro" | "bond" => "BOND",
+                        "equity" => "EQUITY",
+                        "etf" => "ETF",
+                        _ => "MUTUALFUND",
                     }
                     .to_string(),
                 ),
@@ -297,7 +309,7 @@ impl ContractHoldingsTrait for ContractHoldings {
             account_currency: account.currency.clone(),
             snapshot_date: date,
             positions,
-            cash_balances: vec![],
+            cash_balances,
             base_currency: Some(base),
             source: SnapshotSource::CsvImport,
         })

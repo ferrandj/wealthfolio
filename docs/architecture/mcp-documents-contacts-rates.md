@@ -189,6 +189,17 @@ held with the same cost per unit and nearly the same units.
 Removing the document takes those holdings back. The operations copied from the
 site (Date;Opération;Statut;Montant) are read like the CSV export.
 
+### BoursoBank securities account
+
+The quarterly statement (`boursobank.securities_statement_pdf`) and the
+positions exported from the site (`boursobank.securities_positions_csv`) set the
+account's holdings (each line by its ISIN, the cash as a cash balance); the
+operations exported from the site (`boursobank.securities_operations_csv`) bring
+its cash moves with their security, quantity and price in the details; the
+daily value of the portfolio (`boursobank.securities_performance_csv`) is kept
+with the account (one value per month end). The exports name no account: they
+go to the only securities account at BoursoBank.
+
 ### Reading documents again after an update
 
 Each adapter has its own reader version (a fingerprint of its file and every

@@ -20,6 +20,10 @@ use super::boursobank::papers_pdf::{
     BoursoBankResourcesCertificatePdf, BoursoBankRibPdf, BoursoBankTaxFormPdf,
 };
 use super::boursobank::savings_pdf::BoursoBankSavingsPdf;
+use super::boursobank::securities::{
+    BoursoSecuritiesOperationsCsv, BoursoSecuritiesPerformanceCsv, BoursoSecuritiesPositionsCsv,
+    BoursoSecuritiesStatementPdf,
+};
 use super::boursobank::statement_pdf::BoursoBankStatementPdf;
 use super::common::{find_iban, find_institution};
 use super::fortuneo::deposit_guarantee_pdf::FortuneoDepositGuaranteePdf;
@@ -82,6 +86,10 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoVieSituationPdf,
     &BoursoVieYearlyPdf,
     &BoursoVieLifePositionsCsv,
+    &BoursoSecuritiesStatementPdf,
+    &BoursoSecuritiesPositionsCsv,
+    &BoursoSecuritiesOperationsCsv,
+    &BoursoSecuritiesPerformanceCsv,
     &OradeaTaxFormPdf,
     &OradeaPerContributionsPdf,
     &FortuneoStatementPdf,

@@ -4,5 +4,6 @@ pub mod life_pdf;
 pub mod loan_pdf;
 pub mod papers_pdf;
 pub mod savings_pdf;
+pub mod securities;
 pub mod statement_pdf;
 pub mod table;
