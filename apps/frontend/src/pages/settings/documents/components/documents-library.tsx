@@ -178,6 +178,15 @@ export function DocumentsLibrary() {
             }
             total.total += part.length;
           }
+          // the progress kept from the part just done would be counted again on top of it: it is dropped until the
+          // server tells how far the next part is
+          const progressKey = [QueryKeys.STATEMENT_DOCUMENTS, "revalidation-progress"];
+          await queryClient.cancelQueries({ queryKey: progressKey });
+          queryClient.setQueryData(progressKey, {
+            running: false,
+            done: 0,
+            total: 0,
+          });
           setBatch({ done: tried.size, total: first.length });
           // what is still out of date, without the documents already tried (one that cannot be read stays so)
           left = (await getStatementOutdated()).documentIds.filter((id) => !tried.has(id));

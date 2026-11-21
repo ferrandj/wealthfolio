@@ -515,6 +515,7 @@
     "filter_active": "有効",
     "filter_hidden": "非表示",
     "filter_archived": "アーカイブ",
+    "other_banks": "その他の口座",
     "section_active": "有効な口座",
     "section_hidden_archived": "非表示とアーカイブ",
     "no_search_results": "検索条件に一致する口座はありません。",

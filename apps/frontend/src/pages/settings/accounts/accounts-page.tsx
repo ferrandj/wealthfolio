@@ -32,6 +32,13 @@ import { AccountOwners } from "../contacts/components/account-owners";
 import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 import { badgeVariants } from "@wealthfolio/ui";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { groupByBank } from "./accounts-by-bank";
 
 type FilterType = "all" | "active" | "archived" | "hidden";
 
@@ -55,6 +62,8 @@ const SettingsAccountsPage = () => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
+  // the banks folded away, kept from one visit to the next
+  const [folded, setFolded] = usePersistentState<string[]>("settings-accounts-folded-banks", []);
 
   const handleAddAccount = () => {
     setSelectedAccount(null);
@@ -169,6 +178,50 @@ const SettingsAccountsPage = () => {
 
   const showSections = filter === "all";
 
+  // a section's accounts, bank by bank, each bank folding away
+  const renderByBank = (list: Account[], label: string, scope: string) => (
+    <div className="space-y-2">
+      {groupByBank(list, platformMap, t("settings:accounts.other_banks")).map(
+        ({ bank, accounts }) => {
+          const key = `${scope}:${bank}`;
+          const open = !folded.includes(key);
+          return (
+            <Collapsible
+              key={key}
+              open={open}
+              onOpenChange={(next) =>
+                setFolded((current) =>
+                  next
+                    ? current.filter((k) => k !== key)
+                    : [...current.filter((k) => k !== key), key],
+                )
+              }
+            >
+              <Card>
+                <CollapsibleTrigger className="hover:bg-muted/40 flex w-full items-center gap-2 rounded-xl px-6 py-3 text-start">
+                  <Icons.ChevronDown
+                    className={`text-muted-foreground size-4 transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`}
+                  />
+                  <span className="text-sm font-semibold">{bank}</span>
+                  <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+                    {accounts.length}
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-2">
+                    <SettingsList label={`${label} · ${bank}`}>
+                      {accounts.map(renderAccountItem)}
+                    </SettingsList>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          );
+        },
+      )}
+    </div>
+  );
+
   return (
     <>
       <div data-testid="settings-accounts-page" className="space-y-6">
@@ -281,13 +334,7 @@ const SettingsAccountsPage = () => {
                       {counts.active}
                     </span>
                   </div>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <SettingsList label={t("settings:accounts.section_active")}>
-                        {activeAccounts.map(renderAccountItem)}
-                      </SettingsList>
-                    </CardContent>
-                  </Card>
+                  {renderByBank(activeAccounts, t("settings:accounts.section_active"), "active")}
                 </div>
               )}
 
@@ -302,13 +349,11 @@ const SettingsAccountsPage = () => {
                       {counts.hidden + counts.archived}
                     </span>
                   </div>
-                  <Card>
-                    <CardContent className="pt-6">
-                      <SettingsList label={t("settings:accounts.section_hidden_archived")}>
-                        {inactiveAccounts.map(renderAccountItem)}
-                      </SettingsList>
-                    </CardContent>
-                  </Card>
+                  {renderByBank(
+                    inactiveAccounts,
+                    t("settings:accounts.section_hidden_archived"),
+                    "inactive",
+                  )}
                 </div>
               )}
             </>

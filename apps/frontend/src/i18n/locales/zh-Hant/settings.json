@@ -515,6 +515,7 @@
     "filter_active": "使用中",
     "filter_hidden": "已隱藏",
     "filter_archived": "已封存",
+    "other_banks": "其他帳戶",
     "section_active": "使用中的帳戶",
     "section_hidden_archived": "已隱藏與封存",
     "no_search_results": "找不到符合搜尋條件的帳戶。",
