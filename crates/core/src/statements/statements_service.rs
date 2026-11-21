@@ -134,7 +134,7 @@ fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
     match (kind, preview.account_type.as_deref()) {
         ("statement", Some("life_insurance")) => Some(account_types::SECURITIES),
         // an arbitrage letter names the contract it moves money in: the contract exists even before its first statement
-        ("info", Some("life_insurance")) if preview.account_number.is_some() => {
+        ("info" | "positions", Some("life_insurance")) if preview.account_number.is_some() => {
             Some(account_types::SECURITIES)
         }
         // an insurance that protects (death, disability): a contract without a value, kept as an account so that its
@@ -4107,6 +4107,11 @@ mod tests {
         );
         // no contract number: nothing ties the letter to a contract, it waits for an account
         assert_eq!(own("info", Some("life_insurance"), None), None);
+        // the statement of a life insurance's holdings names its contract: it makes the account too
+        assert_eq!(
+            own("positions", Some("life_insurance"), Some("123")),
+            Some(account_types::SECURITIES)
+        );
         // the papers of an insurance that protects make its account, even without a number (they go by type)
         assert_eq!(
             own("info", Some("prevoyance"), None),
