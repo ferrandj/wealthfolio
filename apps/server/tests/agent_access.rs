@@ -3290,16 +3290,16 @@ async fn mcp_manages_contacts_rates_and_documents_with_their_own_scopes() {
         "update_contact",
         serde_json::json!({
             "contactId": contact_id, "kind": "self", "firstName": "Jean", "lastName": "Dupont",
-            "street": "45 RUE ALEXANDRE BICKART", "postalCode": "77500", "city": "CHELLES"
+            "street": "12 RUE DES LILAS", "postalCode": "75011", "city": "PARIS"
         }),
     )
     .await;
     assert_eq!(
-        updated["contact"]["address"], "45 RUE ALEXANDRE BICKART\n77500 CHELLES",
+        updated["contact"]["address"], "12 RUE DES LILAS\n75011 PARIS",
         "{updated}"
     );
-    assert_eq!(updated["contact"]["postalCode"], "77500", "{updated}");
-    assert_eq!(updated["contact"]["city"], "CHELLES", "{updated}");
+    assert_eq!(updated["contact"]["postalCode"], "75011", "{updated}");
+    assert_eq!(updated["contact"]["city"], "PARIS", "{updated}");
 
     let linked = mcp_call_tool(
         &server,

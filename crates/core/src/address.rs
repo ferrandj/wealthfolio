@@ -112,10 +112,10 @@ mod tests {
 
     #[test]
     fn splits_a_printed_address() {
-        let p = split_address("45 RUE ALEXANDRE BICKART\n77500 CHELLES");
-        assert_eq!(p.street.as_deref(), Some("45 RUE ALEXANDRE BICKART"));
-        assert_eq!(p.postal_code.as_deref(), Some("77500"));
-        assert_eq!(p.city.as_deref(), Some("CHELLES"));
+        let p = split_address("12 RUE DES LILAS\n75011 PARIS");
+        assert_eq!(p.street.as_deref(), Some("12 RUE DES LILAS"));
+        assert_eq!(p.postal_code.as_deref(), Some("75011"));
+        assert_eq!(p.city.as_deref(), Some("PARIS"));
     }
 
     #[test]
@@ -134,15 +134,15 @@ mod tests {
     fn joins_and_merges_parts() {
         let parts = AddressParts {
             street: Some("45 RUE X".into()),
-            postal_code: Some("77500".into()),
-            city: Some("CHELLES".into()),
+            postal_code: Some("75011".into()),
+            city: Some("PARIS".into()),
         };
         assert_eq!(
             join_address(&parts).as_deref(),
-            Some("45 RUE X\n77500 CHELLES")
+            Some("45 RUE X\n75011 PARIS")
         );
         let merged = resolve_address(
-            Some("45 RUE X\n77500 CHELLES"),
+            Some("45 RUE X\n75011 PARIS"),
             &None,
             &None,
             &Some("60200".into()),
