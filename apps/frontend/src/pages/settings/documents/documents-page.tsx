@@ -2,6 +2,9 @@ import { DocumentStorageLine } from "./components/document-storage-line";
 import { findMissingAssetLogos } from "@/hooks/use-asset-logos";
 import {
   analyzeStatement,
+  attachStatementLoanDocument,
+  getAlternativeHoldings,
+  getStatementLoans,
   importStatement,
   listStatementDocuments,
   logger,
@@ -11,6 +14,7 @@ import { LoanAccountDialog } from "../loans/loan-account-dialog";
 import { DescribeNewSourcesDialog, DocumentSourcesPanel } from "./sources/document-sources-dialogs";
 import { invalidateLoanCaches } from "../loans/loan-caches";
 import { LOAN_KINDS } from "./components/loan-validation-card";
+import { loanOfDocument } from "../loans/loans-utils";
 import { useAccounts } from "@/hooks/use-accounts";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { QueryKeys } from "@/lib/query-keys";
@@ -28,6 +32,9 @@ import { PendingFileCard, type PendingFile } from "./components/pending-file-car
 import { SupportedDocuments } from "./components/supported-documents";
 import {
   fileToBase64,
+  isLoanPaper,
+  liabilitiesOf,
+  loanChoiceFor,
   needsOverlapDecision,
   overrideFor,
   replacedDocumentIds,
@@ -166,7 +173,30 @@ export default function DocumentsPage() {
           !result.alreadyImported &&
           LOAN_KINDS.includes(imported.documentKind ?? "")
         ) {
-          setAttachQueue((list) => (list.includes(imported.id) ? list : [...list, imported.id]));
+          // a loan paper goes to the liability chosen on its card (or the one of its loan): no question afterwards
+          const paper = file.analysis?.statements.find(isLoanPaper);
+          try {
+            if (!paper) throw new Error("no loan paper");
+            const [holdings, loans] = await Promise.all([
+              queryClient.fetchQuery({
+                queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS],
+                queryFn: getAlternativeHoldings,
+                staleTime: 0,
+              }),
+              getStatementLoans(),
+            ]);
+            const choice = loanChoiceFor(
+              paper,
+              file.choices[paper.preview.index],
+              liabilitiesOf(holdings),
+              loanOfDocument(loans, imported.id),
+            );
+            const attached = await attachStatementLoanDocument(imported.id, choice);
+            queryClient.setQueryData([QueryKeys.STATEMENT_LOANS], attached);
+          } catch (e) {
+            logger.error(`Error attaching the loan paper: ${String(e)}`);
+            setAttachQueue((list) => (list.includes(imported.id) ? list : [...list, imported.id]));
+          }
         }
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENTS] }),

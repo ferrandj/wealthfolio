@@ -1,4 +1,10 @@
-import type { AnalyzedStatement, StatementOverride } from "@/lib/types/statements";
+import type { AlternativeAssetHolding } from "@/lib/types";
+import type {
+  AnalyzedStatement,
+  LoanAccountChoice,
+  LoanView,
+  StatementOverride,
+} from "@/lib/types/statements";
 
 /** The bytes of a file as base64, without the data-URL prefix. */
 export function fileToBase64(file: Blob): Promise<string> {
@@ -32,6 +38,61 @@ export interface StatementChoice {
   newAccountName: string;
   skip: boolean;
   overlap?: OverlapDecision;
+  /** A loan paper: the liability it goes to (an id, or `LIABILITY_NEW`); unset, the one of its loan. */
+  liability?: string;
+}
+
+/** The kinds of the papers of a loan: they go to a liability, not to an account. */
+export const LOAN_PAPER_KINDS = ["loan_offer", "loan_schedule", "loan_event", "loan_statement"];
+/** A new liability, made empty for the loan. */
+export const LIABILITY_NEW = "__new_liability__";
+const LOAN_KEY = "statement_loan_key";
+
+export const isLoanPaper = (statement: AnalyzedStatement): boolean =>
+  LOAN_PAPER_KINDS.includes(statement.preview.documentKind ?? "");
+
+/** The loan number a paper gives ("80372-00060536765"), if any. */
+export function loanReference(statement: AnalyzedStatement): string | null {
+  const loan = statement.preview.extra?.loan as { reference?: unknown } | undefined;
+  return typeof loan?.reference === "string" && loan.reference ? loan.reference : null;
+}
+
+/** The liabilities a loan paper can go to. */
+export const liabilitiesOf = (holdings: AlternativeAssetHolding[]) =>
+  holdings.filter((h) => h.kind.toLowerCase() === "liability");
+
+/**
+ * The liability of a loan paper when the person did not pick one: the one its loan is already attached to, else the
+ * one made for the same loan number, else a new one.
+ */
+export function defaultLiability(
+  statement: AnalyzedStatement,
+  liabilities: AlternativeAssetHolding[],
+  loan?: LoanView,
+): string {
+  if (loan?.liabilityId) return loan.liabilityId;
+  const reference = loanReference(statement);
+  const known = reference
+    ? liabilities.find((l) => l.metadata?.[LOAN_KEY] === reference)
+    : undefined;
+  return known?.id ?? LIABILITY_NEW;
+}
+
+/** What to tell the service about the liability of an imported loan paper. */
+export function loanChoiceFor(
+  statement: AnalyzedStatement,
+  choice: StatementChoice | undefined,
+  liabilities: AlternativeAssetHolding[],
+  loan?: LoanView,
+): LoanAccountChoice {
+  const picked = choice?.liability ?? defaultLiability(statement, liabilities, loan);
+  if (picked !== LIABILITY_NEW) return { liabilityId: picked };
+  const name =
+    choice?.newAccountName?.trim() ||
+    statement.preview.accountLabel ||
+    statement.suggestedAccountName ||
+    "";
+  return { newAccount: { name, key: loanReference(statement) } };
 }
 
 /** The overlap only matters while the statement goes to the account it was matched with. */

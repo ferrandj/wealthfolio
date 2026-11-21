@@ -1,3 +1,4 @@
+import type { AlternativeAssetHolding } from "@/lib/types";
 import type { AnalyzedStatement } from "@/lib/types/statements";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,6 +7,9 @@ import {
   base64ToBytes,
   fileToBase64,
   formatBytes,
+  isLoanPaper,
+  LIABILITY_NEW,
+  loanChoiceFor,
   needsOverlapDecision,
   overrideFor,
   replacedDocumentIds,
@@ -72,5 +76,48 @@ describe("overlapping statements", () => {
     expect(replacedDocumentIds([s], { 0: { ...auto, overlap: "replace", skip: true } })).toEqual(
       [],
     );
+  });
+});
+
+describe("loan papers", () => {
+  const paper = (reference?: string) =>
+    ({
+      preview: {
+        index: 0,
+        documentKind: "loan_offer",
+        accountLabel: "Prêt personnel …5678",
+        extra: reference ? { loan: { reference } } : {},
+      },
+      suggestedAccountName: "Banque - Crédit",
+    }) as unknown as AnalyzedStatement;
+  const liability = (id: string, key?: string) =>
+    ({
+      id,
+      kind: "liability",
+      name: id,
+      metadata: key ? { statement_loan_key: key } : {},
+    }) as unknown as AlternativeAssetHolding;
+
+  it("goes to the liability of its loan number, else to a new one named after the loan", () => {
+    const liabilities = [liability("other"), liability("mine", "12345-00012345678")];
+    expect(isLoanPaper(paper())).toBe(true);
+    expect(loanChoiceFor(paper("12345-00012345678"), undefined, liabilities)).toEqual({
+      liabilityId: "mine",
+    });
+    expect(loanChoiceFor(paper("99999-00000000001"), undefined, liabilities)).toEqual({
+      newAccount: { name: "Prêt personnel …5678", key: "99999-00000000001" },
+    });
+  });
+
+  it("goes where the person chose", () => {
+    const liabilities = [liability("other"), liability("mine", "12345-00012345678")];
+    const choice = { account: "auto", newAccountName: "", skip: false, liability: "other" };
+    expect(loanChoiceFor(paper("12345-00012345678"), choice, liabilities)).toEqual({
+      liabilityId: "other",
+    });
+    const named = { ...choice, liability: LIABILITY_NEW, newAccountName: "Crédit voiture" };
+    expect(loanChoiceFor(paper(), named, liabilities)).toEqual({
+      newAccount: { name: "Crédit voiture", key: null },
+    });
   });
 });

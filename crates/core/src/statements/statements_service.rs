@@ -214,10 +214,14 @@ fn brought(document: &StatementDocument, activities: &[crate::activities::Activi
 
 /// A paper of the bank rather than of one account: the IFU (it covers every account), the statement of resources.
 fn is_bank_paper(preview: &StatementPreview) -> bool {
+    // a loan's papers go to its liability (attached apart), never to an account
     matches!(
         preview.document_kind.as_deref(),
         Some("tax_form" | "bank_certificate")
-    )
+    ) || preview
+        .document_kind
+        .as_deref()
+        .is_some_and(super::is_loan_kind)
 }
 
 /// The type of the account an import would create; empty when a document is kept without one.
