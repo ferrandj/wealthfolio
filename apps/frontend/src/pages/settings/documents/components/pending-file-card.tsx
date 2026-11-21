@@ -44,6 +44,8 @@ export interface PendingFile {
   allowDuplicateDocument: boolean;
   /** Re-import: the document already imported is removed first, with everything it brought. */
   replaceExisting?: boolean;
+  /** The bank that sold the contract, for a paper that names only its insurer. */
+  bank?: string;
   result?: StatementImportResult;
   error?: string;
 }
@@ -51,6 +53,8 @@ export interface PendingFile {
 interface Props {
   file: PendingFile;
   accounts: Account[];
+  /** The banks of the documents already kept, offered for a paper that names only its insurer. */
+  banks?: string[];
   onChange: (patch: Partial<PendingFile>) => void;
   onChoose: (index: number, patch: Partial<StatementChoice>) => void;
   onPickReading: (adapterId: string) => void;
@@ -80,9 +84,12 @@ function StatementBlock({
         ? t("settings:documents.account_matched", {
             name: statement.matchedAccount.name,
           })
-        : t("settings:documents.account_create", {
-            name: statement.suggestedAccountName,
-          }),
+        : // a paper that belongs to no contract (a notice, a card's guarantees) is kept on its own
+          !statement.suggestedAccountType
+          ? t("settings:documents.account_none")
+          : t("settings:documents.account_create", {
+              name: statement.suggestedAccountName,
+            }),
     },
     { value: ACCOUNT_NEW, label: t("settings:documents.account_new") },
     ...accounts.map((a) => ({ value: a.id, label: a.name })),
@@ -245,6 +252,7 @@ function StatementBlock({
 export function PendingFileCard({
   file,
   accounts,
+  banks = [],
   onChange,
   onChoose,
   onPickReading,
@@ -257,6 +265,9 @@ export function PendingFileCard({
   const info = analysis?.analysis;
   const needsReading = !!info && !info.chosenAdapterId && info.candidates.length > 0;
   const existing = analysis?.existingDocument;
+  // a paper that names only the insurer of a contract: the person says which bank sold it
+  const insurer = analysis?.statements.find((s) => s.preview.extra?.insurer_only === true)?.preview
+    .extra?.insurer as string | undefined;
   const canImport =
     file.status === "ready" &&
     !!analysis &&
@@ -365,6 +376,30 @@ export function PendingFileCard({
               </Button>
             </div>
             {file.replaceExisting ? <ReplacePreview documentId={existing.id} /> : null}
+          </div>
+        )}
+
+        {file.status !== "done" && insurer && (
+          <div className="space-y-1">
+            <label className="text-sm font-medium" htmlFor={`bank-${file.id}`}>
+              {t("settings:documents.insurer_bank", { insurer })}
+            </label>
+            <Input
+              id={`bank-${file.id}`}
+              list={`banks-${file.id}`}
+              value={file.bank ?? ""}
+              disabled={busy}
+              placeholder={t("settings:documents.insurer_bank_placeholder")}
+              onChange={(e) => onChange({ bank: e.target.value })}
+            />
+            <datalist id={`banks-${file.id}`}>
+              {banks.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+            <p className="text-muted-foreground text-xs">
+              {t("settings:documents.insurer_bank_hint")}
+            </p>
           </div>
         )}
 

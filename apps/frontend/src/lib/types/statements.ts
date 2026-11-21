@@ -152,6 +152,8 @@ export interface StatementPreview {
   holdingsCount: number;
   warnings: string[];
   confidence: string;
+  /** What the reader found besides (title, category, insurer, insurer_only…). */
+  extra?: Record<string, unknown>;
 }
 
 export interface FileAnalysis {
@@ -181,6 +183,7 @@ export interface AnalyzedStatement {
   mode: "transactions" | "documentOnly";
   matchedAccount?: MatchedAccount | null;
   suggestedAccountName: string;
+  /** The type of the account an import would create; empty when the document is kept without one. */
   suggestedAccountType: string;
   knownDuplicates: number;
   /** Stored statements of the same account whose period overlaps this one (another file). */
@@ -218,6 +221,8 @@ export interface StatementImportRequest {
   allowDuplicateDocument?: boolean;
   /** Stored statements this one replaces (chosen after an overlap was shown). */
   replaceDocumentIds?: string[];
+  /** The bank that sold the contract, for a paper that names only its insurer. */
+  institution?: string | null;
 }
 
 export interface StatementImportOutcome {

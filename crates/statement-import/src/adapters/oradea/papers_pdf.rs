@@ -23,6 +23,17 @@ fn is_oradea(c: &str) -> bool {
     c.contains("oradeavie") || c.contains("oradea")
 }
 
+/// Oradéa Vie insures contracts sold by banks: when the paper names the bank, the paper is filed with it and the
+/// insurer is kept aside; when it does not, the person says which bank sold the contract (`insurer_only`).
+fn sold_by(st: &mut ParsedStatement, c: &str) {
+    st.set_extra("insurer", INSTITUTION);
+    if c.contains("boursorama") || c.contains("boursobank") {
+        st.institution = Some("BoursoBank".into());
+    } else {
+        st.set_extra("insurer_only", true);
+    }
+}
+
 /// "Orléans, mars 2026": the papers are dated by month only, taken as its first day.
 fn dated_month(st: &mut ParsedStatement, text: &str) {
     if let Some(m) = search(r"(?i)Orl[ée]ans,\s+([a-zéû]+)\s+(\d{4})", text) {
@@ -121,6 +132,7 @@ impl OradeaTaxFormPdf {
 
     fn read(&self, doc: &SourceDocument) -> ParseResult {
         let mut st = paper(self);
+        sold_by(&mut st, &squeezed(doc)?);
         let pages = page_rows(doc)?;
         let text = pages
             .iter()
@@ -200,6 +212,7 @@ impl OradeaPerContributionsPdf {
 
     fn read(&self, doc: &SourceDocument) -> ParseResult {
         let mut st = paper(self);
+        sold_by(&mut st, &squeezed(doc)?);
         let text = rows_text(doc)?;
         dated_month(&mut st, &text);
         let year =

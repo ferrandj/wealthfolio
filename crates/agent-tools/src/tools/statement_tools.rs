@@ -162,7 +162,8 @@ service_tool!(
             "identity": {"type": ["object", "null"], "description": "Identity of the account: institution, holderName, holderAddress (or holderStreet, holderPostalCode, holderCity), iban, bic, bankCode, branchCode, accountNumber, ribKey."}
         }), &["index"])},
         "allowDuplicateDocument": {"type": "boolean"},
-        "replaceDocumentIds": {"type": "array", "items": {"type": "string"}}
+        "replaceDocumentIds": {"type": "array", "items": {"type": "string"}},
+        "institution": {"type": ["string", "null"], "description": "The bank that sold the contract, for a paper that names only its insurer (its statements say insurerOnly): the paper is filed with that bank."}
     }), &["fileName", "contentBase64"]),
     |env, args| {
         let request: StatementImportRequest = serde_json::from_value(args)?;

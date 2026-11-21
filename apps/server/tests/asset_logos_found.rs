@@ -104,6 +104,7 @@ async fn a_fund_gets_its_house_s_picture_else_its_bank_s_and_it_is_fetched_once(
             }],
             allow_duplicate_document: false,
             replace_document_ids: vec![],
+            institution: None,
         })
         .await
         .unwrap();

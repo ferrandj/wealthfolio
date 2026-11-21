@@ -90,7 +90,9 @@ fn test_the_oradea_tax_form_reads_the_boxes_of_the_return() {
         vec![(10.0, "Orléans, mars 2026")],
     ]);
     assert_eq!(st.adapter_id.as_deref(), Some("oradea.tax_form_pdf"));
+    // the bank that sold the contract is not named: the person is asked for it
     assert_eq!(st.institution.as_deref(), Some("Oradéa Vie"));
+    assert_eq!(extra(&st, "insurer_only"), &json!(true));
     assert_eq!(extra(&st, "tax_year"), &json!("2025"));
     assert_eq!(extra(&st, "issued_month"), &json!("2026-03"));
     assert_eq!(
@@ -113,12 +115,17 @@ fn test_the_per_deposits_statement_is_filed_with_the_contract() {
         vec![(10.0, "01234/5678901 2"), (120.0, "1 200,00")],
         vec![(10.0, "Pour la période du 01/01/2025 au 31/12/2025")],
         vec![(10.0, "souscrit auprès de ORADEA VIE par l'association")],
+        vec![(10.0, "Votre interlocuteur : BOURSORAMA, courtier en assurance")],
     ]);
     assert_eq!(
         st.adapter_id.as_deref(),
         Some("oradea.per_contributions_pdf")
     );
     assert_eq!(st.account_number.as_deref(), Some("01234/56789012"));
+    // sold through BoursoBank (named on the paper): filed with it, the insurer kept aside
+    assert_eq!(st.institution.as_deref(), Some("BoursoBank"));
+    assert_eq!(extra(&st, "insurer"), &json!("Oradéa Vie"));
+    assert_eq!(extra(&st, "insurer_only"), &json!(null));
     assert_eq!(st.account_type.as_deref(), Some("per"));
     assert_eq!(st.period_end, chrono::NaiveDate::from_ymd_opt(2025, 12, 31));
     assert_eq!(extra(&st, "total_deposits"), &json!("1200.00"));
@@ -169,6 +176,9 @@ fn test_the_insurance_papers_are_told_apart() {
         extra(&certificate, "title"),
         &json!("Certificat d'adhésion · Bourso Prévoyance")
     );
+    // the papers of the contract go to one insurance account, found by its type
+    assert_eq!(certificate.account_type.as_deref(), Some("prevoyance"));
+    assert_eq!(extra(&certificate, "match_by_type"), &json!(true));
 
     let notice = read(&[
         vec![(10.0, "Notice d'Information")],
@@ -188,4 +198,7 @@ fn test_the_insurance_papers_are_told_apart() {
         extra(&notice, "title"),
         &json!("Notice d'information · Carte Ultim")
     );
+    // the guarantees of a card: a paper on its own, no contract
+    assert_eq!(notice.account_type, None);
+    assert_eq!(extra(&notice, "category"), &json!("Garanties de la carte"));
 }

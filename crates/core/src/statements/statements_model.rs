@@ -245,6 +245,10 @@ pub struct StatementImportRequest {
     /// removed first, the categories chosen by hand are kept for the same operations.
     #[serde(default)]
     pub replace_document_ids: Vec<String>,
+    /// The bank that sold the contract, for a paper that names only its insurer (Oradéa Vie…): the paper is filed
+    /// with that bank and its account named after both.
+    #[serde(default)]
+    pub institution: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

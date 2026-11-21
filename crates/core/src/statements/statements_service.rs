@@ -137,15 +137,73 @@ fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
         ("info", Some("life_insurance")) if preview.account_number.is_some() => {
             Some(account_types::SECURITIES)
         }
+        // an insurance that protects (death, disability): a contract without a value, kept as an account so that its
+        // papers stay together
+        ("info", Some("prevoyance")) => Some(account_types::CASH),
+        // a retirement plan (PER) is a contract with a value: its papers name it by its number
+        ("info", Some("per")) if preview.account_number.is_some() => {
+            Some(account_types::SECURITIES)
+        }
         _ => None,
     }
 }
 
+/// A paper that names only the insurer of a contract (`insurer_only`), filed with the bank that sold it: the bank
+/// becomes its institution, the insurer stays beside it. A bank equal to the insurer changes nothing.
+fn sold_through(mut reading: Analysis, bank: Option<&str>) -> Analysis {
+    let Some(bank) = bank.map(str::trim).filter(|b| !b.is_empty()) else {
+        return reading;
+    };
+    for preview in &mut reading.statements {
+        let insurer_only =
+            preview.extra.get("insurer_only").and_then(|v| v.as_bool()) == Some(true);
+        if insurer_only && preview.institution.as_deref() != Some(bank) {
+            preview.institution = Some(bank.to_string());
+            if let Some(extra) = preview.extra.as_object_mut() {
+                extra.remove("insurer_only");
+            }
+        }
+    }
+    if reading
+        .statements
+        .iter()
+        .all(|p| p.institution.as_deref() == Some(bank))
+    {
+        reading.institution = Some(bank.to_string());
+    }
+    reading
+}
+
+/// The type of the account an import would create; empty when a document is kept without one.
+fn suggested_type(mode: ImportMode, preview: &StatementPreview) -> String {
+    match mode {
+        ImportMode::Transactions => account_types::CASH.to_string(),
+        ImportMode::DocumentOnly => own_account_type(preview).unwrap_or_default().to_string(),
+    }
+}
+
+/// The group of an account created from documents.
+fn group_of(preview: &StatementPreview, account_type: &str) -> String {
+    match preview.account_type.as_deref() {
+        Some("prevoyance") => "Prévoyance".to_string(),
+        _ => default_group_for_account_type(account_type).to_string(),
+    }
+}
+
 fn suggested_name(preview: &StatementPreview) -> String {
-    let institution = preview
+    let bank = preview
         .institution
         .clone()
         .unwrap_or_else(|| "Compte".to_string());
+    // a contract sold by a bank and held by an insurer: "BoursoBank - Oradéa Vie PER ••0123"
+    let contract = matches!(
+        preview.account_type.as_deref(),
+        Some("per" | "life_insurance")
+    );
+    let institution = match preview.extra.get("insurer").and_then(|v| v.as_str()) {
+        Some(insurer) if contract && insurer != bank => format!("{bank} - {insurer}"),
+        _ => bank,
+    };
     let label = account_type_label(preview.account_type.as_deref());
     let reference = preview
         .iban
@@ -1005,7 +1063,7 @@ impl StatementService {
                     mode,
                     matched_account,
                     suggested_account_name: suggested_name(preview),
-                    suggested_account_type: account_types::CASH.to_string(),
+                    suggested_account_type: suggested_type(mode, preview),
                     known_duplicates,
                     overlaps,
                 }
@@ -1102,7 +1160,7 @@ impl StatementService {
                 id: None,
                 name: candidate,
                 account_type: account_type.to_string(),
-                group: Some(default_group_for_account_type(account_type).to_string()),
+                group: Some(group_of(preview, account_type)),
                 currency: preview.currency.clone(),
                 is_default: false,
                 is_active: true,
@@ -1226,7 +1284,13 @@ impl StatementService {
                     .map_err(|e| Error::Unexpected(format!("Reading the file failed: {e}")))?
             }
         };
-        let analyzed = self.enrich(reading)?;
+        // a paper of an insurer alone: the bank the person named, or the one it was filed with before
+        let bank = clean(&request.institution).or_else(|| {
+            run.reimport_of
+                .as_ref()
+                .and_then(|previous| previous.institution.clone())
+        });
+        let analyzed = self.enrich(sold_through(reading, bank.as_deref()))?;
         if let Some(error) = &analyzed.analysis.error {
             return Err(invalid(error.clone()));
         }
@@ -2252,7 +2316,7 @@ impl StatementService {
                 mode: mode_of(preview),
                 matched_account: self.match_account(preview, &accounts, &identities),
                 suggested_account_name: suggested_name(preview),
-                suggested_account_type: account_types::CASH.to_string(),
+                suggested_account_type: suggested_type(mode_of(preview), preview),
                 known_duplicates: 0,
                 overlaps: Vec::new(),
             })
@@ -2610,6 +2674,7 @@ impl StatementService {
                     overrides: vec![],
                     allow_duplicate_document: true,
                     replace_document_ids: vec![],
+                    institution: None,
                 },
                 ImportRun {
                     reimport_of: Some(document.clone()),
@@ -3907,6 +3972,11 @@ mod tests {
         );
         // no contract number: nothing ties the letter to a contract, it waits for an account
         assert_eq!(own("info", Some("life_insurance"), None), None);
+        // the papers of an insurance that protects make its account, even without a number (they go by type)
+        assert_eq!(
+            own("info", Some("prevoyance"), None),
+            Some(account_types::CASH)
+        );
         for kind in [
             "fees_summary",
             "deposit_guarantee",
@@ -3916,6 +3986,75 @@ mod tests {
         ] {
             assert_eq!(own(kind, None, Some("123")), None, "{kind}");
         }
+    }
+
+    #[test]
+    fn an_import_says_which_account_it_would_create_or_that_a_paper_stays_alone() {
+        let mut paper = empty_preview();
+        paper.document_kind = Some("info".into());
+        assert_eq!(suggested_type(ImportMode::DocumentOnly, &paper), "");
+        paper.account_type = Some("prevoyance".into());
+        assert_eq!(
+            suggested_type(ImportMode::DocumentOnly, &paper),
+            account_types::CASH
+        );
+        assert_eq!(group_of(&paper, account_types::CASH), "Prévoyance");
+        assert_eq!(
+            suggested_type(ImportMode::Transactions, &empty_preview()),
+            account_types::CASH
+        );
+    }
+
+    #[test]
+    fn a_paper_of_an_insurer_alone_is_filed_with_the_bank_that_sold_the_contract() {
+        let mut per = empty_preview();
+        per.institution = Some("Oradéa Vie".into());
+        per.document_kind = Some("info".into());
+        per.account_type = Some("per".into());
+        per.account_number = Some("01234/56789012".into());
+        per.iban = None;
+        per.extra = serde_json::json!({"insurer": "Oradéa Vie", "insurer_only": true});
+        let reading = |p: StatementPreview| Analysis {
+            file_name: "papier.pdf".into(),
+            size_bytes: 0,
+            sha256: String::new(),
+            format: "pdf".into(),
+            institution: p.institution.clone(),
+            decision: "auto".into(),
+            message: String::new(),
+            candidates: vec![],
+            chosen_adapter_id: None,
+            statements: vec![p],
+            reader_version: String::new(),
+            error: None,
+        };
+        // no bank said: the paper stays with the insurer
+        let kept = sold_through(reading(per.clone()), None);
+        assert_eq!(
+            kept.statements[0].institution.as_deref(),
+            Some("Oradéa Vie")
+        );
+        assert_eq!(
+            suggested_name(&kept.statements[0]),
+            "Oradéa Vie - PER ••9012"
+        );
+        // the bank said: filed with it, the account named after both
+        let sold = sold_through(reading(per.clone()), Some(" BoursoBank "));
+        let p = &sold.statements[0];
+        assert_eq!(p.institution.as_deref(), Some("BoursoBank"));
+        assert_eq!(sold.institution.as_deref(), Some("BoursoBank"));
+        assert!(p.extra.get("insurer_only").is_none());
+        assert_eq!(suggested_name(p), "BoursoBank - Oradéa Vie - PER ••9012");
+        assert_eq!(own_account_type(p), Some(account_types::SECURITIES));
+        // a paper that names its bank is left as it is
+        let mut named = per.clone();
+        named.institution = Some("BoursoBank".into());
+        named.extra = serde_json::json!({"insurer": "Oradéa Vie"});
+        let kept = sold_through(reading(named), Some("Fortuneo"));
+        assert_eq!(
+            kept.statements[0].institution.as_deref(),
+            Some("BoursoBank")
+        );
     }
 
     fn preview(transactions: &[(&str, &str, &str)]) -> StatementPreview {

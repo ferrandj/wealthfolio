@@ -1100,11 +1100,23 @@ impl BoursoBankInsurancePaperPdf {
             }
         }
         let (title, category) = match which {
-            "certificate" => (format!("Certificat d'adhésion · {product}"), "Assurance"),
-            "advice" => (format!("Devoir de conseil · {product}"), "Assurance"),
-            "ipid" => (format!("Fiche produit (IPID) · {product}"), "Assurance"),
-            _ => (format!("Notice d'information · {product}"), "Assurance"),
+            "certificate" => (format!("Certificat d'adhésion · {product}"), "Prévoyance"),
+            "advice" => (format!("Devoir de conseil · {product}"), "Prévoyance"),
+            "ipid" => (format!("Fiche produit (IPID) · {product}"), "Prévoyance"),
+            // the insurance and assistance of a card are its guarantees: a paper, no contract of its own
+            "card_notice" => (
+                format!("Notice d'information · {product}"),
+                "Garanties de la carte",
+            ),
+            _ => (format!("Notice d'information · {product}"), "Prévoyance"),
         };
+        if which != "card_notice" {
+            // the papers of one insurance contract (Bourso Prévoyance, formerly Assurance Comptes): they print no
+            // contract number, so they go to the only insurance contract at the bank, created with the first one
+            st.account_type = Some("prevoyance".into());
+            st.account_label = Some("Bourso Prévoyance".into());
+            st.set_extra("match_by_type", true);
+        }
         st.set_extra("paper", which);
         st.set_extra("title", title);
         st.set_extra("category", category);

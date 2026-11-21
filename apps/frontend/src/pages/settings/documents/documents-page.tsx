@@ -1,6 +1,12 @@
 import { DocumentStorageLine } from "./components/document-storage-line";
 import { findMissingAssetLogos } from "@/hooks/use-asset-logos";
-import { analyzeStatement, importStatement, logger, purgeStatementDocuments } from "@/adapters";
+import {
+  analyzeStatement,
+  importStatement,
+  listStatementDocuments,
+  logger,
+  purgeStatementDocuments,
+} from "@/adapters";
 import { LoanAccountDialog } from "../loans/loan-account-dialog";
 import { DescribeNewSourcesDialog, DocumentSourcesPanel } from "./sources/document-sources-dialogs";
 import { invalidateLoanCaches } from "../loans/loan-caches";
@@ -9,9 +15,10 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { invalidatePerformanceCaches } from "@/lib/performance-cache";
 import { QueryKeys } from "@/lib/query-keys";
 import { invalidateSpendingCaches } from "@/features/spending/lib/invalidation";
-import { useQueryClient } from "@tanstack/react-query";
+import type { StatementDocument } from "@/lib/types/statements";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Icons, Separator } from "@wealthfolio/ui";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { AccountOwnerPrompt, OwnerlessAccountsBanner } from "../contacts/components/account-owners";
@@ -39,6 +46,21 @@ export default function DocumentsPage() {
   const queryClient = useQueryClient();
   const { accounts } = useAccounts({ filterActive: false });
   const [files, setFiles] = useState<PendingFile[]>([]);
+  // the files as they are now, for what an import does to the others
+  const filesRef = useRef<PendingFile[]>([]);
+  filesRef.current = files;
+  const { data: documents } = useQuery<StatementDocument[]>({
+    queryKey: [QueryKeys.STATEMENT_DOCUMENTS],
+    queryFn: listStatementDocuments,
+  });
+  // the banks of the documents kept, offered for a paper that names only its insurer
+  const banks = useMemo(
+    () =>
+      [
+        ...new Set((documents ?? []).map((d) => d.institution).filter((i): i is string => !!i)),
+      ].sort(),
+    [documents],
+  );
   const [dragging, setDragging] = useState(false);
   // accounts this session's imports created: their owner is asked once the imports are done
   const [newAccounts, setNewAccounts] = useState<string[]>([]);
@@ -96,7 +118,7 @@ export default function DocumentsPage() {
   );
 
   const importOne = useCallback(
-    async (file: PendingFile) => {
+    async (file: PendingFile, rematch = true) => {
       patchFile(file.id, { status: "importing", error: undefined });
       try {
         // re-import: the old document goes first, with its operations and what it set up
@@ -116,12 +138,24 @@ export default function DocumentsPage() {
           overrides,
           allowDuplicateDocument: file.allowDuplicateDocument,
           replaceDocumentIds: replacedDocumentIds(file.analysis?.statements ?? [], file.choices),
+          institution: file.bank?.trim() || null,
         });
         patchFile(file.id, { status: "done", result });
         const created = result.outcomes.flatMap((o) =>
           o.createdAccount && o.accountId ? [o.accountId] : [],
         );
-        if (created.length > 0) setNewAccounts((list) => [...new Set([...list, ...created])]);
+        if (created.length > 0) {
+          setNewAccounts((list) => [...new Set([...list, ...created])]);
+          // the files still waiting are read against the accounts again: those of the account just created now go
+          // to it instead of proposing a new account each (an import of them all matches on its own)
+          if (rematch) {
+            for (const other of filesRef.current) {
+              if (other.id !== file.id && other.status === "ready") {
+                void analyse(other.id, other.fileName, other.contentBase64, other.adapterId);
+              }
+            }
+          }
+        }
         void queryClient.invalidateQueries({ queryKey: [QueryKeys.STATEMENT_DOCUMENT_SOURCES] });
         // the funds a document brought get their picture
         void findMissingAssetLogos(queryClient);
@@ -150,7 +184,7 @@ export default function DocumentsPage() {
         patchFile(file.id, { status: "error", error: message(e) });
       }
     },
-    [patchFile, queryClient],
+    [analyse, patchFile, queryClient],
   );
 
   const importable = files.filter(
@@ -172,7 +206,7 @@ export default function DocumentsPage() {
     // One after the other: the writes go through a single database connection anyway.
     setImportingAll(true);
     try {
-      for (const file of importable) await importOne(file);
+      for (const file of importable) await importOne(file, false);
     } finally {
       setImportingAll(false);
     }
@@ -263,6 +297,7 @@ export default function DocumentsPage() {
               key={file.id}
               file={file}
               accounts={accounts}
+              banks={banks}
               onChange={(patch) => patchFile(file.id, patch)}
               onChoose={(index, patch) => setChoice(file, index, patch)}
               onPickReading={(adapterId) =>

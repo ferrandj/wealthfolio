@@ -102,6 +102,7 @@ async fn the_automatic_review_validates_what_raises_no_alert_and_says_why_for_th
                     }],
                     allow_duplicate_document: false,
                     replace_document_ids: vec![],
+                    institution: None,
                 })
                 .await
                 .unwrap();

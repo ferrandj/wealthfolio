@@ -87,6 +87,7 @@ async fn removing_documents_takes_their_operations_and_the_accounts_they_leave_e
         }],
         allow_duplicate_document: false,
         replace_document_ids: vec![],
+        institution: None,
     };
     state
         .statement_service
@@ -166,6 +167,7 @@ async fn a_source_remembers_how_the_document_is_obtained() {
             }],
             allow_duplicate_document: false,
             replace_document_ids: vec![],
+            institution: None,
         })
         .await
         .unwrap();

@@ -96,6 +96,7 @@ async fn a_document_reviewed_again_says_the_same() {
                     }],
                     allow_duplicate_document: false,
                     replace_document_ids: vec![],
+                    institution: None,
                 })
                 .await
                 .unwrap();

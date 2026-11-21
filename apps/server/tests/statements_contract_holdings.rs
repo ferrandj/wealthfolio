@@ -78,6 +78,7 @@ async fn the_positions_of_a_contract_become_its_holdings_and_go_with_the_documen
             }],
             allow_duplicate_document: false,
             replace_document_ids: vec![],
+            institution: None,
         })
         .await
         .unwrap();
