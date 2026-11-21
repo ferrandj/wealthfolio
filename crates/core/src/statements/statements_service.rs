@@ -174,6 +174,52 @@ fn sold_through(mut reading: Analysis, bank: Option<&str>) -> Analysis {
     reading
 }
 
+/// What a document brought, compared before and after it is read again: its account, period and balances, and its
+/// operations (account, day, type, amount, quantity, price, asset), in a fixed order.
+#[derive(Debug, PartialEq)]
+struct Brought {
+    document: [Option<String>; 6],
+    operations: Vec<String>,
+}
+
+fn brought(document: &StatementDocument, activities: &[crate::activities::Activity]) -> Brought {
+    let mut operations: Vec<String> = activities
+        .iter()
+        .map(|a| {
+            format!(
+                "{}|{}|{}|{:?}|{:?}|{:?}|{:?}",
+                a.account_id,
+                a.activity_date.date_naive(),
+                a.activity_type,
+                a.amount.map(|d| d.normalize()),
+                a.quantity.map(|d| d.normalize()),
+                a.unit_price.map(|d| d.normalize()),
+                a.asset_id
+            )
+        })
+        .collect();
+    operations.sort();
+    Brought {
+        document: [
+            document.account_id.clone(),
+            document.document_kind.clone(),
+            document.period_start.clone(),
+            document.period_end.clone(),
+            document.opening_balance.clone(),
+            document.closing_balance.clone(),
+        ],
+        operations,
+    }
+}
+
+/// A paper of the bank rather than of one account: the IFU (it covers every account), the statement of resources.
+fn is_bank_paper(preview: &StatementPreview) -> bool {
+    matches!(
+        preview.document_kind.as_deref(),
+        Some("tax_form" | "bank_certificate")
+    )
+}
+
 /// The type of the account an import would create; empty when a document is kept without one.
 fn suggested_type(mode: ImportMode, preview: &StatementPreview) -> String {
     match mode {
@@ -661,15 +707,23 @@ impl StatementService {
         mut documents: Vec<StatementDocument>,
     ) -> Result<RevalidationResult> {
         documents.sort_by(logical_order);
-        let run = RevalidationRun(&self.revalidation);
-        run.set(|p| {
-            *p = RevalidationProgress {
+        // one reading again at a time: two at once (one given up by its request but still going, another started
+        // meanwhile) would undo each other's operations and slow both down
+        {
+            let mut progress = self.revalidation.lock().unwrap_or_else(|p| p.into_inner());
+            if progress.running {
+                return Err(invalid(
+                    "Documents are already being read again: wait until it ends",
+                ));
+            }
+            *progress = RevalidationProgress {
                 running: true,
                 done: 0,
                 total: documents.len(),
                 file_name: None,
-            }
-        });
+            };
+        }
+        let run = RevalidationRun(&self.revalidation);
         let mut result = RevalidationResult {
             total: documents.len(),
             ..RevalidationResult::default()
@@ -714,12 +768,17 @@ impl StatementService {
             }
         }
         let mut carries: HashMap<String, HashMap<OperationKey, (String, String)>> = HashMap::new();
+        // what each validated document brought, to tell whether the newer readers change it
+        let mut before: HashMap<String, Brought> = HashMap::new();
         for (document, _) in &readable {
             let activities = document
                 .import_run_id
                 .as_ref()
                 .and_then(|run| by_run.remove(run))
                 .unwrap_or_default();
+            if document.status == super::statements_model::DOCUMENT_STATUS_VALIDATED {
+                before.insert(document.id.clone(), brought(document, &activities));
+            }
             carries.insert(document.id.clone(), self.undo_operations(activities).await?);
         }
 
@@ -761,6 +820,49 @@ impl StatementService {
         // the transfers between own accounts, once every document is in
         if let Err(e) = self.link_own_transfers().await {
             warn!("could not look for transfers between own accounts: {e}");
+        }
+
+        // a validated document read the same as before stays validated; one the newer readers changed waits for the
+        // person, who sees why
+        if !before.is_empty() {
+            let mut by_run: HashMap<String, Vec<crate::activities::Activity>> = HashMap::new();
+            for activity in self.activity_service.get_activities()? {
+                if let Some(run) = activity.import_run_id.clone() {
+                    by_run.entry(run).or_default().push(activity);
+                }
+            }
+            for (id, previous) in &before {
+                let Some(outcome) = outcomes.get_mut(id) else {
+                    continue;
+                };
+                if outcome.error.is_some() {
+                    continue;
+                }
+                let Some(mut document) = self.repository.get_document(id)? else {
+                    continue;
+                };
+                let activities = document
+                    .import_run_id
+                    .as_ref()
+                    .and_then(|run| by_run.get(run))
+                    .map(Vec::as_slice)
+                    .unwrap_or_default();
+                let mut reason = ReviewReason::default();
+                if &brought(&document, activities) != previous {
+                    reason = document
+                        .review_reason
+                        .as_deref()
+                        .and_then(|r| serde_json::from_str(r).ok())
+                        .unwrap_or_default();
+                    reason.doubts = document.to_review_count.max(0) as u32;
+                    reason.changed = true;
+                } else if document.status == super::statements_model::DOCUMENT_STATUS_VALIDATED {
+                    continue;
+                }
+                apply_reason(&mut document, &reason);
+                let saved = self.repository.update_document(document).await?;
+                *outcome = outcome_of(&saved, None);
+            }
         }
 
         for document in &documents {
@@ -1371,6 +1473,8 @@ impl StatementService {
                 Some(id) => Some(self.account_service.get_account(&id)?),
                 None => match &item.matched_account {
                     Some(m) => Some(self.account_service.get_account(&m.id)?),
+                    // a paper of the bank (IFU, statement of resources) belongs to no account, even read again
+                    None if is_bank_paper(preview) => None,
                     None => match (&run.fallback_account, analyzed.statements.len()) {
                         (Some(id), 1) => self.account_service.get_account(id).ok(),
                         _ => None,

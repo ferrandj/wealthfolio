@@ -105,8 +105,9 @@ paper_adapter!(
     OradeaTaxFormPdf,
     "oradea.tax_form_pdf",
     "Oradéa Vie · relevé fiscal annuel (IFU, PDF)",
-    "La déclaration récapitulative des opérations (2561) d'Oradéa Vie : les montants des cases de la déclaration de revenus (6NS pour les versements sur un PER, 2CH, 2DH…).",
-    INSTITUTION
+    "La déclaration récapitulative des opérations (2561) d'Oradéa Vie : les montants des cases de la déclaration de revenus (6NS pour les versements sur un PER, 2CH, 2DH…), rangée avec la banque.",
+    INSTITUTION,
+    "tax_form"
 );
 
 impl OradeaTaxFormPdf {

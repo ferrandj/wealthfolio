@@ -48,6 +48,7 @@ export function parseReviewReason(value: string | null | undefined): StatementRe
       warnings: Number(parsed.warnings ?? 0),
       chain: !!parsed.chain,
       reopened: !!parsed.reopened,
+      changed: !!parsed.changed,
     };
   } catch {
     return null;

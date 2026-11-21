@@ -55,6 +55,8 @@ pub fn document_kind_label(kind: Option<&str>) -> String {
         "loan_schedule" => "Tableau d'amortissement".into(),
         "loan_event" => "Remboursement anticipé".into(),
         "info" => "Courrier".into(),
+        "tax_form" => "IFU".into(),
+        "bank_certificate" => "Attestation".into(),
         "positions" => "Positions".into(),
         "" => "Document".into(),
         other => other.replace('_', " "),

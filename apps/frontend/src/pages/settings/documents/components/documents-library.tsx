@@ -486,8 +486,11 @@ export function DocumentsLibrary() {
 
   // institution → account (a loan's papers under its loan account) → kind → year
   const renderTree = () => {
+    // a paper with no account is a paper of the bank (an IFU, a statement of resources…)
     const accountName = (id: string | null | undefined) =>
-      id ? (accounts.find((a) => a.id === id)?.name ?? id) : t("settings:documents.no_account");
+      id
+        ? (accounts.find((a) => a.id === id)?.name ?? id)
+        : t("settings:documents.tree_bank_papers");
     const nodeOf = (d: StatementDocument) => {
       if (LOAN_KINDS.includes(d.documentKind ?? "")) {
         const loan = loanOfDocument(loans, d.id);
@@ -799,6 +802,7 @@ function StatusBadge({ doc }: { doc: StatementDocument }) {
   if (reason && reason.warnings > 0) parts.push(t("settings:documents.reason_warnings"));
   if (reason?.chain) parts.push(t("settings:documents.reason_chain"));
   if (reason?.reopened) parts.push(t("settings:documents.reason_reopened"));
+  if (reason?.changed) parts.push(t("settings:documents.reason_changed"));
   return (
     <Badge variant="outline" className="border-amber-500 text-amber-700" title={parts.join(" · ")}>
       {t("settings:documents.status_pending")}

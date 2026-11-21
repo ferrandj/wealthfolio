@@ -2212,6 +2212,7 @@
     "loan_check_first": "Some points need checking before you validate: see the checks above.",
     "reason_chain": "does not follow the previous statement",
     "reason_reopened": "to check again (a neighbouring statement changed)",
+    "reason_changed": "the new readers read something else: check it again",
     "chain_first": "First statement of this account: none before it, its opening balance is taken as it is. If there are older statements, import them: they come first.",
     "chain_follows": "Follows the previous statement ({{name}}, until {{end}}) with no missing day.",
     "chain_gap": "Days are missing since the previous statement ({{name}}, until {{end}}): nothing covers {{from}} to {{to}}. Import the missing statement.",
@@ -2241,6 +2242,8 @@
       "loan_schedule": "Repayment schedule",
       "loan_event": "Early repayment",
       "info": "Letters",
+      "tax_form": "IFU",
+      "bank_certificate": "Bank certificates",
       "document": "Documents",
       "life_deposit": "Life insurance deposits",
       "life_arbitrage": "Life insurance switches",
@@ -2248,6 +2251,7 @@
       "positions": "Contract positions"
     },
     "tree_loan": "Loan · {{name}}",
+    "tree_bank_papers": "Bank documents",
     "group": {
       "invalidate": "Invalidate",
       "invalidate_hint": "Put the validated documents of “{{name}}” back to review",

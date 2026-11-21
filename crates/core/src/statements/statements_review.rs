@@ -37,6 +37,10 @@ pub struct ReviewReason {
     /// it is checked again.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reopened: bool,
+    /// It was validated, then read again by newer readers that brought something else (other operations, amounts,
+    /// dates, account, period or balances): the person checks what changed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub changed: bool,
 }
 
 impl ReviewReason {
@@ -47,6 +51,7 @@ impl ReviewReason {
             && !self.confirm
             && !self.chain
             && !self.reopened
+            && !self.changed
     }
 
     pub fn to_json(&self) -> Option<String> {
@@ -63,6 +68,7 @@ impl ReviewReason {
         self.confirm |= other.confirm;
         self.chain |= other.chain;
         self.reopened |= other.reopened;
+        self.changed |= other.changed;
         if self.balance_gap.is_none() {
             self.balance_gap = other.balance_gap;
         }

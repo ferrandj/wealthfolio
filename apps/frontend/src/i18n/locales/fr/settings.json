@@ -2212,6 +2212,7 @@
     "loan_check_first": "Certains points sont à vérifier avant de valider : consultez les contrôles ci-dessus.",
     "reason_chain": "ne suit pas le relevé précédent",
     "reason_reopened": "remis à vérifier (un relevé voisin a changé)",
+    "reason_changed": "la nouvelle version lit autre chose : à revérifier",
     "chain_first": "Premier relevé de ce compte : aucun relevé avant celui-ci, le solde d'ouverture est pris tel quel. S'il existe des relevés plus anciens, importez-les : ils passeront avant.",
     "chain_follows": "Suit le relevé précédent ({{name}}, jusqu'au {{end}}) sans jour manquant.",
     "chain_gap": "Des jours manquent depuis le relevé précédent ({{name}}, jusqu'au {{end}}) : rien ne couvre du {{from}} au {{to}}. Importez le relevé manquant.",
@@ -2241,6 +2242,8 @@
       "loan_schedule": "Tableau d'amortissement",
       "loan_event": "Remboursement anticipé",
       "info": "Courriers",
+      "tax_form": "IFU",
+      "bank_certificate": "Attestations de la banque",
       "document": "Documents",
       "life_deposit": "Versements assurance-vie",
       "life_arbitrage": "Arbitrages assurance-vie",
@@ -2248,6 +2251,7 @@
       "positions": "Positions du contrat"
     },
     "tree_loan": "Prêt · {{name}}",
+    "tree_bank_papers": "Documents de la banque",
     "group": {
       "invalidate": "Invalider",
       "invalidate_hint": "Remettre en revue les documents validés de « {{name}} »",

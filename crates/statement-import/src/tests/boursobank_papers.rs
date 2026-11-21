@@ -91,6 +91,8 @@ fn test_a_statement_of_resources_lists_every_account_with_its_balance() {
         vec![(10.0, FOOTER)],
     ]);
     assert_eq!(adapter(&st), "boursobank.resources_certificate_pdf");
+    // a paper of the bank, in its own category
+    assert_eq!(st.document_kind.as_deref(), Some("bank_certificate"));
     assert_eq!(
         st.account_number, None,
         "it is about every account, kept without one"
@@ -309,8 +311,11 @@ fn test_the_tax_form_adds_up_its_boxes_and_its_capital_gains() {
         vec![(10.0, "Montant des plus ou moins-values"), (180.0, "-3")],
     ]);
     assert_eq!(adapter(&st), "boursobank.tax_form_pdf");
-    assert_eq!(st.account_number.as_deref(), Some(ACCOUNT));
-    assert_eq!(st.branch_code.as_deref(), Some(BRANCH));
+    // a paper of the bank: the account it quotes is kept aside, it is not filed with it
+    assert_eq!(st.document_kind.as_deref(), Some("tax_form"));
+    assert_eq!(st.account_number, None);
+    assert_eq!(extra(&st, "reference_account"), &json!(ACCOUNT));
+    assert_eq!(extra(&st, "branch_code"), &json!(BRANCH));
     assert_eq!(extra(&st, "tax_year"), &json!("2025"));
     assert_eq!(extra(&st, "issued_on"), &json!("2026-03-31"));
     assert_eq!(

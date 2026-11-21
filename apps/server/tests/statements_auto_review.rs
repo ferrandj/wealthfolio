@@ -207,3 +207,70 @@ async fn two_files_of_a_new_account_sent_at_once_make_one_account() {
     let accounts = state.account_service.get_all_accounts().unwrap();
     assert_eq!(accounts.len(), 1);
 }
+
+#[tokio::test]
+async fn reading_again_keeps_what_did_not_change_validated_and_runs_once_at_a_time() {
+    let root = tempdir().unwrap();
+    let state = build_state(&test_config(root.path())).await.unwrap();
+    let account = state
+        .account_service
+        .create_account(new_account("44444444444"))
+        .await
+        .unwrap();
+    for month in [1, 2, 3] {
+        state
+            .statement_service
+            .import(StatementImportRequest {
+                file_name: format!("44444444444-{month}.ofx"),
+                content_base64: base64::engine::general_purpose::STANDARD.encode(ofx(
+                    "44444444444",
+                    month,
+                    3,
+                    "PRLV SEPA EDF CLIENTS",
+                )),
+                adapter_id: None,
+                overrides: vec![StatementOverride {
+                    index: 0,
+                    account_id: Some(account.id.clone()),
+                    new_account_name: None,
+                    skip: false,
+                    identity: None,
+                }],
+                allow_duplicate_document: false,
+                replace_document_ids: vec![],
+                institution: None,
+            })
+            .await
+            .unwrap();
+    }
+    let documents = state.statement_service.list_documents().unwrap();
+    let validated: Vec<_> = documents
+        .iter()
+        .filter(|d| d.status == "VALIDATED")
+        .map(|d| d.id.clone())
+        .collect();
+    assert!(!validated.is_empty(), "{documents:?}");
+
+    // read again by the same readers: nothing changes, nothing waits for the person
+    let ids: Vec<String> = documents.iter().map(|d| d.id.clone()).collect();
+    let result = state
+        .statement_service
+        .revalidate_documents(&ids)
+        .await
+        .unwrap();
+    assert_eq!(result.failed, 0);
+    let after = state.statement_service.list_documents().unwrap();
+    for id in &validated {
+        let d = after.iter().find(|d| &d.id == id).unwrap();
+        assert_eq!(d.status, "VALIDATED", "{d:?}");
+        assert!(!d.review_reason.as_deref().unwrap_or("").contains("changed"));
+    }
+
+    // two readings at once: the second is refused instead of undoing what the first brings back
+    let service = &state.statement_service;
+    let (first, second) = tokio::join!(
+        service.revalidate_documents(&ids),
+        service.revalidate_documents(&ids)
+    );
+    assert!(first.is_ok() != second.is_ok(), "{first:?} {second:?}");
+}

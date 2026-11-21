@@ -90,6 +90,7 @@ fn test_the_oradea_tax_form_reads_the_boxes_of_the_return() {
         vec![(10.0, "Orléans, mars 2026")],
     ]);
     assert_eq!(st.adapter_id.as_deref(), Some("oradea.tax_form_pdf"));
+    assert_eq!(st.document_kind.as_deref(), Some("tax_form"));
     // the bank that sold the contract is not named: the person is asked for it
     assert_eq!(st.institution.as_deref(), Some("Oradéa Vie"));
     assert_eq!(extra(&st, "insurer_only"), &json!(true));

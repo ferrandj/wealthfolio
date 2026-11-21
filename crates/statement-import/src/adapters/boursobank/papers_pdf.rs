@@ -167,6 +167,9 @@ macro_rules! paper_adapter {
         paper_adapter!($name, $id, $label, $description, INSTITUTION);
     };
     ($name:ident, $id:literal, $label:literal, $description:literal, $institution:expr) => {
+        paper_adapter!($name, $id, $label, $description, $institution, "info");
+    };
+    ($name:ident, $id:literal, $label:literal, $description:literal, $institution:expr, $kind:literal) => {
         impl Adapter for $name {
             fn id(&self) -> &'static str {
                 $id
@@ -175,7 +178,7 @@ macro_rules! paper_adapter {
                 Some($institution)
             }
             fn kind(&self) -> &'static str {
-                "info"
+                $kind
             }
             fn label(&self) -> &'static str {
                 $label
@@ -375,7 +378,9 @@ paper_adapter!(
     BoursoBankResourcesCertificatePdf,
     "boursobank.resources_certificate_pdf",
     "BoursoBank · attestation de ressources (PDF)",
-    "L'attestation de ressources : le solde ou la valorisation de chaque compte à une date (comptes bancaires, épargne, comptes-titres, PEA)."
+    "L'attestation de ressources : le solde ou la valorisation de chaque compte à une date (comptes bancaires, épargne, comptes-titres, PEA).",
+    INSTITUTION,
+    "bank_certificate"
 );
 
 impl BoursoBankResourcesCertificatePdf {
@@ -874,7 +879,9 @@ paper_adapter!(
     BoursoBankTaxFormPdf,
     "boursobank.tax_form_pdf",
     "BoursoBank · imprimé fiscal unique (IFU, PDF)",
-    "L'IFU de l'année : les montants des cases de la déclaration de revenus (2DC, 2TR, 2CK…) et les cessions de valeurs mobilières."
+    "L'IFU de l'année : les montants des cases de la déclaration de revenus (2DC, 2TR, 2CK…) et les cessions de valeurs mobilières, rangé avec la banque (il porte sur tous ses comptes).",
+    INSTITUTION,
+    "tax_form"
 );
 
 impl BoursoBankTaxFormPdf {
@@ -918,15 +925,16 @@ impl BoursoBankTaxFormPdf {
             st.period_start = parse_date_s(&format!("01/01/{y}"));
             st.period_end = parse_date_s(&format!("31/12/{y}"));
         }
+        // the IFU covers every account of the customer at the bank: a paper of the bank, not of the account it
+        // quotes as its reference
         if let Some(m) = search(r"(?i)Guichet\s+(\d{5})", &text) {
-            st.branch_code = Some(m[1].to_string());
+            st.set_extra("branch_code", m[1].to_string());
         }
         if let Some(m) = search(
             r"(?i)r[ée]f[ée]rences du compte ou num[ée]ro de contrat\s+([0-9A-Z]{11})",
             &text,
         ) {
-            st.account_number = Some(m[1].to_string());
-            st.bank_code = Some("40618".into());
+            st.set_extra("reference_account", m[1].to_string());
         }
         // the page "Aide à la déclaration de vos revenus": a label, the box, its amount
         let mut boxes: Vec<(String, Decimal)> = vec![];

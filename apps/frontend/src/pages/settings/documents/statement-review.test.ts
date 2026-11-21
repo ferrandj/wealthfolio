@@ -48,10 +48,12 @@ describe("statement review", () => {
       warnings: 0,
       chain: false,
       reopened: false,
+      changed: false,
     });
-    expect(parseReviewReason('{"chain":true,"reopened":true}')).toMatchObject({
+    expect(parseReviewReason('{"chain":true,"reopened":true,"changed":true}')).toMatchObject({
       chain: true,
       reopened: true,
+      changed: true,
     });
     expect(parseReviewReason("not json")).toBeNull();
     expect(parseReviewReason(null)).toBeNull();

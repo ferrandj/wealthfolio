@@ -89,6 +89,8 @@ export interface StatementReviewReason {
   chain?: boolean;
   /** A statement next to it came or went after it was validated: to check again. */
   reopened?: boolean;
+  /** Validated, then read again by newer readers that brought something else. */
+  changed?: boolean;
 }
 
 export interface StatementDocumentContent {
