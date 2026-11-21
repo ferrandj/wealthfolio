@@ -172,3 +172,38 @@ async fn the_automatic_review_validates_what_raises_no_alert_and_says_why_for_th
         after.iter().map(|d| (&d.id, &d.status)).collect::<Vec<_>>()
     );
 }
+
+#[tokio::test]
+async fn two_files_of_a_new_account_sent_at_once_make_one_account() {
+    let root = tempdir().unwrap();
+    let state = build_state(&test_config(root.path())).await.unwrap();
+    let request = |month: u32| StatementImportRequest {
+        file_name: format!("33333333333-{month}.ofx"),
+        content_base64: base64::engine::general_purpose::STANDARD.encode(ofx(
+            "33333333333",
+            month,
+            1,
+            "PRLV SEPA EDF CLIENTS",
+        )),
+        adapter_id: None,
+        overrides: vec![],
+        allow_duplicate_document: false,
+        replace_document_ids: vec![],
+        institution: None,
+    };
+    let service = &state.statement_service;
+    let (january, february) = tokio::join!(service.import(request(1)), service.import(request(2)));
+    let (january, february) = (january.unwrap(), february.unwrap());
+    let created = [&january, &february]
+        .iter()
+        .flat_map(|r| &r.outcomes)
+        .filter(|o| o.created_account)
+        .count();
+    assert_eq!(created, 1);
+    assert_eq!(
+        january.outcomes[0].account_id,
+        february.outcomes[0].account_id
+    );
+    let accounts = state.account_service.get_all_accounts().unwrap();
+    assert_eq!(accounts.len(), 1);
+}

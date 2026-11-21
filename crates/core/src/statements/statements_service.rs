@@ -638,6 +638,9 @@ impl Drop for RevalidationRun<'_> {
 
 pub struct StatementService {
     revalidation: std::sync::Mutex<RevalidationProgress>,
+    /// Two imports of papers of the same new contract (two files sent at once) must not each create its account:
+    /// the account is looked for again and created under this lock, its identity saved before it is released.
+    account_creation: tokio::sync::Mutex<()>,
     readings: std::sync::Mutex<Readings>,
     repository: Arc<dyn StatementRepositoryTrait>,
     account_service: Arc<dyn AccountServiceTrait>,
@@ -873,6 +876,7 @@ impl StatementService {
     ) -> Self {
         Self {
             revalidation: std::sync::Mutex::new(RevalidationProgress::default()),
+            account_creation: tokio::sync::Mutex::new(()),
             readings: std::sync::Mutex::new(Readings::default()),
             repository,
             account_service,
@@ -1132,9 +1136,30 @@ impl StatementService {
         count
     }
 
-    async fn create_cash_account(&self, preview: &StatementPreview, name: &str) -> Result<Account> {
-        self.create_account_of(preview, name, account_types::CASH)
-            .await
+    /// The account an import with no account found goes to: created, unless another import made it meanwhile
+    /// (looked for again under the lock; not when the person asked for a new account). Returns it and whether it
+    /// was created here.
+    async fn account_for(
+        &self,
+        preview: &StatementPreview,
+        name: &str,
+        account_type: &str,
+        asked_new: bool,
+    ) -> Result<(Account, bool)> {
+        let _creating = self.account_creation.lock().await;
+        if !asked_new {
+            let accounts = self.account_service.get_all_accounts()?;
+            let identities = self.repository.list_identities()?;
+            if let Some(found) = self.match_account(preview, &accounts, &identities) {
+                return Ok((self.account_service.get_account(&found.id)?, false));
+            }
+        }
+        let account = self.create_account_of(preview, name, account_type).await?;
+        // its identity now, so that the next import finds it
+        self.repository
+            .save_identity(merge_identity(None, &account.id, preview, None))
+            .await?;
+        Ok((account, true))
     }
 
     async fn create_account_of(
@@ -1361,11 +1386,15 @@ impl StatementService {
                     let target = match target {
                         None if run.create_accounts => match own_account_type(preview) {
                             Some(account_type) => {
-                                let name = over
-                                    .and_then(|o| clean(&o.new_account_name))
+                                let asked = over.and_then(|o| clean(&o.new_account_name));
+                                let name = asked
+                                    .clone()
                                     .unwrap_or_else(|| item.suggested_account_name.clone());
-                                created_here = true;
-                                Some(self.create_account_of(preview, &name, account_type).await?)
+                                let (account, created) = self
+                                    .account_for(preview, &name, account_type, asked.is_some())
+                                    .await?;
+                                created_here = created;
+                                Some(account)
                             }
                             None => None,
                         },
@@ -1413,10 +1442,12 @@ impl StatementService {
                     let (account, created) = match target {
                         Some(a) => (a, false),
                         None => {
-                            let name = over
-                                .and_then(|o| clean(&o.new_account_name))
+                            let asked = over.and_then(|o| clean(&o.new_account_name));
+                            let name = asked
+                                .clone()
                                 .unwrap_or_else(|| item.suggested_account_name.clone());
-                            (self.create_cash_account(preview, &name).await?, true)
+                            self.account_for(preview, &name, account_types::CASH, asked.is_some())
+                                .await?
                         }
                     };
                     outcome.account_id = Some(account.id.clone());
