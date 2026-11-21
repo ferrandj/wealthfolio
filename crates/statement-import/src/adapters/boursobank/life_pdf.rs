@@ -25,7 +25,7 @@ use crate::adapters::re::search;
 use crate::py;
 
 const INSTITUTION: &str = "BoursoBank";
-const INSURER: &str = "Generali Vie";
+pub(crate) const INSURER: &str = "Generali Vie";
 const ISIN: &str = r"([A-Z]{2}[A-Z0-9]{9}\d)";
 /// A number of units or a unit value: "0,5108", "11 388,90".
 const NUMBER: &str = r"(-?\d{1,3}(?: \d{3})*(?:,\d+)?)";

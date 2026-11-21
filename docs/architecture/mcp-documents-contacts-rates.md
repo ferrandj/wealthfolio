@@ -178,9 +178,14 @@ what would go — run it first.
 ### Positions of an investment contract
 
 A document listing a contract's funds (the Fortuneo Vie positions copied from
-the site, `fortuneo.life_positions_csv`) sets the contract's holdings on its
-value date: the account switches to holdings tracking, each fund is a
-hand-priced asset found again by its ISIN, its net asset value is its price.
+the site, `fortuneo.life_positions_csv`; the Bourso Vie statement of situation,
+`boursobank.life_situation_pdf`, and positions export,
+`boursobank.life_positions_csv`) sets the contract's holdings on its value
+date: the account switches to holdings tracking, each fund is a hand-priced
+asset found again by its ISIN, its net asset value is its price. A fund without
+ISIN is found again by its name, then (named differently from one document to
+the other, as the Bourso Vie PDF and CSV do) by the fund the contract already
+held with the same cost per unit and nearly the same units.
 Removing the document takes those holdings back. The operations copied from the
 site (Date;Opération;Statut;Montant) are read like the CSV export.
 

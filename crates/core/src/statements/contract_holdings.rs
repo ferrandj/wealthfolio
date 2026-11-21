@@ -84,6 +84,101 @@ pub fn holding_symbol(h: &HoldingPreview) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// A fund the contract held in an earlier snapshot: its asset, name, cost per unit and units.
+struct HeldFund {
+    asset_id: String,
+    name: String,
+    average_cost: Decimal,
+    quantity: Decimal,
+}
+
+fn squeezed_name(name: &str) -> String {
+    name.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .map(|c| match c {
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'à' | 'â' => 'a',
+            'ô' => 'o',
+            'î' | 'ï' => 'i',
+            'ù' | 'û' | 'ü' => 'u',
+            'ç' => 'c',
+            other => other,
+        })
+        .collect()
+}
+
+fn held_funds(
+    keyframes: &[crate::portfolio::snapshot::AccountStateSnapshot],
+    assets: &[crate::assets::Asset],
+) -> Vec<HeldFund> {
+    let mut held: Vec<HeldFund> = Vec::new();
+    // the latest first: a fund's latest cost and units are the ones a new document carries on
+    let mut frames: Vec<_> = keyframes.iter().collect();
+    frames.sort_by_key(|f| std::cmp::Reverse(f.snapshot_date));
+    for frame in frames {
+        for position in frame.positions.values() {
+            if held.iter().any(|f| f.asset_id == position.asset_id) {
+                continue;
+            }
+            let Some(asset) = assets.iter().find(|a| {
+                a.id == position.asset_id && a.quote_mode == crate::assets::QuoteMode::Manual
+            }) else {
+                continue;
+            };
+            held.push(HeldFund {
+                asset_id: asset.id.clone(),
+                name: asset
+                    .name
+                    .clone()
+                    .or_else(|| asset.instrument_symbol.clone())
+                    .unwrap_or_default(),
+                average_cost: position.average_cost,
+                quantity: position.quantity,
+            });
+        }
+    }
+    held
+}
+
+/// The asset of a fund the contract already held under another name: the same name once spaces and case are set
+/// aside, else the only one with the same cost per unit (the cost per unit is the insurer's, the same in every
+/// document) and nearly the same units.
+fn same_fund(
+    held: &[HeldFund],
+    h: &HoldingPreview,
+    cost: Decimal,
+    quantity: Decimal,
+) -> Option<String> {
+    if h.isin.is_some() {
+        return None;
+    }
+    let name = squeezed_name(
+        h.name
+            .as_deref()
+            .or(h.symbol.as_deref())
+            .unwrap_or_default(),
+    );
+    if !name.is_empty() {
+        if let Some(f) = held.iter().find(|f| squeezed_name(&f.name) == name) {
+            return Some(f.asset_id.clone());
+        }
+    }
+    if cost.is_zero() || cost == Decimal::ONE {
+        return None;
+    }
+    let near = |f: &&HeldFund| {
+        (f.average_cost - cost).abs() <= Decimal::new(1, 2)
+            && (f.quantity - quantity).abs()
+                <= quantity.abs() * Decimal::new(5, 2) + Decimal::new(1, 2)
+    };
+    let mut same = held.iter().filter(near);
+    match (same.next(), same.next()) {
+        (Some(f), None) => Some(f.asset_id.clone()),
+        _ => None,
+    }
+}
+
 #[async_trait]
 impl ContractHoldingsTrait for ContractHoldings {
     async fn set_holdings(
@@ -117,6 +212,14 @@ impl ContractHoldingsTrait for ContractHoldings {
         let mut positions = Vec::new();
         // the price of each fund, by its symbol, on its own value date
         let mut prices: Vec<(String, Decimal, String, NaiveDate)> = Vec::new();
+        // the funds the contract already held, from any earlier document
+        let held = held_funds(
+            &self
+                .snapshot_service
+                .get_holdings_keyframes(account_id, None, None)
+                .unwrap_or_default(),
+            &assets,
+        );
         for h in holdings {
             let Some(symbol) = holding_symbol(h) else {
                 continue;
@@ -126,10 +229,20 @@ impl ContractHoldingsTrait for ContractHoldings {
             };
             let price = dec(h.unit_price.as_deref());
             let cost = dec(h.cost_basis.as_deref()).or(price).unwrap_or_default();
-            let known = assets.iter().find(|a| {
-                a.instrument_symbol.as_deref() == Some(symbol.as_str())
-                    && a.quote_mode == crate::assets::QuoteMode::Manual
-            });
+            let known = assets
+                .iter()
+                .find(|a| {
+                    a.instrument_symbol.as_deref() == Some(symbol.as_str())
+                        && a.quote_mode == crate::assets::QuoteMode::Manual
+                })
+                .or_else(|| {
+                    same_fund(&held, h, cost, quantity)
+                        .and_then(|id| assets.iter().find(|a| a.id == id))
+                });
+            // a fund already held under another name (the CSV export and the PDF statement name them differently)
+            let symbol = known
+                .and_then(|a| a.instrument_symbol.clone())
+                .unwrap_or(symbol);
             positions.push(ManualHoldingInput {
                 asset_id: known.map(|a| a.id.clone()),
                 symbol: symbol.clone(),
@@ -232,5 +345,91 @@ impl ContractHoldingsTrait for ContractHoldings {
         self.snapshot_service
             .delete_snapshot_for_account(account_id, &[date])
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn held(asset_id: &str, name: &str, cost: &str, quantity: &str) -> HeldFund {
+        HeldFund {
+            asset_id: asset_id.into(),
+            name: name.into(),
+            average_cost: Decimal::from_str(cost).unwrap(),
+            quantity: Decimal::from_str(quantity).unwrap(),
+        }
+    }
+
+    fn holding(name: &str) -> HoldingPreview {
+        HoldingPreview {
+            isin: None,
+            symbol: Some(name.into()),
+            name: Some(name.into()),
+            quantity: "1".into(),
+            unit_price: None,
+            value: None,
+            cost_basis: None,
+            currency: "EUR".into(),
+            value_date: None,
+            asset_class: "fund".into(),
+        }
+    }
+
+    #[test]
+    fn a_fund_named_differently_is_found_again() {
+        let funds = vec![
+            held("a1", "AMUNDI Actions USA ISR PC", "167.37", "4.09"),
+            held("a2", "EDR Euro Sustainable Equity A", "654.05", "0.54"),
+            held("a3", "FF Global Dividend Fund A", "23.08", "0.01"),
+        ];
+        let d = |s: &str| Decimal::from_str(s).unwrap();
+        // the same name once spaces and case are set aside
+        assert_eq!(
+            same_fund(
+                &funds,
+                &holding("Amundi Actions USA ISR P C"),
+                d("167.37"),
+                d("4.09")
+            )
+            .as_deref(),
+            Some("a1")
+        );
+        // another name, the same cost per unit and units
+        assert_eq!(
+            same_fund(
+                &funds,
+                &holding("EdR Euro Sustainable Growth A"),
+                d("654.05"),
+                d("0.54")
+            )
+            .as_deref(),
+            Some("a2")
+        );
+        assert_eq!(
+            same_fund(
+                &funds,
+                &holding("Fidelity Global Dividend A-MInc(G)-EUR"),
+                d("23.08"),
+                d("0.01")
+            )
+            .as_deref(),
+            Some("a3")
+        );
+        // a new fund stays new
+        assert_eq!(
+            same_fund(
+                &funds,
+                &holding("Carmignac Emergents"),
+                d("1779.74"),
+                d("0.24")
+            ),
+            None
+        );
+        // the same cost but other units: another fund
+        assert_eq!(
+            same_fund(&funds, &holding("Autre fonds"), d("167.37"), d("12")),
+            None
+        );
     }
 }
