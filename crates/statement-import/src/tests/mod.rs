@@ -6,6 +6,7 @@ mod bourso_vie;
 mod bourso_vie_csv;
 mod boursobank;
 mod boursobank_papers;
+mod envelope_positions;
 mod fortuneo;
 mod hellobank;
 mod oradea;

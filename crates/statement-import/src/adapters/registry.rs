@@ -8,6 +8,7 @@
 use serde_json::{Map, Value};
 
 use super::base::{Adapter, ParsedStatement, SourceDocument};
+use super::boursobank::envelopes_csv::EnvelopePositionsCsv;
 use super::boursobank::fees_pdf::BoursoBankFeesPdf;
 use super::boursobank::life_csv::BoursoVieLifePositionsCsv;
 use super::boursobank::life_pdf::{BoursoVieLetterPdf, BoursoVieSituationPdf, BoursoVieYearlyPdf};
@@ -96,6 +97,7 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoManagedOperationsCsv,
     &BoursoManagedPositionsCsv,
     &BoursoManagedCompositionCsv,
+    &EnvelopePositionsCsv,
     &OradeaTaxFormPdf,
     &OradeaPerContributionsPdf,
     &FortuneoStatementPdf,

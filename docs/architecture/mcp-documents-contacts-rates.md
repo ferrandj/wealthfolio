@@ -211,6 +211,14 @@ the securities account "BoursoBank - Épargne pilotée", the others go to it by
 type. Their file names may say otherwise ("fortuneo_…"): only their columns
 count.
 
+### Envelope positions (PEA, PEA-PME, PER)
+
+`boursobank.envelope_positions_csv` reads a positions export whose rows carry
+their bank and envelope (Banque;Enveloppe;Nom;ISIN;Quantité;…;Montant (€)): one
+statement per bank and envelope, holdings on the day in the file name. No
+account number: each goes to the only account of that envelope at that bank
+(account types `pea`, `pea_pme`, `per`), made on the first import.
+
 ### Reading documents again after an update
 
 Each adapter has its own reader version (a fingerprint of its file and every

@@ -150,6 +150,8 @@ fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
         }
         // managed savings (épargne pilotée): its files name no number, it goes by type
         ("positions" | "info", Some("managed")) => Some(account_types::SECURITIES),
+        // an envelope's positions (PEA, PEA-PME, PER) exported without number: the only one of its kind at its bank
+        ("positions", Some("pea" | "pea_pme" | "per")) => Some(account_types::SECURITIES),
         _ => None,
     }
 }
@@ -4452,6 +4454,10 @@ mod tests {
         assert_eq!(own("positions", Some("securities"), None), None);
         assert_eq!(
             own("positions", Some("managed"), None),
+            Some(account_types::SECURITIES)
+        );
+        assert_eq!(
+            own("positions", Some("pea_pme"), None),
             Some(account_types::SECURITIES)
         );
         // the papers of an insurance that protects make its account, even without a number (they go by type)
