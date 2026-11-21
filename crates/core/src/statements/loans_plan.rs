@@ -113,6 +113,8 @@ pub struct OfferData {
 
 #[derive(Debug, Clone, Default)]
 pub struct ScheduleData {
+    /// The day the table was printed, when it says so: of two tables starting on the same instalment, the later one.
+    pub issued_on: Option<NaiveDate>,
     pub reference: Option<String>,
     pub product: Option<String>,
     pub borrower: Option<String>,
@@ -202,6 +204,7 @@ impl ScheduleData {
             })
             .unwrap_or_default();
         Self {
+            issued_on: date_of(v, "issued_on"),
             reference: str_of(v, "reference"),
             product: str_of(v, "product"),
             borrower: str_of(v, "borrower"),
@@ -307,6 +310,8 @@ impl Plan {
 pub struct LoanInput {
     pub offer: Option<OfferData>,
     pub schedule: Vec<DatedRow>,
+    /// The day the table kept in `schedule` was printed.
+    pub schedule_issued_on: Option<NaiveDate>,
     pub schedule_rate: Option<Decimal>,
     pub events: Vec<EventData>,
     /// The date of instalment n°1, typed by the person (it wins over what the papers allow to infer).

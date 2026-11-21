@@ -156,13 +156,21 @@ pub fn assemble_loans(
                 id.0 = id.0.take().or(s.borrower.clone());
                 id.1 = id.1.take().or(s.product.clone());
                 input.schedule_rate = input.schedule_rate.or(s.rate);
-                // several dated tables: the most recent one (the one that starts latest) is the current state
+                // several dated tables: the most recent one (the one that starts latest, else the one printed last) is
+                // the current state
                 let newer = match (input.schedule.first(), s.rows.first()) {
-                    (Some(old), Some(new)) => new.date >= old.date,
+                    (Some(old), Some(new)) if new.date == old.date => {
+                        match (s.issued_on, input.schedule_issued_on) {
+                            (Some(new), Some(old)) => new >= old,
+                            _ => true,
+                        }
+                    }
+                    (Some(old), Some(new)) => new.date > old.date,
                     _ => true,
                 };
                 if newer {
                     input.schedule = s.rows;
+                    input.schedule_issued_on = s.issued_on;
                 }
             }
             _ => {}
@@ -254,4 +262,45 @@ pub fn document_problems(views: &[LoanView], document_id: &str) -> Option<Vec<St
             .map(|c| c.text.clone())
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal::Decimal;
+    use serde_json::json;
+    use std::str::FromStr;
+
+    fn table(id: &str, issued: &str, instalment: &str) -> LoanDocumentData {
+        LoanDocumentData {
+            document_id: id.into(),
+            kind: KIND_SCHEDULE.into(),
+            reference: Some("12345-00012345678".into()),
+            payload: json!({
+                "reference": "12345-00012345678",
+                "issued_on": issued,
+                "rows": [{"date": "2024-12-20", "capital": "100.00", "interest": "1.00", "insurance": "0.00",
+                          "total": instalment, "remaining": "0.00"}]
+            }),
+        }
+    }
+
+    #[test]
+    fn of_two_tables_starting_on_the_same_instalment_the_one_printed_last_is_kept() {
+        let today = NaiveDate::from_ymd_opt(2024, 12, 1).unwrap();
+        let later = table("b", "2024-11-28", "101.00");
+        let earlier = table("a", "2024-11-20", "999.00");
+        for data in [
+            vec![earlier.clone(), later.clone()],
+            vec![later.clone(), earlier.clone()],
+        ] {
+            let loans = assemble_loans(&data, &[], &[], today);
+            let rows = &loans[0].plan.rows;
+            let row = rows
+                .iter()
+                .find(|r| r.date == NaiveDate::from_ymd_opt(2024, 12, 20))
+                .expect("the instalment of the table");
+            assert_eq!(row.total, Decimal::from_str("101.00").unwrap(), "{rows:?}");
+        }
+    }
 }

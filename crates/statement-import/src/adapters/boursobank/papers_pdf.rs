@@ -1003,6 +1003,10 @@ paper_adapter!(
 
 /// Which insurance paper it is, from its title.
 fn insurance_paper(c: &str) -> Option<&'static str> {
+    // the insurance sheet annexed to a loan contract is part of the contract
+    if c.contains("offredecontratdecredit") {
+        return None;
+    }
     if c.starts_with("bulletind'adhesionvalantcertificat") {
         Some("certificate")
     } else if c.contains("vosbesoins-nosconseils") {
