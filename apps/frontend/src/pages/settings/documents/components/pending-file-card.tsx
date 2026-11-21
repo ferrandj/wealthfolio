@@ -1,4 +1,4 @@
-import type { Account } from "@/lib/types";
+import type { Account, AlternativeAssetHolding } from "@/lib/types";
 import type {
   AnalyzedStatement,
   StatementAnalysis,
@@ -18,12 +18,17 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { purgeStatementDocuments } from "@/adapters";
+import { getAlternativeHoldings, purgeStatementDocuments } from "@/adapters";
+import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import {
   ACCOUNT_AUTO,
   ACCOUNT_NEW,
+  defaultLiability,
   formatBytes,
+  isLoanPaper,
+  liabilitiesOf,
+  LIABILITY_NEW,
   needsOverlapDecision,
   overlapsApply,
   type StatementChoice,
@@ -62,21 +67,91 @@ interface Props {
   onRemove: () => void;
 }
 
+/**
+ * A paper of a loan goes to a liability (the loan), not to an account: the one of its loan, one the person already
+ * has, or a new one named after the loan.
+ */
+function LiabilityChoice({
+  statement,
+  choice,
+  liabilities,
+  disabled,
+  onChoose,
+}: {
+  statement: AnalyzedStatement;
+  choice: StatementChoice;
+  liabilities: AlternativeAssetHolding[];
+  disabled: boolean;
+  onChoose: (patch: Partial<StatementChoice>) => void;
+}) {
+  const { t } = useTranslation();
+  const name = statement.preview.accountLabel ?? statement.suggestedAccountName;
+  const value = choice.liability ?? defaultLiability(statement, liabilities);
+  const items = [
+    ...liabilities.map((l) => ({ value: l.id, label: l.name })),
+    { value: LIABILITY_NEW, label: t("settings:documents.liability_new", { name }) },
+  ];
+  return (
+    <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+        <Select
+          items={items}
+          value={value}
+          onValueChange={(v) => onChoose({ liability: String(v), skip: false })}
+          disabled={disabled || choice.skip}
+        >
+          <SelectTrigger aria-label={t("settings:documents.liability")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant={choice.skip ? "default" : "ghost"}
+          size="sm"
+          disabled={disabled}
+          onClick={() => onChoose({ skip: !choice.skip })}
+        >
+          {choice.skip ? t("settings:documents.include") : t("settings:documents.skip")}
+        </Button>
+      </div>
+      {value === LIABILITY_NEW && !choice.skip && (
+        <Input
+          value={choice.newAccountName}
+          placeholder={name}
+          aria-label={t("settings:documents.liability_name")}
+          disabled={disabled}
+          onChange={(e) => onChoose({ newAccountName: e.target.value })}
+        />
+      )}
+    </div>
+  );
+}
+
 function StatementBlock({
   statement,
   choice,
   accounts,
+  liabilities,
   disabled,
   onChoose,
 }: {
   statement: AnalyzedStatement;
   choice: StatementChoice;
   accounts: Account[];
+  liabilities: AlternativeAssetHolding[];
   disabled: boolean;
   onChoose: (patch: Partial<StatementChoice>) => void;
 }) {
   const { t } = useTranslation();
   const { preview } = statement;
+  const loanPaper = isLoanPaper(statement);
   const items = [
     {
       value: ACCOUNT_AUTO,
@@ -186,36 +261,46 @@ function StatementBlock({
         </div>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
-        <Select
-          items={items}
-          value={choice.account}
-          onValueChange={(value) => onChoose({ account: String(value), skip: false })}
-          disabled={disabled || choice.skip}
-        >
-          <SelectTrigger aria-label={t("settings:documents.account")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          type="button"
-          variant={choice.skip ? "default" : "ghost"}
-          size="sm"
+      {loanPaper ? (
+        <LiabilityChoice
+          statement={statement}
+          choice={choice}
+          liabilities={liabilities}
           disabled={disabled}
-          onClick={() => onChoose({ skip: !choice.skip })}
-        >
-          {choice.skip ? t("settings:documents.include") : t("settings:documents.skip")}
-        </Button>
-      </div>
+          onChoose={onChoose}
+        />
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+          <Select
+            items={items}
+            value={choice.account}
+            onValueChange={(value) => onChoose({ account: String(value), skip: false })}
+            disabled={disabled || choice.skip}
+          >
+            <SelectTrigger aria-label={t("settings:documents.account")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant={choice.skip ? "default" : "ghost"}
+            size="sm"
+            disabled={disabled}
+            onClick={() => onChoose({ skip: !choice.skip })}
+          >
+            {choice.skip ? t("settings:documents.include") : t("settings:documents.skip")}
+          </Button>
+        </div>
+      )}
 
-      {choice.account === ACCOUNT_NEW && !choice.skip && (
+      {!loanPaper && choice.account === ACCOUNT_NEW && !choice.skip && (
         <Input
           value={choice.newAccountName}
           placeholder={statement.suggestedAccountName}
@@ -261,6 +346,12 @@ export function PendingFileCard({
 }: Props) {
   const { t } = useTranslation();
   const analysis = file.analysis;
+  const { data: holdings = [] } = useQuery({
+    queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS],
+    queryFn: getAlternativeHoldings,
+    enabled: !!analysis?.statements.some(isLoanPaper),
+  });
+  const liabilities = liabilitiesOf(holdings);
   const busy = file.status === "analyzing" || file.status === "importing";
   const info = analysis?.analysis;
   const needsReading = !!info && !info.chosenAdapterId && info.candidates.length > 0;
@@ -409,6 +500,7 @@ export function PendingFileCard({
               key={statement.preview.index}
               statement={statement}
               accounts={accounts}
+              liabilities={liabilities}
               disabled={busy}
               choice={
                 file.choices[statement.preview.index] ?? {
