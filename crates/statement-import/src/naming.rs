@@ -39,7 +39,8 @@ pub fn account_type_label(account_type: Option<&str>) -> &'static str {
         "per" => "PER",
         "mortgage" | "loan" => "Crédit",
         "pea" => "PEA",
-        "cto" => "Compte-titres",
+        "cto" | "securities" => "Compte-titres",
+        "managed" => "Épargne pilotée",
         "crypto_exchange" => "Crypto",
         _ => "Compte",
     }

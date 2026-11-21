@@ -14,6 +14,9 @@ use super::boursobank::life_pdf::{BoursoVieLetterPdf, BoursoVieSituationPdf, Bou
 use super::boursobank::loan_pdf::{
     BoursoBankLoanContractPdf, BoursoBankLoanSchedulePdf, BoursoBankLoanYearlyPdf,
 };
+use super::boursobank::managed::{
+    BoursoManagedCompositionCsv, BoursoManagedOperationsCsv, BoursoManagedPositionsCsv,
+};
 use super::boursobank::papers_pdf::{
     BoursoBankAccountCertificatePdf, BoursoBankCardRequestPdf, BoursoBankHomeSavingsSituationPdf,
     BoursoBankInsurancePaperPdf, BoursoBankLoanInformationPdf, BoursoBankMobilityMandatePdf,
@@ -90,6 +93,9 @@ pub static ADAPTERS: &[&dyn Adapter] = &[
     &BoursoSecuritiesPositionsCsv,
     &BoursoSecuritiesOperationsCsv,
     &BoursoSecuritiesPerformanceCsv,
+    &BoursoManagedOperationsCsv,
+    &BoursoManagedPositionsCsv,
+    &BoursoManagedCompositionCsv,
     &OradeaTaxFormPdf,
     &OradeaPerContributionsPdf,
     &FortuneoStatementPdf,

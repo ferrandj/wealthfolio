@@ -200,6 +200,17 @@ daily value of the portfolio (`boursobank.securities_performance_csv`) is kept
 with the account (one value per month end). The exports name no account: they
 go to the only securities account at BoursoBank.
 
+### BoursoBank Épargne pilotée
+
+The managed savings' exports: operations (`boursobank.managed_operations_csv`,
+transfers in and subscriptions with units and unit value), holdings
+(`boursobank.managed_positions_csv`, each fund on its value date) and the
+composition of the fund (`boursobank.managed_composition_csv`, kept with the
+account). They name no account (account type `managed`): the first one makes
+the securities account "BoursoBank - Épargne pilotée", the others go to it by
+type. Their file names may say otherwise ("fortuneo_…"): only their columns
+count.
+
 ### Reading documents again after an update
 
 Each adapter has its own reader version (a fingerprint of its file and every

@@ -148,6 +148,8 @@ fn own_account_type(preview: &StatementPreview) -> Option<&'static str> {
         ("positions" | "info", Some("securities")) if preview.account_number.is_some() => {
             Some(account_types::SECURITIES)
         }
+        // managed savings (épargne pilotée): its files name no number, it goes by type
+        ("positions" | "info", Some("managed")) => Some(account_types::SECURITIES),
         _ => None,
     }
 }
@@ -232,7 +234,12 @@ fn is_bank_paper(preview: &StatementPreview) -> bool {
 fn suggested_type(mode: ImportMode, preview: &StatementPreview) -> String {
     match mode {
         // the operations of a securities account (purchases, sales, coupons) belong to a securities account
-        ImportMode::Transactions if preview.account_type.as_deref() == Some("securities") => {
+        ImportMode::Transactions
+            if matches!(
+                preview.account_type.as_deref(),
+                Some("securities" | "managed")
+            ) =>
+        {
             account_types::SECURITIES.to_string()
         }
         ImportMode::Transactions => account_types::CASH.to_string(),
@@ -4443,6 +4450,10 @@ mod tests {
             Some(account_types::SECURITIES)
         );
         assert_eq!(own("positions", Some("securities"), None), None);
+        assert_eq!(
+            own("positions", Some("managed"), None),
+            Some(account_types::SECURITIES)
+        );
         // the papers of an insurance that protects make its account, even without a number (they go by type)
         assert_eq!(
             own("info", Some("prevoyance"), None),
